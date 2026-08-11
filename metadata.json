@@ -1,0 +1,6 @@
+{
+  "name": "TimeSnap Pro",
+  "description": "Hệ thống Quản lý Chấm công & Lương Cá nhân chuyên nghiệp với giao diện Dark Mode",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

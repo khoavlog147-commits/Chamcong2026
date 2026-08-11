@@ -1,0 +1,2 @@
+sed -i 's/"companyCode" to config.companyCode,/"companyCode" to config.companyCode,\n            "roleId" to config.roleId,\n            "roleName" to config.roleName,/g' app/src/main/java/com/example/data/FirestoreService.kt
+sed -i 's/companyCode = getString("companyCode") ?: "DEFAULT",/companyCode = getString("companyCode") ?: "DEFAULT",\n        roleId = getString("roleId") ?: "",\n        roleName = getString("roleName") ?: "",/g' app/src/main/java/com/example/data/FirestoreService.kt

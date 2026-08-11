@@ -1,0 +1,2 @@
+sed -i 's/"tinhKhauTruNghi" to company.tinhKhauTruNghi,/"tinhKhauTruNghi" to company.tinhKhauTruNghi,\n            "rolesData" to company.rolesData,/g' app/src/main/java/com/example/data/FirestoreService.kt
+sed -i 's/tinhKhauTruNghi = getBoolean("tinhKhauTruNghi") ?: false,/tinhKhauTruNghi = getBoolean("tinhKhauTruNghi") ?: false,\n        rolesData = getString("rolesData") ?: "",/g' app/src/main/java/com/example/data/FirestoreService.kt

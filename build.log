@@ -1,0 +1,43 @@
+Initialized native services in: /opt/gradle/.gradle/native
+Initialized jansi services in: /opt/gradle/.gradle/native
+The client will now receive all logging from the daemon (pid: 107). The daemon log file: /opt/gradle/.gradle/daemon/9.3.1/daemon-107.out.log
+Starting 8th build in daemon [uptime: 5 mins 22.441 secs, performance: 96%, GC rate: 0.00/s, heap usage: 0% of 4 GiB]
+Using 4 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=true, configureOnDemand=false, configurationCache=true, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=true, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Encryption key source: default Gradle keystore (pkcs12)
+Reusing configuration cache.
+Watching the file system is configured to be enabled if available
+Unable to list file systems to check whether they can be watched. Disabling watching. Reason: Could not query file systems: could not open mount file (errno 2: No such file or directory)
+File system watching is inactive
+Using local directory build cache for the root build (location = /opt/gradle/.gradle/caches/build-cache-1, remove unused entries = after 7 days).
+Tasks to be executed: [task ':app:preBuild', task ':app:preDebugBuild', task ':app:generateDebugBuildConfig', task ':app:kspDebugKotlin']
+Tasks that were excluded: []
+Resolve mutations for :app:preBuild (Thread[#417,Execution worker,5,main]) started.
+:app:preBuild (Thread[#417,Execution worker,5,main]) started.
+
+> Task :app:preBuild UP-TO-DATE
+Skipping task ':app:preBuild' as it has no actions.
+Resolve mutations for :app:preDebugBuild (Thread[#417,Execution worker,5,main]) started.
+Build 138a13cb-ab73-4781-8be7-927928eeff23 is started
+:app:preDebugBuild (Thread[#416,included builds,5,main]) started.
+
+> Task :app:preDebugBuild UP-TO-DATE
+Skipping task ':app:preDebugBuild' as it has no actions.
+Resolve mutations for :app:generateDebugBuildConfig (Thread[#416,included builds,5,main]) started.
+:app:generateDebugBuildConfig (Thread[#416,included builds,5,main]) started.
+
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+Build cache key for task ':app:generateDebugBuildConfig' is 81e92e314af4a1524170a91295d600e7
+Skipping task ':app:generateDebugBuildConfig' as it is up-to-date.
+Resolve mutations for :app:kspDebugKotlin (Thread[#416,included builds,5,main]) started.
+:app:kspDebugKotlin (Thread[#416,included builds,5,main]) started.
+
+> Task :app:kspDebugKotlin FAILED
+Build cache key for task ':app:kspDebugKotlin' is ad32528936e5c2ba9aec0718f5519018
+Task ':app:kspDebugKotlin' is not up-to-date because:
+  Task has failed previously.
+The input changes require a full rebuild for incremental task ':app:kspDebugKotlin'.
+e: [ksp] [MissingType]: Element 'com.example.data.AppDatabase' references a type that is not present
+Build 138a13cb-ab73-4781-8be7-927928eeff23 is closed
+2 actionable tasks: 1 executed, 1 up-to-date
+Configuration cache entry reused.
