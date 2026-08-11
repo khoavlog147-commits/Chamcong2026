@@ -5,6 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,11 +24,43 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Build Debug APK
+    - name: Configure google-services.json from Secret
+      run: |
+        if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+          echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > app/google-services.json
+          echo "Created app/google-services.json from secret."
+        else
+          echo "Warning: GOOGLE_SERVICES_JSON secret not found. Checking existing file..."
+        fi
+
+    - name: Configure .env from Secret
+      run: |
+        if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" > .env
+          echo "Configured .env with GEMINI_API_KEY from secret."
+        elif [ -f ".env.example" ]; then
+          cp .env.example .env
+          echo "Copied .env.example to .env."
+        fi
+
+    - name: Configure Keystore from Secret
+      run: |
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-upload-key.jks
+          echo "Decoded keystore from secret."
+        fi
+
+    - name: Build Android APK
+      env:
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
       run: gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/**/*.apk
+
