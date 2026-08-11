@@ -28,42 +28,12 @@ jobs:
       env:
         GOOGLE_SERVICES_DATA: ${{ secrets.GOOGLE_SERVICES_JSON }}
       run: |
+        mkdir -p app
         if [ -n "$GOOGLE_SERVICES_DATA" ]; then
-          mkdir -p app
           printf '%s\n' "$GOOGLE_SERVICES_DATA" > app/google-services.json
           echo "Created app/google-services.json from secret."
         elif [ ! -f "app/google-services.json" ]; then
-          cat << 'EOF' > app/google-services.json
-{
-  "project_info": {
-    "project_number": "123456789012",
-    "project_id": "placeholder",
-    "storage_bucket": "placeholder.appspot.com"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890",
-        "android_client_info": {
-          "package_name": "com.aistudio.timesnappro.vklypa"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "placeholder"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
-}
-EOF
+          echo '{"project_info":{"project_number":"123456789012","project_id":"timesnappro-placeholder","storage_bucket":"timesnappro-placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef1234567890","android_client_info":{"package_name":"com.aistudio.timesnappro.vklypa"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyMockKeyForLocalStudioBuildOnly"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
           echo "Created fallback placeholder app/google-services.json for build."
         fi
 
