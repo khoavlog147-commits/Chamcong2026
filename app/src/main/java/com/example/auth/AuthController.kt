@@ -142,14 +142,18 @@ class AuthController(
                                             repository.insertDefaultConfig(user.uid, name, cleanEmail, cleanMaNhanVien, company)
                                             
                                             // Save the registration mappings
-                                            sharedPrefs.edit()
+                                            val oldUid = sharedPrefs.getString("last_logged_in_uid", "local_user") ?: "local_user"
+                                            val editor = sharedPrefs.edit()
                                                 .putString("email_of_employee_$cleanMaNhanVien", cleanEmail)
                                                 .putString("maNhanVien_of_email_$cleanEmail", cleanMaNhanVien)
                                                 .putBoolean("manually_logged_out", false)
                                                 .putString("last_logged_in_uid", user.uid)
                                                 .putString("last_logged_in_email", user.email ?: cleanEmail)
                                                 .putString("last_logged_in_name", name)
-                                                .apply()
+                                            if (oldUid.startsWith("local") || oldUid == "local_user") {
+                                                editor.putString("pending_migration_guest_uid", oldUid)
+                                            }
+                                            editor.apply()
                                             
                                             val session = UserSession(
                                                 uid = user.uid,
@@ -251,12 +255,16 @@ class AuthController(
                                     displayName = user.displayName ?: "User"
                                 )
                             _currentUserFlow.value = session
-                            sharedPrefs.edit()
+                            val oldUid = sharedPrefs.getString("last_logged_in_uid", "local_user") ?: "local_user"
+                            val editor = sharedPrefs.edit()
                                 .putBoolean("manually_logged_out", false)
                                 .putString("last_logged_in_uid", session.uid)
                                 .putString("last_logged_in_email", session.email)
                                 .putString("last_logged_in_name", session.displayName)
-                                .apply()
+                            if (oldUid.startsWith("local") || oldUid == "local_user") {
+                                editor.putString("pending_migration_guest_uid", oldUid)
+                            }
+                            editor.apply()
                                     
                             CoroutineScope(Dispatchers.IO).launch {
                                 try {

@@ -984,7 +984,9 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         if (newUserId == "local_user" || newUserId.startsWith("local")) return
         try {
             val sharedPrefs = getApplication<Application>().getSharedPreferences("timesnap_auth", android.content.Context.MODE_PRIVATE)
-            val lastUid = sharedPrefs.getString("last_logged_in_uid", "local_user") ?: "local_user"
+            val pendingGuestUid = sharedPrefs.getString("pending_migration_guest_uid", null)
+            val lastUid = pendingGuestUid ?: sharedPrefs.getString("last_logged_in_uid", "local_user") ?: "local_user"
+            
             if (lastUid != newUserId && lastUid.startsWith("local")) {
                 val guestEntries = repository.getEntries(lastUid).first()
                 if (guestEntries.isNotEmpty()) {
@@ -1002,6 +1004,9 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                         database.timeEntryDao().clearAllForUser(lastUid)
                     }
                 }
+            }
+            if (pendingGuestUid != null) {
+                sharedPrefs.edit().remove("pending_migration_guest_uid").apply()
             }
         } catch (e: Exception) {
             android.util.Log.e("TimeSnapViewModel", "Failed to migrate guest data: ${e.message}")

@@ -769,6 +769,8 @@ object FirestoreService {
                     try {
                         firestore.collection("app_config").document("version_control")
                             .get().awaitTaskFirestore()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         val exMessage = e.message ?: "Unknown Firestore error"
                         errors.add("Firestore: $exMessage")
@@ -786,6 +788,8 @@ object FirestoreService {
             } else {
                 errors.add("Firestore instance null")
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Throwable) {
             errors.add("Firestore exception: ${e.message}")
             Log.e(TAG, "fetchPublishedVersion (Firestore) failed: ${e.message}")
@@ -798,6 +802,8 @@ object FirestoreService {
             val snap = kotlinx.coroutines.withTimeoutOrNull(3000) {
                 try {
                     ref.get().awaitTaskFirestore()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     val exMessage = e.message ?: "Unknown RTDB error"
                     errors.add("RTDB: $exMessage")
@@ -812,6 +818,8 @@ object FirestoreService {
             } else if (snap != null && !snap.exists()) {
                 errors.add("RTDB: node empty")
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Throwable) {
             errors.add("RTDB exception: ${e.message}")
             Log.e(TAG, "fetchPublishedVersion (RTDB) failed: ${e.message}")
