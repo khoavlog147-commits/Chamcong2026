@@ -1,3 +1,5 @@
+import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -127,6 +129,10 @@ dependencies {
   // debugImplementation(libs.androidx.compose.ui.tooling) // Already in main implementation
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}
+
+googleServices {
+  missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
 }
 
 
