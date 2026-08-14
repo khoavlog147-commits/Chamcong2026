@@ -45,7 +45,7 @@ object NotificationHelper {
     }
 
     // Hiển thị thông báo ngay lập tức
-    fun showNotification(context: Context, title: String, message: String, notificationId: Int) {
+    fun showNotification(context: Context, title: String, message: String, notificationId: Int, uid: String? = null) {
         createNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -70,6 +70,55 @@ object NotificationHelper {
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, builder.build())
+
+        // Lưu vào cache để hiển thị trong Notification Center của ứng dụng nếu có UID
+        if (!uid.isNullOrBlank()) {
+            val type = when (notificationId) {
+                1001 -> "SHIFT_REMINDER" // Nhắc nhở check-in
+                1002 -> "SHIFT_REMINDER" // Nhắc nhở check-out hoặc tự động ra ca
+                1003 -> "AUTO_TIME_APPROVED" // Tự động vào ca
+                else -> "SHIFT_REMINDER"
+            }
+            addLocalNotificationToCache(context, uid, title, message, type)
+        }
+    }
+
+    // Thêm thông báo vào cache cục bộ của Notification Center
+    fun addLocalNotificationToCache(context: Context, uid: String, title: String, message: String, type: String) {
+        try {
+            val prefs = context.getSharedPreferences("admin_notif_prefs_v2", Context.MODE_PRIVATE)
+            val cachedJson = prefs.getString("cached_notifs_$uid", "") ?: ""
+            val list = mutableListOf<org.json.JSONObject>()
+            
+            if (cachedJson.isNotBlank()) {
+                val array = org.json.JSONArray(cachedJson)
+                for (i in 0 until array.length()) {
+                    list.add(array.getJSONObject(i))
+                }
+            }
+            
+            val newNotif = org.json.JSONObject().apply {
+                put("id", "local_" + java.util.UUID.randomUUID().toString())
+                put("targetUid", uid)
+                put("targetName", "Cá nhân")
+                put("title", title)
+                put("message", message)
+                put("type", type)
+                put("createdAt", System.currentTimeMillis())
+                put("sentBy", "Hệ thống")
+            }
+            
+            list.add(0, newNotif)
+            val limitedList = if (list.size > 100) list.subList(0, 100) else list
+            
+            val newArray = org.json.JSONArray()
+            limitedList.forEach { newArray.put(it) }
+            
+            prefs.edit().putString("cached_notifs_$uid", newArray.toString()).apply()
+            android.util.Log.d("NotificationHelper", "Đã thêm thông báo nội bộ vào cache cho $uid: $title")
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Lỗi thêm thông báo local vào cache: ${e.message}", e)
+        }
     }
 
     // Kiểm tra quyền thông báo (Android 13+ / API 33+)

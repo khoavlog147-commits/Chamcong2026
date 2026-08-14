@@ -122,7 +122,8 @@ class ReminderWorker(
                         context = context,
                         title = "🔔 Nhắc nhở vào ca làm việc",
                         message = "Đã đến giờ vào ca của bạn rồi! Hãy nhanh chóng check-in trên ứng dụng nhé.",
-                        notificationId = 1001
+                        notificationId = 1001,
+                        uid = uid
                     )
 
                     // 4. Lên lịch tiếp theo
@@ -145,7 +146,8 @@ class ReminderWorker(
                             context = context,
                             title = "🔔 Nhắc nhở ra ca làm việc",
                             message = "Đã hết thời gian ca làm việc dự kiến của bạn. Hãy thực hiện check-out để ghi nhận đầy đủ giờ công nhé!",
-                            notificationId = 1002
+                            notificationId = 1002,
+                            uid = uid
                         )
                     } else {
                         android.util.Log.d("ReminderWorker", "Nhân viên đã check-out thủ công hoặc không có ca làm việc hoạt động, bỏ qua thông báo.")

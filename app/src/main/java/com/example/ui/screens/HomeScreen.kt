@@ -2174,14 +2174,23 @@ private fun calculateRecent7Days(entries: List<TimeEntry>): List<DayChartPoint> 
 
     return dates.map { (label, dateStr) ->
         val entity = entries.find { it.date == dateStr }
-        val hours = if (entity != null && entity.checkInTime != null && entity.checkOutTime != null) {
-            val elapsed = entity.checkOutTime - entity.checkInTime
-            val actual = elapsed / 3600000.0
-            
-            if (actual <= 8.5) {
-                actual.coerceAtMost(8.0)
+        val hours = if (entity != null && entity.checkInTime != null) {
+            if (entity.checkOutTime != null) {
+                val elapsed = entity.checkOutTime - entity.checkInTime
+                val actual = elapsed / 3600000.0
+                if (actual <= 8.5) {
+                    actual.coerceAtMost(8.0)
+                } else {
+                    actual
+                }
             } else {
-                actual
+                val elapsed = System.currentTimeMillis() - entity.checkInTime
+                val actual = (elapsed / 3600000.0).coerceAtLeast(0.0)
+                if (actual <= 8.5) {
+                    actual.coerceAtMost(8.0)
+                } else {
+                    actual
+                }
             }
         } else {
             0.0
@@ -2212,13 +2221,23 @@ private fun calculateMonthlyChartData(selectedMonth: String, entries: List<TimeE
 
         val entity = entries.find { it.date == dateStr1 || it.date == dateStr2 }
         val hours = if (entity != null) {
-            if (entity.checkInTime != null && entity.checkOutTime != null) {
-                val elapsed = entity.checkOutTime - entity.checkInTime
-                val actual = elapsed / 3600000.0
-                if (actual <= 8.5) {
-                    actual.coerceAtMost(8.0)
+            if (entity.checkInTime != null) {
+                if (entity.checkOutTime != null) {
+                    val elapsed = entity.checkOutTime - entity.checkInTime
+                    val actual = elapsed / 3600000.0
+                    if (actual <= 8.5) {
+                        actual.coerceAtMost(8.0)
+                    } else {
+                        actual
+                    }
                 } else {
-                    actual
+                    val elapsed = System.currentTimeMillis() - entity.checkInTime
+                    val actual = (elapsed / 3600000.0).coerceAtLeast(0.0)
+                    if (actual <= 8.5) {
+                        actual.coerceAtMost(8.0)
+                    } else {
+                        actual
+                    }
                 }
             } else {
                 (entity.workDay * 8.0) + entity.otHours

@@ -88,7 +88,8 @@ class AutoCheckOutWorker(
                     context = context,
                     title = "Bạn đã ra ca",
                     message = "Bạn đã làm $formattedHours tiếng.",
-                    notificationId = 1002
+                    notificationId = 1002,
+                    uid = uid
                 )
             } else {
                 android.util.Log.d("AutoCheckOutWorker", "Không tìm thấy ca làm việc active nào để tự động ra ca.")

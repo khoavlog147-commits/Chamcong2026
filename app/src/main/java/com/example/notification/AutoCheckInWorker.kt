@@ -113,7 +113,8 @@ class AutoCheckInWorker(
                     context = context,
                     title = "Bạn đã vào ca",
                     message = "Lúc $timeStr",
-                    notificationId = 1003
+                    notificationId = 1003,
+                    uid = uid
                 )
 
                 // Nếu bật tự động ra ca, lên lịch auto checkout cho ca này
