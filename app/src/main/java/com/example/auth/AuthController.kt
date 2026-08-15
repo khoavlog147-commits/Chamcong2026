@@ -28,9 +28,14 @@ class AuthController(
     private val repository: TimeRepository
 ) {
     private val firebaseAuth: com.google.firebase.auth.FirebaseAuth? = try {
-        com.google.firebase.auth.FirebaseAuth.getInstance()
+        val app = try {
+            FirebaseApp.getInstance()
+        } catch (e: Exception) {
+            FirebaseApp.initializeApp(context)
+        }
+        if (app != null) com.google.firebase.auth.FirebaseAuth.getInstance(app) else null
     } catch (e: Throwable) {
-        Log.e("AuthController", "Firebase Auth initialization failed: ${e.message}")
+        Log.w("AuthController", "Firebase Auth not active or initialized: ${e.message}")
         null
     }
     private val cloudSyncManager = CloudSyncManager(context)

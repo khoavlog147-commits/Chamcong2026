@@ -6,5 +6,4 @@ plugins {
     alias(libs.plugins.roborazzi) apply false
     alias(libs.plugins.secrets) apply false
     alias(libs.plugins.play.services.google.services) apply false
-    id("org.jetbrains.kotlin.android") version libs.versions.kotlin apply false
 }
