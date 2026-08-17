@@ -211,19 +211,21 @@ fun HomeScreen(
     onNavigateToNotifications: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val notificationPrefs = remember(context) { context.getSharedPreferences("notification_prefs", android.content.Context.MODE_PRIVATE) }
-    var notificationsEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
-    var autoClockInOutEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
-    var reminderMinutes by remember { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
+    val userSession by viewModel.currentUserSession.collectAsStateWithLifecycle()
+    val currentUid = userSession?.uid
+    val notificationPrefs = remember(context, currentUid) { com.example.notification.NotificationHelper.getPrefs(context, currentUid) }
+    var notificationsEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
+    var autoClockInOutEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
+    var reminderMinutes by remember(currentUid) { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
     var showReminderDialog by remember { mutableStateOf(false) }
 
     var showNotificationConfigDialog by remember { mutableStateOf(false) }
     var showAutoCheckoutSetupDialog by remember { mutableStateOf(false) }
-    var autoCheckoutEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("auto_checkout_enabled", false)) }
-    var customCheckoutTime by remember { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
+    var autoCheckoutEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("auto_checkout_enabled", false)) }
+    var customCheckoutTime by remember(currentUid) { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
 
     // Refresh settings when returning to screen or dialog closes
-    LaunchedEffect(showNotificationConfigDialog) {
+    LaunchedEffect(showNotificationConfigDialog, currentUid) {
         notificationsEnabled = notificationPrefs.getBoolean("notifications_enabled", true)
         autoClockInOutEnabled = notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)
         autoCheckoutEnabled = notificationPrefs.getBoolean("auto_checkout_enabled", false)
@@ -233,7 +235,6 @@ fun HomeScreen(
 
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    val userSession by viewModel.currentUserSession.collectAsStateWithLifecycle()
     val activeEntry by viewModel.activeWorkingEntry.collectAsStateWithLifecycle()
     val runningTimeText by viewModel.runningDurationText.collectAsStateWithLifecycle()
     val summaryState by viewModel.salarySummaryState.collectAsStateWithLifecycle()
@@ -1335,18 +1336,24 @@ fun HomeScreen(
     }
 
     if (showNotificationConfigDialog) {
-        val notificationPrefs = remember(context) { context.getSharedPreferences("notification_prefs", android.content.Context.MODE_PRIVATE) }
-        var notificationsEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
-        var reminderMinutes by remember { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
+        val currentUid = userSession?.uid
+        val notificationPrefs = remember(context, currentUid) { com.example.notification.NotificationHelper.getPrefs(context, currentUid) }
+        var notificationsEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
+        var reminderMinutes by remember(currentUid) { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
         
-        var autoClockInOutEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
-        var customCheckInTime by remember { mutableStateOf(notificationPrefs.getString("custom_check_in_time", "") ?: "") }
-        var customCheckoutTime by remember { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
+        var autoClockInOutEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
+        var customCheckInTime by remember(currentUid) { mutableStateOf(notificationPrefs.getString("custom_check_in_time", "") ?: "") }
+        var customCheckoutTime by remember(currentUid) { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
 
-        var estimatedInTime by remember { mutableStateOf("Đang tính...") }
-        var estimatedOutTime by remember { mutableStateOf("Đang tính...") }
+        var shiftRotationWeeks by remember(currentUid) { mutableStateOf(notificationPrefs.getInt("shift_rotation_weeks", 2)) }
+        var rotationWeeksTf by remember(currentUid, shiftRotationWeeks) { mutableStateOf(TextFieldValue(shiftRotationWeeks.toString())) }
+        var shiftAnchorTime by remember(currentUid) { mutableStateOf(notificationPrefs.getLong("shift_anchor_time", System.currentTimeMillis())) }
+        var shiftAnchorType by remember(currentUid) { mutableStateOf(notificationPrefs.getString("shift_anchor_type", "DAY") ?: "DAY") }
 
-        LaunchedEffect(Unit) {
+        var estimatedInTime by remember(currentUid) { mutableStateOf("Đang tính...") }
+        var estimatedOutTime by remember(currentUid) { mutableStateOf("Đang tính...") }
+
+        LaunchedEffect(currentUid) {
             userSession?.let { session ->
                 val inMs = com.example.notification.NotificationHelper.estimateHistoricalCheckInTime(context, session.uid)
                 estimatedInTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(inMs))
@@ -1615,8 +1622,6 @@ fun HomeScreen(
                             )
 
                             // Input Chu kỳ đổi ca (tuần)
-                            var shiftRotationWeeks by remember { mutableStateOf(notificationPrefs.getInt("shift_rotation_weeks", 2)) }
-                            var rotationWeeksTf by remember { mutableStateOf(TextFieldValue(shiftRotationWeeks.toString())) }
                             OutlinedTextField(
                                 value = rotationWeeksTf,
                                 onValueChange = { newVal ->
@@ -1665,8 +1670,6 @@ fun HomeScreen(
                             )
 
                             // Cấu hình Ngày mốc và Ca mốc bắt đầu
-                            var shiftAnchorTime by remember { mutableStateOf(notificationPrefs.getLong("shift_anchor_time", System.currentTimeMillis())) }
-                            var shiftAnchorType by remember { mutableStateOf(notificationPrefs.getString("shift_anchor_type", "DAY") ?: "DAY") }
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

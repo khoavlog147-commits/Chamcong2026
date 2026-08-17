@@ -425,7 +425,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         val todayStr = dateFormatter.format(Date())
 
         viewModelScope.launch(Dispatchers.IO) {
-            val sharedPrefs = getApplication<Application>().getSharedPreferences("notification_prefs", android.content.Context.MODE_PRIVATE)
+            val sharedPrefs = com.example.notification.NotificationHelper.getPrefs(getApplication<Application>(), session.uid)
             val isAutoCheckoutEnabled = enableAutoCheckout ?: sharedPrefs.getBoolean("auto_checkout_enabled", false)
             val storedCustomTime = customCheckoutTime ?: sharedPrefs.getString("custom_checkout_time", "") ?: ""
             val active = repository.getActiveEntry(session.uid)
@@ -1701,7 +1701,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
                 // Phát sinh thông báo hệ thống nếu có thông báo mới tinh
                 val context = getApplication<Application>()
-                val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+                val sharedPrefs = com.example.notification.NotificationHelper.getPrefs(context, uid)
                 val lastCheckTime = sharedPrefs.getLong("admin_notif_last_check_${uid}", 0L)
 
                 var newestTimestamp = lastCheckTime

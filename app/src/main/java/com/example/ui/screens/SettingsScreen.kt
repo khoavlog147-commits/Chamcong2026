@@ -994,20 +994,26 @@ fun SettingsScreen(
             // CATEGORY 5: CẤU HÌNH NHẮC NHỞ CHẤM CÔNG (Notification Config)
             val keyboardController = LocalSoftwareKeyboardController.current
             val focusManager = LocalFocusManager.current
-            val notificationPrefs = LocalContext.current.getSharedPreferences("notification_prefs", android.content.Context.MODE_PRIVATE)
-            var notificationsEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
-            var smartLearningEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("smart_learning_enabled", true)) }
-            var reminderMinutes by remember { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
+            val currentUid = sessionState?.uid
+            val notificationPrefs = remember(context, currentUid) { com.example.notification.NotificationHelper.getPrefs(context, currentUid) }
+            var notificationsEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("notifications_enabled", true)) }
+            var smartLearningEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("smart_learning_enabled", true)) }
+            var reminderMinutes by remember(currentUid) { mutableStateOf(notificationPrefs.getString("reminder_minutes_before", "15") ?: "15") }
             var showMinutesPickerDialog by remember { mutableStateOf(false) }
 
-            var autoClockInOutEnabled by remember { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
-            var customCheckInTime by remember { mutableStateOf(notificationPrefs.getString("custom_check_in_time", "") ?: "") }
-            var customCheckoutTime by remember { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
+            var autoClockInOutEnabled by remember(currentUid) { mutableStateOf(notificationPrefs.getBoolean("auto_clock_in_out_enabled", false)) }
+            var customCheckInTime by remember(currentUid) { mutableStateOf(notificationPrefs.getString("custom_check_in_time", "") ?: "") }
+            var customCheckoutTime by remember(currentUid) { mutableStateOf(notificationPrefs.getString("custom_checkout_time", "") ?: "") }
 
-            var estimatedInTime by remember { mutableStateOf("07:30") }
-            var estimatedOutTime by remember { mutableStateOf("17:30") }
+            var estimatedInTime by remember(currentUid) { mutableStateOf("07:30") }
+            var estimatedOutTime by remember(currentUid) { mutableStateOf("17:30") }
 
-            LaunchedEffect(Unit) {
+            var shiftRotationWeeks by remember(currentUid) { mutableStateOf(notificationPrefs.getInt("shift_rotation_weeks", 2)) }
+            var rotationWeeksTf by remember(currentUid, shiftRotationWeeks) { mutableStateOf(TextFieldValue(shiftRotationWeeks.toString())) }
+            var shiftAnchorTime by remember(currentUid) { mutableStateOf(notificationPrefs.getLong("shift_anchor_time", System.currentTimeMillis())) }
+            var shiftAnchorType by remember(currentUid) { mutableStateOf(notificationPrefs.getString("shift_anchor_type", "DAY") ?: "DAY") }
+
+            LaunchedEffect(currentUid) {
                 sessionState?.let { session ->
                     val inMs = com.example.notification.NotificationHelper.estimateHistoricalCheckInTime(context, session.uid)
                     estimatedInTime = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(inMs))
@@ -1276,8 +1282,6 @@ fun SettingsScreen(
                             )
 
                             // Input Chu kỳ đổi ca (tuần)
-                            var shiftRotationWeeks by remember { mutableStateOf(notificationPrefs.getInt("shift_rotation_weeks", 2)) }
-                            var rotationWeeksTf by remember { mutableStateOf(TextFieldValue(shiftRotationWeeks.toString())) }
                             OutlinedTextField(
                                 value = rotationWeeksTf,
                                 onValueChange = { newVal ->
@@ -1326,8 +1330,6 @@ fun SettingsScreen(
                             )
 
                             // Cấu hình Ngày mốc và Ca mốc bắt đầu
-                            var shiftAnchorTime by remember { mutableStateOf(notificationPrefs.getLong("shift_anchor_time", System.currentTimeMillis())) }
-                            var shiftAnchorType by remember { mutableStateOf(notificationPrefs.getString("shift_anchor_type", "DAY") ?: "DAY") }
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),

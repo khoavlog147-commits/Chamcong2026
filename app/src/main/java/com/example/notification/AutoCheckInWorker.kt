@@ -43,7 +43,7 @@ class AutoCheckInWorker(
             if (activeEntry != null && activeEntry.isWorking) {
                 // Người dùng đã vào ca (thủ công hoặc ca trước chưa ra ca) -> Tránh ghi đè ca đang làm
                 android.util.Log.d("AutoCheckInWorker", "Xung đột: Người dùng đang trong ca làm việc (${activeEntry.date}). Bỏ qua tự động vào ca.")
-                val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+                val sharedPrefs = NotificationHelper.getPrefs(context, uid)
                 val autoCheckoutEnabled = sharedPrefs.getBoolean("auto_checkout_enabled", false)
                 if (autoCheckoutEnabled) {
                     val checkoutMs = NotificationHelper.estimateHistoricalCheckoutTime(context, uid, activeEntry)
@@ -52,7 +52,7 @@ class AutoCheckInWorker(
             } else if (existingToday != null && existingToday.checkInTime != null) {
                 // Người dùng đã chủ động vào ca hoặc đã có dữ liệu chấm công cho ngày hôm nay
                 android.util.Log.d("AutoCheckInWorker", "Xung đột: Đã có bản ghi chấm công ngày $todayStr. Bỏ qua tự động vào ca.")
-                val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+                val sharedPrefs = NotificationHelper.getPrefs(context, uid)
                 val autoCheckoutEnabled = sharedPrefs.getBoolean("auto_checkout_enabled", false)
                 if (autoCheckoutEnabled && existingToday.isWorking) {
                     val checkoutMs = NotificationHelper.estimateHistoricalCheckoutTime(context, uid, existingToday)
@@ -118,7 +118,7 @@ class AutoCheckInWorker(
                 )
 
                 // Nếu bật tự động ra ca, lên lịch auto checkout cho ca này
-                val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+                val sharedPrefs = NotificationHelper.getPrefs(context, uid)
                 val autoCheckoutEnabled = sharedPrefs.getBoolean("auto_checkout_enabled", false)
                 if (autoCheckoutEnabled) {
                     val checkoutMs = NotificationHelper.estimateHistoricalCheckoutTime(context, uid, calculated)

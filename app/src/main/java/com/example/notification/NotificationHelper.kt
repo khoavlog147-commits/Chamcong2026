@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.Data
@@ -168,9 +169,17 @@ object NotificationHelper {
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork("checkin_reminder_$uid")
     }
 
+    fun getPrefs(context: Context, uid: String? = null): SharedPreferences {
+        val targetUid = uid?.trim()
+        if (!targetUid.isNullOrBlank()) {
+            return context.getSharedPreferences("notification_prefs_$targetUid", Context.MODE_PRIVATE)
+        }
+        return context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+    }
+
     // Lên lịch nhắc Check-out nối đuôi động
     fun scheduleCheckOutReminder(context: Context, uid: String, delayMs: Long, shiftId: String) {
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = getPrefs(context, uid)
         val notificationsEnabled = sharedPrefs.getBoolean("notifications_enabled", true)
         if (!notificationsEnabled) return
 
@@ -200,7 +209,7 @@ object NotificationHelper {
 
     // Lên lịch lắng nghe / đồng bộ thông báo từ Admin khi có kết nối mạng (NetworkType.CONNECTED)
     fun scheduleAdminNotificationSync(context: Context, uid: String) {
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = getPrefs(context, uid)
         if (uid.isNotBlank()) {
             sharedPrefs.edit().putString("current_user_uid", uid).apply()
         }
@@ -231,7 +240,7 @@ object NotificationHelper {
     fun scheduleCheckOutReminderForActiveEntry(context: Context, uid: String, activeEntry: TimeEntry) {
         if (!activeEntry.isWorking) return
 
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = getPrefs(context, uid)
         val notificationsEnabled = sharedPrefs.getBoolean("notifications_enabled", true)
         if (!notificationsEnabled) return
 
@@ -261,8 +270,8 @@ object NotificationHelper {
         return (localMs + offsetMs) / (7L * 24 * 3600 * 1000L)
     }
 
-    fun getEffectiveCheckInTime(context: Context, targetMs: Long = System.currentTimeMillis()): String {
-        val prefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+    fun getEffectiveCheckInTime(context: Context, targetMs: Long = System.currentTimeMillis(), uid: String? = null): String {
+        val prefs = getPrefs(context, uid)
         val rawIn = prefs.getString("custom_check_in_time", "") ?: ""
         val rawOut = prefs.getString("custom_checkout_time", "") ?: ""
         
@@ -298,8 +307,8 @@ object NotificationHelper {
         return rawIn
     }
 
-    fun getEffectiveCheckOutTime(context: Context, targetMs: Long = System.currentTimeMillis()): String {
-        val prefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+    fun getEffectiveCheckOutTime(context: Context, targetMs: Long = System.currentTimeMillis(), uid: String? = null): String {
+        val prefs = getPrefs(context, uid)
         val rawIn = prefs.getString("custom_check_in_time", "") ?: ""
         val rawOut = prefs.getString("custom_checkout_time", "") ?: ""
         
@@ -390,7 +399,7 @@ object NotificationHelper {
         var loopCount = 0
         
         while (!found && loopCount < 14) {
-            val customTime = getEffectiveCheckOutTime(context, currentTargetMs)
+            val customTime = getEffectiveCheckOutTime(context, currentTargetMs, uid)
             
             if (customTime.isNotBlank() && customTime.contains(":") && customTime.length == 5) {
                 val parts = customTime.split(":")
@@ -503,7 +512,7 @@ object NotificationHelper {
     fun scheduleNextCheckInReminder(context: Context, uid: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+                val sharedPrefs = getPrefs(context, uid)
                 val autoInEnabled = sharedPrefs.getBoolean("auto_check_in_enabled", false)
                 val notificationsEnabled = sharedPrefs.getBoolean("notifications_enabled", true)
                 
@@ -532,7 +541,7 @@ object NotificationHelper {
         var targetMin = -1
 
         try {
-            val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+            val sharedPrefs = getPrefs(context, uid)
             val rotationWeeks = sharedPrefs.getInt("shift_rotation_weeks", 2).coerceIn(0, 5)
 
             val db = com.example.data.db.AppDatabase.getInstance(context)
@@ -640,7 +649,7 @@ object NotificationHelper {
         var loopCount = 0
         
         while (!found && loopCount < 14) {
-            val customTime = getEffectiveCheckInTime(context, currentTargetMs)
+            val customTime = getEffectiveCheckInTime(context, currentTargetMs, uid)
             
             if (customTime.isNotBlank() && customTime.contains(":") && customTime.length == 5) {
                 val parts = customTime.split(":")

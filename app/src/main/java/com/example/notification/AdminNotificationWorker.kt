@@ -16,10 +16,10 @@ class AdminNotificationWorker(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
-            val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
             var uid = inputData.getString("uid")
             if (uid.isNullOrBlank()) {
-                uid = sharedPrefs.getString("current_user_uid", "") ?: ""
+                val fallbackPrefs = NotificationHelper.getPrefs(context)
+                uid = fallbackPrefs.getString("current_user_uid", "") ?: ""
             }
 
             if (uid.isBlank()) {
@@ -33,6 +33,7 @@ class AdminNotificationWorker(
                 return@withContext Result.success()
             }
 
+            val sharedPrefs = NotificationHelper.getPrefs(context, uid)
             val lastCheckTime = sharedPrefs.getLong("admin_notif_last_check_${uid}", 0L)
             
             val notifications = FirestoreService.getUnreadAdminNotifications(uid, lastCheckTime)

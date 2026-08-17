@@ -20,7 +20,7 @@ class ReminderWorker(
         val reminderType = inputData.getString("reminderType") ?: return Result.failure()
 
         // 0. Kiểm tra công tắc bật/tắt thông báo tổng
-        val sharedPrefs = context.getSharedPreferences("notification_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = NotificationHelper.getPrefs(context, uid)
         val notificationsEnabled = sharedPrefs.getBoolean("notifications_enabled", true)
         if (!notificationsEnabled) {
             android.util.Log.d("ReminderWorker", "Thông báo nhắc nhở đã bị tắt. Hủy bỏ doWork.")
