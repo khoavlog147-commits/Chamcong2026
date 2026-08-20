@@ -32,8 +32,10 @@ class ReminderWorker(
         when (reminderType) {
             "CHECK_IN" -> {
                 try {
-                    // 1. Last-second filter (Kiểm tra sát nút ngày nghỉ & ngày lễ & ca làm việc)
+                    // 1. Last-second filter (Kiểm tra sát nút ngày nghỉ & ngày lễ & ngày nghỉ phép)
                     val today = Calendar.getInstance()
+                    val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(today.time)
+                    val altDateStr = SimpleDateFormat("dd/MM/yyyy", Locale.US).format(today.time)
                     
                     if (isSunday(today)) {
                         android.util.Log.d("ReminderWorker", "Hôm nay là Chủ nhật (ngày nghỉ), không gửi thông báo Check-in.")
@@ -44,6 +46,15 @@ class ReminderWorker(
 
                     if (isHoliday(today)) {
                         android.util.Log.d("ReminderWorker", "Hôm nay là ngày nghỉ lễ, không gửi thông báo Check-in.")
+                        NotificationHelper.scheduleNextCheckInReminder(context, uid)
+                        return Result.success()
+                    }
+
+                    val dbCheck = AppDatabase.getInstance(context)
+                    val existingLeaveToday = dbCheck.timeEntryDao().getEntryByDate(uid, dateStr)
+                        ?: dbCheck.timeEntryDao().getEntryByDate(uid, altDateStr)
+                    if (existingLeaveToday != null && com.example.data.SalaryCalculator.isLeaveType(existingLeaveToday.dayType)) {
+                        android.util.Log.d("ReminderWorker", "Hôm nay là ngày nghỉ phép (${existingLeaveToday.dayType}), không gửi thông báo Check-in.")
                         NotificationHelper.scheduleNextCheckInReminder(context, uid)
                         return Result.success()
                     }

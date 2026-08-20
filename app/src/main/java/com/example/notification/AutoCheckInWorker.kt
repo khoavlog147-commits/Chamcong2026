@@ -25,8 +25,11 @@ class AutoCheckInWorker(
 
         try {
             val database = AppDatabase.getInstance(context)
-            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(if (scheduledTimeMs > 0) scheduledTimeMs else System.currentTimeMillis()))
+            val targetDate = Date(if (scheduledTimeMs > 0) scheduledTimeMs else System.currentTimeMillis())
+            val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(targetDate)
+            val altTodayStr = SimpleDateFormat("dd/MM/yyyy", Locale.US).format(targetDate)
             
+            // 1. Kiểm tra ngày nghỉ cuối tuần hoặc ngày lễ
             val isSunday = SalaryCalculator.isSunday(todayStr)
             val isHoliday = SalaryCalculator.isHoliday(todayStr)
             if (isSunday || isHoliday) {
@@ -35,10 +38,35 @@ class AutoCheckInWorker(
                 NotificationHelper.scheduleAutoCheckIn(context, uid, nextCheckInMs)
                 return Result.success()
             }
-            
-            // Xung đột 1: Kiểm tra xem đang có ca nào active hay không
-            val activeEntry = database.timeEntryDao().getActiveEntry(uid)
+
+            // 2. KIỂM TRA NGHỈ PHÉP: Không được tự động vào ca nếu người dùng nghỉ phép
             val existingToday = database.timeEntryDao().getEntryByDate(uid, todayStr)
+                ?: database.timeEntryDao().getEntryByDate(uid, altTodayStr)
+
+            var isUserOnLeave = existingToday != null && SalaryCalculator.isLeaveType(existingToday.dayType)
+
+            if (!isUserOnLeave) {
+                try {
+                    val remoteRecord = kotlinx.coroutines.withTimeoutOrNull(3000L) {
+                        com.example.data.FirestoreService.getAttendanceRecordForDate(uid, todayStr)
+                    }
+                    if (remoteRecord != null && SalaryCalculator.isLeaveType(remoteRecord.status)) {
+                        isUserOnLeave = true
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.d("AutoCheckInWorker", "Lỗi kiểm tra trạng thái nghỉ phép từ Firestore: ${e.message}")
+                }
+            }
+
+            if (isUserOnLeave) {
+                android.util.Log.d("AutoCheckInWorker", "Bỏ qua tự động vào ca vì người dùng đang nghỉ phép ngày $todayStr (${existingToday?.dayType}).")
+                val nextCheckInMs = NotificationHelper.estimateHistoricalCheckInTime(context, uid)
+                NotificationHelper.scheduleAutoCheckIn(context, uid, nextCheckInMs)
+                return Result.success()
+            }
+            
+            // 3. Xung đột: Kiểm tra xem đang có ca nào active hay không
+            val activeEntry = database.timeEntryDao().getActiveEntry(uid)
 
             if (activeEntry != null && activeEntry.isWorking) {
                 // Người dùng đã vào ca (thủ công hoặc ca trước chưa ra ca) -> Tránh ghi đè ca đang làm

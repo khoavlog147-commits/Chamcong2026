@@ -393,6 +393,28 @@ fun NotificationCenterScreen(
                             Text("Sao chép", fontSize = 12.sp, color = TextSecondary)
                         }
                     }
+
+                    if (notif.isPinned) {
+                        Surface(
+                            color = AccentOrange.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.PushPin, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "Thông báo quan trọng đã được ghim (Không thể xóa)",
+                                    color = AccentOrange,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
@@ -408,14 +430,16 @@ fun NotificationCenterScreen(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteNotificationLocally(notif.id)
-                        selectedNotifForDetail = null
-                        Toast.makeText(context, "Đã xóa khỏi danh sách", Toast.LENGTH_SHORT).show()
+                if (!notif.isPinned) {
+                    TextButton(
+                        onClick = {
+                            viewModel.deleteNotificationLocally(notif.id)
+                            selectedNotifForDetail = null
+                            Toast.makeText(context, "Đã xóa khỏi danh sách", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text("Xóa tin nhắn", color = DangerRed, fontSize = 13.sp)
                     }
-                ) {
-                    Text("Xóa tin nhắn", color = DangerRed, fontSize = 13.sp)
                 }
             },
             containerColor = DarkContainer,
@@ -471,6 +495,7 @@ private fun NotificationCardItem(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val context = LocalContext.current
     val notifColor = getNotifColor(notif.type)
     val notifIcon = getNotifIcon(notif.type)
 
@@ -573,6 +598,21 @@ private fun NotificationCardItem(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (notif.isPinned) {
+                        Surface(
+                            color = AccentOrange.copy(alpha = 0.25f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "📌 ĐÃ GHIM",
+                                color = AccentOrange,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
                     Surface(
                         color = notifColor.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(4.dp)
@@ -594,17 +634,33 @@ private fun NotificationCardItem(
                 }
             }
 
-            // Quick delete option
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Xóa khỏi máy",
-                    tint = TextSecondary.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp)
-                )
+            // Quick delete option or pinned icon
+            if (notif.isPinned) {
+                IconButton(
+                    onClick = {
+                        Toast.makeText(context, "📌 Thông báo đã ghim bởi Admin, không thể xóa", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = "Đã ghim",
+                        tint = AccentOrange,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Xóa khỏi máy",
+                        tint = TextSecondary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }

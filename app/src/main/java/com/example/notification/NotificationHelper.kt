@@ -669,10 +669,15 @@ object NotificationHelper {
             }
             
             val dateStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(cal.time)
+            val altDateStr = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.US).format(cal.time)
             val isSunday = com.example.data.SalaryCalculator.isSunday(dateStr)
             val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
             
-            if (!isSunday && !isHoliday && cal.timeInMillis > System.currentTimeMillis()) {
+            val db = com.example.data.db.AppDatabase.getInstance(context)
+            val existingEntry = db.timeEntryDao().getEntryByDate(uid, dateStr) ?: db.timeEntryDao().getEntryByDate(uid, altDateStr)
+            val isLeave = existingEntry != null && com.example.data.SalaryCalculator.isLeaveType(existingEntry.dayType)
+            
+            if (!isSunday && !isHoliday && !isLeave && cal.timeInMillis > System.currentTimeMillis()) {
                 found = true
                 break
             }

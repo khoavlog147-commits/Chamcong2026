@@ -900,18 +900,19 @@ fun AdminScreen(
         SendAdminNotificationDialog(
             employees = employees,
             onDismiss = { showSendNotifDialog = false },
-            onSend = { targetUid, targetName, title, message, type ->
+            onSend = { targetUid, targetName, title, message, type, isPinned ->
                 adminViewModel.sendNotificationToEmployee(
                     targetUid = targetUid,
                     targetName = targetName,
                     title = title,
                     message = message,
-                    type = type
+                    type = type,
+                    isPinned = isPinned
                 ) { success ->
                     if (success) {
                         android.widget.Toast.makeText(
                             context,
-                            "Đã gửi thông báo",
+                            if (isPinned) "Đã gửi & ghim thông báo" else "Đã gửi thông báo",
                             android.widget.Toast.LENGTH_SHORT
                         ).show()
                     } else {
@@ -3284,10 +3285,11 @@ fun normalizeMonthYearInput(input: String): String {
 fun SendAdminNotificationDialog(
     employees: List<UserConfig>,
     onDismiss: () -> Unit,
-    onSend: (targetUid: String, targetName: String, title: String, message: String, type: String) -> Unit
+    onSend: (targetUid: String, targetName: String, title: String, message: String, type: String, isPinned: Boolean) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
+    var isPinned by remember { mutableStateOf(false) }
     var expandedUserDropdown by remember { mutableStateOf(false) }
     var selectedUser by remember { mutableStateOf<UserConfig?>(null) } // null means "Tất cả nhân viên"
 
@@ -3361,6 +3363,52 @@ fun SendAdminNotificationDialog(
 
                 AdminInputField("Tiêu đề", title, { title = it })
                 AdminInputField("Nội dung", message, { message = it })
+
+                // Pinned Notification Option
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (isPinned) AccentOrange.copy(alpha = 0.15f) else Color.Transparent,
+                            RoundedCornerShape(8.dp)
+                        )
+                        .clickable { isPinned = !isPinned }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "📌",
+                            fontSize = 18.sp
+                        )
+                        Column {
+                            Text(
+                                text = "Ghim thông báo quan trọng",
+                                color = if (isPinned) AccentOrange else White,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                text = "Nhân viên không thể xóa thông báo này",
+                                color = LightGray,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isPinned,
+                        onCheckedChange = { isPinned = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = White,
+                            checkedTrackColor = AccentOrange
+                        )
+                    )
+                }
             }
         },
         confirmButton = {
@@ -3368,7 +3416,7 @@ fun SendAdminNotificationDialog(
                 onClick = {
                     val uid = selectedUser?.userId ?: "ALL"
                     val name = selectedUser?.hoVaTen ?: "Tất cả nhân viên"
-                    onSend(uid, name, title, message, "general")
+                    onSend(uid, name, title, message, "general", isPinned)
                 },
                 enabled = title.isNotBlank() && message.isNotBlank()
             ) {

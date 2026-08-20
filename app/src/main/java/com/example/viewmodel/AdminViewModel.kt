@@ -139,6 +139,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         title: String,
         message: String,
         type: String,
+        isPinned: Boolean = false,
         onResult: (Boolean) -> Unit
     ) {
         viewModelScope.launch {
@@ -149,7 +150,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 message = message,
                 type = type,
                 createdAt = System.currentTimeMillis(),
-                sentBy = "Admin"
+                sentBy = "Admin",
+                isPinned = isPinned
             )
             val success = FirestoreService.sendAdminNotification(notif)
             onResult(success)

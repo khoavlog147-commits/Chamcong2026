@@ -1213,6 +1213,17 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             repository.insertOrUpdate(calculated)
             syncTimeEntryToLegacyLog(calculated)
             triggerSync()
+
+            if (isLeave) {
+                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                val todayDmy = com.example.data.SalaryCalculator.normalizeDateToDmy(todayStr)
+                val entryNormDate = com.example.data.SalaryCalculator.normalizeDateToDmy(dateStr)
+                if (entryNormDate == todayDmy) {
+                    com.example.notification.NotificationHelper.cancelAutoCheckIn(getApplication(), session.uid)
+                    com.example.notification.NotificationHelper.cancelAutoCheckOut(getApplication(), session.uid)
+                }
+                com.example.notification.NotificationHelper.scheduleNextCheckInReminder(getApplication(), session.uid)
+            }
         }
     }
 
@@ -1635,7 +1646,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     for (i in 0 until array.length()) {
                         val obj = array.getJSONObject(i)
                         val id = obj.optString("id")
-                        if (id !in deletedSet) {
+                        val isPinned = obj.optBoolean("isPinned", false)
+                        if (isPinned || id !in deletedSet) {
                             list.add(
                                 com.example.data.model.AdminNotification(
                                     id = id,
@@ -1645,12 +1657,16 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                                     message = obj.optString("message"),
                                     type = obj.optString("type", "GENERAL"),
                                     createdAt = obj.optLong("createdAt", System.currentTimeMillis()),
-                                    sentBy = obj.optString("sentBy", "Admin")
+                                    sentBy = obj.optString("sentBy", "Admin"),
+                                    isPinned = isPinned
                                 )
                             )
                         }
                     }
-                    _adminNotifications.value = list.sortedByDescending { it.createdAt }
+                    _adminNotifications.value = list.sortedWith(
+                        compareByDescending<com.example.data.model.AdminNotification> { it.isPinned }
+                            .thenByDescending { it.createdAt }
+                    )
                 } catch (e: Exception) {
                     android.util.Log.e("TimeSnapViewModel", "Lỗi đọc cache thông báo local", e)
                 }
@@ -1673,6 +1689,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     obj.put("type", notif.type)
                     obj.put("createdAt", notif.createdAt)
                     obj.put("sentBy", notif.sentBy)
+                    obj.put("isPinned", notif.isPinned)
                     array.put(obj)
                 }
                 prefs.edit().putString("cached_notifs_$uid", array.toString()).apply()
@@ -1687,15 +1704,24 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             _isRefreshingNotifications.value = true
             try {
+                // Tải danh sách ID đã xóa từ Cloud của user này để đồng bộ đa thiết bị
+                val remoteDeleted = com.example.data.FirestoreService.getUserDeletedNotificationIds(uid)
+                val allDeleted = _deletedNotificationIds.value + remoteDeleted
+                _deletedNotificationIds.value = allDeleted
+                getNotifPrefs().edit().putStringSet("deleted_ids_$uid", allDeleted).apply()
+
                 val serverNotifs = com.example.data.FirestoreService.getUnreadAdminNotifications(uid, 0L)
-                val deletedIds = _deletedNotificationIds.value
                 
-                val currentLocal = _adminNotifications.value.filter { it.id !in deletedIds }
+                val currentLocal = _adminNotifications.value.filter { it.isPinned || it.id !in allDeleted }
                 val notifMap = mutableMapOf<String, com.example.data.model.AdminNotification>()
                 currentLocal.forEach { notifMap[it.id] = it }
-                serverNotifs.filter { it.id !in deletedIds }.forEach { notifMap[it.id] = it }
+                serverNotifs.filter { it.isPinned || it.id !in allDeleted }.forEach { notifMap[it.id] = it }
 
-                val mergedList = notifMap.values.sortedByDescending { it.createdAt }
+                // Pinned thông báo luôn ở đầu danh sách, sau đó đến mới nhất
+                val mergedList = notifMap.values.sortedWith(
+                    compareByDescending<com.example.data.model.AdminNotification> { it.isPinned }
+                        .thenByDescending { it.createdAt }
+                )
                 _adminNotifications.value = mergedList
                 saveLocalCachedNotifications(uid, mergedList)
 
@@ -1753,6 +1779,12 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
     fun deleteNotificationLocally(id: String) {
         val uid = currentUserSession.value?.uid ?: return
+        // Không cho phép xóa thông báo nếu được ghim bởi Admin
+        val targetNotif = _adminNotifications.value.firstOrNull { it.id == id }
+        if (targetNotif?.isPinned == true) {
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             val updatedDeleted = _deletedNotificationIds.value.toMutableSet()
             updatedDeleted.add(id)
@@ -1764,9 +1796,10 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             saveLocalCachedNotifications(uid, newList)
 
             try {
-                com.example.data.FirestoreService.deleteAdminNotification(uid, id)
+                // Lưu vĩnh viễn trạng thái đã xóa cho user này trên Firestore mà không xóa mất thông báo của user mới khác
+                com.example.data.FirestoreService.recordUserDeletedNotification(uid, id)
             } catch (e: Exception) {
-                android.util.Log.e("TimeSnapViewModel", "Lỗi xóa thông báo server", e)
+                android.util.Log.e("TimeSnapViewModel", "Lỗi ghi nhận user xóa thông báo", e)
             }
         }
     }

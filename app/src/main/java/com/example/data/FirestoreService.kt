@@ -224,6 +224,26 @@ object FirestoreService {
             .awaitTaskFirestore()
     }
 
+    suspend fun getAttendanceRecordForDate(uid: String, dateString: String): AttendanceRecord? {
+        if (isDemoUser(uid)) return null
+        val firestore = getDb() ?: return null
+        return try {
+            val docId = formatDateForDocId(dateString)
+            val doc = firestore.collection("users").document(uid)
+                .collection("attendance_logs").document(docId)
+                .get()
+                .awaitTaskFirestore()
+            if (doc != null && doc.exists()) {
+                doc.toAttendanceRecord(uid)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching record for date $dateString of user $uid: ${e.message}")
+            null
+        }
+    }
+
     suspend fun getAllUserConfigs(): List<com.example.data.model.UserConfig> {
         val firestore = getDb() ?: return emptyList()
         val allConfigs = mutableListOf<com.example.data.model.UserConfig>()
@@ -832,9 +852,9 @@ object FirestoreService {
     suspend fun cleanupExpiredNotifications(uid: String = "") {
         try {
             val firestore = getDb() ?: return
-            val cutoff = System.currentTimeMillis() - (12 * 3600 * 1000L) // 12 tiếng trước
+            val cutoff = System.currentTimeMillis() - (30L * 24 * 3600 * 1000L) // 30 ngày để tài khoản mới vào vẫn xem được thông báo hệ thống
 
-            // 1. Chỉ dọn dẹp các thông báo Admin trong collection root admin_notifications cũ hơn 12 tiếng
+            // 1. Chỉ dọn dẹp các thông báo Admin không ghim và đã quá 30 ngày
             val rootOldDocs = kotlinx.coroutines.withTimeoutOrNull(5000L) {
                 firestore.collection("admin_notifications")
                     .whereLessThan("createdAt", cutoff)
@@ -842,17 +862,16 @@ object FirestoreService {
             }
             rootOldDocs?.documents?.forEach { doc ->
                 try {
-                    // Kiểm tra đúng là thông báo Admin (có sentBy hoặc targetUid)
-                    val sentBy = doc.getString("sentBy")
-                    if (sentBy != null || doc.contains("targetUid")) {
+                    val isPinned = doc.getBoolean("isPinned") ?: false
+                    if (!isPinned) {
                         firestore.collection("admin_notifications").document(doc.id).delete()
                     }
                 } catch (e: Exception) {
-                    Log.e(TAG, "Lỗi xóa thông báo Admin quá 12h root: ${e.message}")
+                    Log.e(TAG, "Lỗi dọn dẹp thông báo cũ: ${e.message}")
                 }
             }
 
-            // 2. Chỉ dọn dẹp các thông báo Admin trong subcollection users/{uid}/notifications cũ hơn 12 tiếng
+            // 2. Dọn dẹp subcollection users/{uid}/notifications cũ hơn 30 ngày nếu không ghim
             if (uid.isNotBlank() && !isDemoUser(uid)) {
                 val userOldDocs = kotlinx.coroutines.withTimeoutOrNull(5000L) {
                     firestore.collection("users").document(uid)
@@ -862,14 +881,13 @@ object FirestoreService {
                 }
                 userOldDocs?.documents?.forEach { doc ->
                     try {
-                        val sentBy = doc.getString("sentBy")
-                        // Chỉ xóa nếu là thông báo do Admin gửi
-                        if (sentBy == "Admin" || sentBy != null) {
+                        val isPinned = doc.getBoolean("isPinned") ?: false
+                        if (!isPinned) {
                             firestore.collection("users").document(uid)
                                 .collection("notifications").document(doc.id).delete()
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Lỗi xóa thông báo Admin quá 12h user: ${e.message}")
+                        Log.e(TAG, "Lỗi dọn dẹp thông báo user: ${e.message}")
                     }
                 }
             }
@@ -900,7 +918,8 @@ object FirestoreService {
             "message" to notif.message,
             "type" to notif.type,
             "createdAt" to notif.createdAt,
-            "sentBy" to notif.sentBy
+            "sentBy" to notif.sentBy,
+            "isPinned" to notif.isPinned
         )
 
         // 1. Lưu vào kho chung admin_notifications/{notifId} (Tăng timeout lên 10s)
@@ -976,7 +995,7 @@ object FirestoreService {
     }
 
     suspend fun getUnreadAdminNotifications(uid: String, lastTimestamp: Long): List<com.example.data.model.AdminNotification> {
-        // Tự động dọn dẹp các thông báo đã hết hạn quá 12h
+        // Tự động dọn dẹp các thông báo đã hết hạn
         cleanupExpiredNotifications(uid)
 
         val firestore = getDb() ?: return emptyList()
@@ -996,7 +1015,8 @@ object FirestoreService {
                         message = doc.getString("message") ?: "",
                         type = doc.getString("type") ?: "GENERAL",
                         createdAt = createdAt,
-                        sentBy = doc.getString("sentBy") ?: "Admin"
+                        sentBy = doc.getString("sentBy") ?: "Admin",
+                        isPinned = doc.getBoolean("isPinned") ?: false
                     )
                     notifMap[id] = notif
                 }
@@ -1044,6 +1064,41 @@ object FirestoreService {
         }
 
         return notifMap.values.sortedBy { it.createdAt }
+    }
+
+    suspend fun recordUserDeletedNotification(uid: String, notificationId: String): Boolean {
+        if (uid.isBlank() || isDemoUser(uid)) return true
+        val firestore = getDb() ?: return false
+        return try {
+            firestore.collection("users").document(uid)
+                .collection("deleted_notifications").document(notificationId)
+                .set(mapOf("deletedAt" to System.currentTimeMillis(), "notificationId" to notificationId))
+                .awaitTaskFirestore()
+            try {
+                firestore.collection("users").document(uid)
+                    .collection("notifications").document(notificationId).delete()
+            } catch (e: Exception) {}
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi ghi nhận user xóa thông báo: ${e.message}")
+            false
+        }
+    }
+
+    suspend fun getUserDeletedNotificationIds(uid: String): Set<String> {
+        if (uid.isBlank() || isDemoUser(uid)) return emptySet()
+        val firestore = getDb() ?: return emptySet()
+        return try {
+            val snap = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                firestore.collection("users").document(uid)
+                    .collection("deleted_notifications")
+                    .get().awaitTaskFirestore()
+            }
+            snap?.documents?.map { it.id }?.toSet() ?: emptySet()
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi đọc deleted_notifications: ${e.message}")
+            emptySet()
+        }
     }
 
     suspend fun deleteAdminNotification(uid: String, notificationId: String): Boolean {

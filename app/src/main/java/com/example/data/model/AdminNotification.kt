@@ -8,5 +8,6 @@ data class AdminNotification(
     val message: String = "",
     val type: String = "GENERAL", // "SHIFT_REMINDER", "SHIFT_CHANGE", "AUTO_TIME_APPROVED", "GENERAL"
     val createdAt: Long = System.currentTimeMillis(),
-    val sentBy: String = "Admin"
+    val sentBy: String = "Admin",
+    val isPinned: Boolean = false
 )
