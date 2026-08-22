@@ -3590,8 +3590,16 @@ fun EmployeePayslipView(
         holidayDatesInMonth = holidayDatesInMonth
     )
 
+    val hasTodayLogged = timeEntries.any { e ->
+        val day = try {
+            val parts = if (e.date.contains("/")) e.date.split("/") else e.date.split("-")
+            if (e.date.contains("/")) parts.getOrNull(0)?.toIntOrNull() else parts.getOrNull(2)?.toIntOrNull()
+        } catch (ex: Exception) { null }
+        day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || e.dayType == "PAID_LEAVE" || e.dayType == "UNPAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE")
+    }
+
     // Projected state calculations
-    val startProjectionDay = if (!isCurrentSelectedMonth) 1 else (todayDayOfMonth + 1).coerceAtMost(maxDaysInMo + 1)
+    val startProjectionDay = if (!isCurrentSelectedMonth) 1 else if (hasTodayLogged) (todayDayOfMonth + 1).coerceAtMost(maxDaysInMo + 1) else todayDayOfMonth.coerceAtMost(maxDaysInMo + 1)
     
     val remainingWeekdays = if (!isCurrentSelectedMonth) 0 else {
         var count = 0
@@ -3942,7 +3950,13 @@ fun EmployeePayslipView(
                 if (summary.tienOtLe > 0.0) {
                     LocalPayslipMoneyRow(label = "OT lễ ${df.format(employee.heSoOtNgayLe)} (${df.format(summary.otLeHours)}h)", value = summary.tienOtLe, isAddition = true, isAccent = true)
                 }
-                if (summary.tienChuNhat > 0.0) {
+                if (summary.tienChuNhatNgay > 0.0) {
+                    LocalPayslipMoneyRow(label = "OT CN - Ca ngày ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatDayHours)}h)", value = summary.tienChuNhatNgay, isAddition = true, isAccent = true)
+                }
+                if (summary.tienChuNhatDem > 0.0) {
+                    LocalPayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatNightHours)}h)", value = summary.tienChuNhatDem, isAddition = true, isAccent = true)
+                }
+                if (summary.tienChuNhatNgay == 0.0 && summary.tienChuNhatDem == 0.0 && summary.tienChuNhat > 0.0) {
                     LocalPayslipMoneyRow(label = "OT chủ nhật ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", value = summary.tienChuNhat, isAddition = true, isAccent = true)
                 }
 

@@ -66,7 +66,11 @@ data class SalarySummary(
     val pcCaDemVal: Double = 0.0,
     val caDemCount: Int = 0,
     val tienChuNhat: Double = 0.0,
+    val tienChuNhatNgay: Double = 0.0,
+    val tienChuNhatDem: Double = 0.0,
     val chuNhatHours: Double = 0.0,
+    val chuNhatDayHours: Double = 0.0,
+    val chuNhatNightHours: Double = 0.0,
     val otLeHours: Double = 0.0,
     val tienOtLe: Double = 0.0
 )
@@ -301,7 +305,11 @@ object ExportUtils {
             pcCaDemVal = vmSummary.pcCaDemVal,
             caDemCount = vmSummary.caDemCount,
             tienChuNhat = vmSummary.tienChuNhat,
+            tienChuNhatNgay = vmSummary.tienChuNhatNgay,
+            tienChuNhatDem = vmSummary.tienChuNhatDem,
             chuNhatHours = vmSummary.chuNhatHours,
+            chuNhatDayHours = vmSummary.chuNhatDayHours,
+            chuNhatNightHours = vmSummary.chuNhatNightHours,
             otLeHours = vmSummary.otLeHours,
             tienOtLe = vmSummary.tienOtLe
         )
@@ -492,7 +500,11 @@ object ExportUtils {
         if (pcComOtShowPNG > 0.0) drawRow("Phụ cấp cơm OT", "+${fmt.format(pcComOtShowPNG)}đ", paintGreen)
         
         if (summary.tienOtNgay > 0.0) drawRow("OT ngày ${df.format(config.heSoOtNgayThuong)} (${df.format(summary.otDayHours)}h)", "+${fmt.format(summary.tienOtNgay)}đ", paintGreen)
-        if (summary.tienChuNhat > 0.0) drawRow("OT chủ nhật ${df.format(config.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", "+${fmt.format(summary.tienChuNhat)}đ", paintGreen)
+        if (summary.tienChuNhatNgay > 0.0) drawRow("OT CN - Ca ngày ${df.format(config.heSoOtChuNhat)} (${df.format(summary.chuNhatDayHours)}h)", "+${fmt.format(summary.tienChuNhatNgay)}đ", paintGreen)
+        if (summary.tienChuNhatDem > 0.0) drawRow("OT CN - Ca đêm ${df.format(config.heSoOtChuNhat)} (${df.format(summary.chuNhatNightHours)}h)", "+${fmt.format(summary.tienChuNhatDem)}đ", paintGreen)
+        if (summary.tienChuNhatNgay == 0.0 && summary.tienChuNhatDem == 0.0 && summary.tienChuNhat > 0.0) {
+            drawRow("OT chủ nhật ${df.format(config.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", "+${fmt.format(summary.tienChuNhat)}đ", paintGreen)
+        }
         if (summary.tienOtLe > 0.0) drawRow("OT lễ ${df.format(config.heSoOtNgayLe)} (${df.format(summary.otLeHours)}h)", "+${fmt.format(summary.tienOtLe)}đ", paintGreen)
         if (summary.tienOtDem > 0.0) drawRow("OT đêm ${df.format(config.heSoOtDem)} (${df.format(summary.otNightHours)}h)", "+${fmt.format(summary.tienOtDem)}đ", paintGreen)
         
@@ -785,13 +797,19 @@ object ExportUtils {
 
         // OT Lương
         val otNormalPay = summary.tienOtNgay
+        val otSundayDayPay = summary.tienChuNhatNgay
+        val otSundayNightPay = summary.tienChuNhatDem
         val otSundayPay = summary.tienChuNhat
         val otHolidayPay = summary.tienOtLe
         val otNightPay = summary.tienOtDem
         val totalOtPay = otNormalPay + otSundayPay + otHolidayPay + otNightPay
         if (totalOtPay > 0.0) {
             if (otNormalPay > 0.0) drawPdfRow("Lương tăng ca ngày thường (${df.format(summary.otDayHours)}h)", otNormalPay, 0.0)
-            if (otSundayPay > 0.0) drawPdfRow("Lương tăng ca chủ nhật (${df.format(summary.chuNhatHours)}h)", otSundayPay, 0.0)
+            if (otSundayDayPay > 0.0) drawPdfRow("Lương tăng ca CN - Ca ngày (${df.format(summary.chuNhatDayHours)}h)", otSundayDayPay, 0.0)
+            if (otSundayNightPay > 0.0) drawPdfRow("Lương tăng ca CN - Ca đêm (${df.format(summary.chuNhatNightHours)}h)", otSundayNightPay, 0.0)
+            if (otSundayDayPay == 0.0 && otSundayNightPay == 0.0 && otSundayPay > 0.0) {
+                drawPdfRow("Lương tăng ca chủ nhật (${df.format(summary.chuNhatHours)}h)", otSundayPay, 0.0)
+            }
             if (otHolidayPay > 0.0) drawPdfRow("Lương tăng ca ngày lễ (${df.format(summary.otLeHours)}h)", otHolidayPay, 0.0)
             if (otNightPay > 0.0) drawPdfRow("Lương tăng ca đêm (${df.format(summary.otNightHours)}h)", otNightPay, 0.0)
         } else {

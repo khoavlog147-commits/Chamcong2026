@@ -1856,7 +1856,11 @@ data class SalarySummary(
     val pcCaDemVal: Double = 0.0,
     val caDemCount: Int = 0,
     val tienChuNhat: Double = 0.0,
+    val tienChuNhatNgay: Double = 0.0,
+    val tienChuNhatDem: Double = 0.0,
     val chuNhatHours: Double = 0.0,
+    val chuNhatDayHours: Double = 0.0,
+    val chuNhatNightHours: Double = 0.0,
     val otLeHours: Double = 0.0,
     val tienOtLe: Double = 0.0
 )

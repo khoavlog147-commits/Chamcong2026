@@ -360,10 +360,14 @@ object SalaryCalculator {
         var totalOtNightHours = 0.0
         var totalOtLeHours = 0.0
         var totalSundayHours = 0.0
+        var totalSundayDayHours = 0.0
+        var totalSundayNightHours = 0.0
 
         var otDayPay = 0.0
         var otLePay = 0.0
         var otNightPay = 0.0
+        var sundayDayPay = 0.0
+        var sundayNightPay = 0.0
         var sundayPay = 0.0
         var nightShiftsCount = 0
 
@@ -393,7 +397,8 @@ object SalaryCalculator {
             if (e.rawCheckIn == null) continue
 
             // Night shift count
-            if (e.shiftType == "NIGHT") {
+            val isNight = e.shiftType == "NIGHT"
+            if (isNight) {
                 nightShiftsCount++
             }
 
@@ -403,8 +408,16 @@ object SalaryCalculator {
             if (e.rawCheckOut == null && e.isWorking) {
                 if (isSundayVal) {
                     actualPresenceDaysCount++
-                    totalSundayHours += 8.0
-                    sundayPay += 8.0 * hourlySalary * config.heSoOtChuNhat
+                    val activeHours = 8.0
+                    totalSundayHours += activeHours
+                    if (isNight) {
+                        totalSundayNightHours += activeHours
+                        sundayNightPay += activeHours * hourlySalary * config.heSoOtChuNhat
+                    } else {
+                        totalSundayDayHours += activeHours
+                        sundayDayPay += activeHours * hourlySalary * config.heSoOtChuNhat
+                    }
+                    sundayPay = sundayDayPay + sundayNightPay
                 } else {
                     totalWorkDays += e.workDay
                     actualPresenceDaysCount++
@@ -423,7 +436,14 @@ object SalaryCalculator {
                 val workedHrs = (e.normalizedCheckOut!! - e.normalizedCheckIn!!) / 3600000.0
                 val actualHours = (workedHrs - eBreakHours).coerceAtLeast(0.0)
                 totalSundayHours += actualHours
-                sundayPay += actualHours * hourlySalary * config.heSoOtChuNhat
+                if (isNight) {
+                    totalSundayNightHours += actualHours
+                    sundayNightPay += actualHours * hourlySalary * config.heSoOtChuNhat
+                } else {
+                    totalSundayDayHours += actualHours
+                    sundayDayPay += actualHours * hourlySalary * config.heSoOtChuNhat
+                }
+                sundayPay = sundayDayPay + sundayNightPay
             } else {
                 totalWorkDays += e.workDay
                 actualPresenceDaysCount++
@@ -573,9 +593,13 @@ object SalaryCalculator {
             caDemCount = nightShiftsCount,
             
             tienChuNhat = roundedSundayPay,
+            tienChuNhatNgay = Math.round(sundayDayPay).toDouble(),
+            tienChuNhatDem = Math.round(sundayNightPay).toDouble(),
+            chuNhatHours = totalSundayHours,
+            chuNhatDayHours = totalSundayDayHours,
+            chuNhatNightHours = totalSundayNightHours,
             otLeHours = totalOtLeHours,
-            tienOtLe = roundedOtLePay,
-            chuNhatHours = totalSundayHours
+            tienOtLe = roundedOtLePay
         )
     }
 

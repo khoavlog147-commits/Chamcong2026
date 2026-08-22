@@ -212,25 +212,6 @@ fun PayslipScreen(
                     }
                 }
                 
-                val tinhDenNgay = if (isCurrentSelectedMonth) {
-                    todayDayOfMonth
-                } else {
-                    val tempCal = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, targetYear)
-                        set(Calendar.MONTH, targetMonth - 1)
-                    }
-                    tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-                }
-
-                // Remaining days calculation
-                val maxDaysInMonth = remember(targetYear, targetMonth) {
-                    val tempCal = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, targetYear)
-                        set(Calendar.MONTH, targetMonth - 1)
-                    }
-                    tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
-                }
-
                 val lastLoggedDayOfMonth = remember(entries, isCurrentSelectedMonth) {
                     if (!isCurrentSelectedMonth) 0 else {
                         entries.filter { e ->
@@ -248,8 +229,43 @@ fun PayslipScreen(
                     }
                 }
 
-                val startProjectionDay = remember(lastLoggedDayOfMonth, todayDayOfMonth, isCurrentSelectedMonth) {
-                    if (!isCurrentSelectedMonth) 1 else (lastLoggedDayOfMonth + 1).coerceAtLeast(todayDayOfMonth + 1)
+                val hasTodayLogged = remember(entries, todayDayOfMonth, isCurrentSelectedMonth) {
+                    if (!isCurrentSelectedMonth) false else {
+                        entries.any { e ->
+                            val day = try {
+                                val parts = if (e.date.contains("/")) e.date.split("/") else e.date.split("-")
+                                if (e.date.contains("/")) {
+                                    parts.getOrNull(0)?.toIntOrNull()
+                                } else {
+                                    parts.getOrNull(2)?.toIntOrNull()
+                                }
+                            } catch (ex: Exception) { null }
+                            day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || e.dayType == "PAID_LEAVE" || e.dayType == "UNPAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE")
+                        }
+                    }
+                }
+
+                val tinhDenNgay = if (isCurrentSelectedMonth) {
+                    if (hasTodayLogged) todayDayOfMonth else (if (lastLoggedDayOfMonth > 0) lastLoggedDayOfMonth else todayDayOfMonth)
+                } else {
+                    val tempCal = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, targetYear)
+                        set(Calendar.MONTH, targetMonth - 1)
+                    }
+                    tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                }
+
+                // Remaining days calculation
+                val maxDaysInMonth = remember(targetYear, targetMonth) {
+                    val tempCal = Calendar.getInstance().apply {
+                        set(Calendar.YEAR, targetYear)
+                        set(Calendar.MONTH, targetMonth - 1)
+                    }
+                    tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                }
+
+                val startProjectionDay = remember(hasTodayLogged, lastLoggedDayOfMonth, todayDayOfMonth, isCurrentSelectedMonth, maxDaysInMonth) {
+                    if (!isCurrentSelectedMonth) 1 else if (hasTodayLogged) (todayDayOfMonth + 1).coerceAtMost(maxDaysInMonth + 1) else todayDayOfMonth.coerceAtMost(maxDaysInMonth + 1)
                 }
 
                 val totalSundaysInMonth = remember(targetYear, targetMonth, maxDaysInMonth) {
@@ -285,7 +301,9 @@ fun PayslipScreen(
                         count
                     }
                 }
-                var remainingSundays by remember(defaultRemainingSundays) { mutableStateOf(defaultRemainingSundays) }
+                var remainingSundaysDay by remember(defaultRemainingSundays) { mutableStateOf(defaultRemainingSundays) }
+                var remainingSundaysNight by remember { mutableStateOf(0) }
+                val remainingSundays = remainingSundaysDay + remainingSundaysNight
 
                 val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth) {
                     if (!isCurrentSelectedMonth) 0 else {
@@ -334,11 +352,22 @@ fun PayslipScreen(
                 val hourlySalary = dailySalary / 8.0
 
                 val additionalWeekdaysPay = remainingWeekdays * dailySalary
-                val additionalSundaysPay = if (includeSundayInProjection) {
-                    remainingSundays * dailySalary * c.heSoOtChuNhat
+                val additionalSundaysDayPay = if (includeSundayInProjection) {
+                    remainingSundaysDay * dailySalary * c.heSoOtChuNhat
                 } else {
                     0.0
                 }
+                val additionalSundaysNightPay = if (includeSundayInProjection) {
+                    remainingSundaysNight * dailySalary * c.heSoOtChuNhat
+                } else {
+                    0.0
+                }
+                val additionalSundaysNightAllowance = if (includeSundayInProjection) {
+                    remainingSundaysNight * c.pcCaDem
+                } else {
+                    0.0
+                }
+                val additionalSundaysPay = additionalSundaysDayPay + additionalSundaysNightPay
 
                 // TAB / SEGMENT CONTROL
                 var selectedTab by remember { mutableStateOf(0) }
@@ -455,7 +484,7 @@ fun PayslipScreen(
                 val customNightAllowance = if (selectedOt15Shift == "Đêm") {
                     customOt15DaysCount * c.pcCaDem
                 } else 0.0
-                val luongDuKienVal = s.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + allowanceAdjustment + customOt15Pay + customNightAllowance
+                val luongDuKienVal = s.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + additionalSundaysNightAllowance + allowanceAdjustment + customOt15Pay + customNightAllowance
 
                 Row(
                     modifier = Modifier
@@ -622,9 +651,15 @@ fun PayslipScreen(
                                 value = "${soNgayCongDuKien.toInt()} / ${if (isCurrentSelectedMonth) s.expectedWorkDays else s.standardWorkDays} ngày"
                             )
                             if (isCurrentSelectedMonth) {
+                                val sundayDetails = buildString {
+                                    if (includeSundayInProjection && remainingSundays > 0) {
+                                        if (remainingSundaysDay > 0) append(" + $remainingSundaysDay CN ngày")
+                                        if (remainingSundaysNight > 0) append(" + $remainingSundaysNight CN đêm")
+                                    }
+                                }
                                 PayslipProfileRow(
                                     label = "Trong đó làm thêm:", 
-                                    value = "$remainingWeekdays ngày thường" + (if (includeSundayInProjection && remainingSundays > 0) " + $remainingSundays Chủ Nhật" else "")
+                                    value = "$remainingWeekdays ngày thường$sundayDetails"
                                 )
                             }
                         } else {
@@ -658,74 +693,165 @@ fun PayslipScreen(
                                 }
 
                                 if (includeSundayInProjection) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                                            .padding(10.dp)
                                     ) {
-                                        Column {
-                                            Text("Số ngày CN còn lại:", color = LightGray, fontSize = 12.sp)
-                                            Text("(Tối đa lịch tháng: $totalSundaysInMonth ngày)", color = Color.Gray, fontSize = 10.sp)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text("Phân chia ca làm Chủ Nhật:", color = LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text("(Tối đa: $totalSundaysInMonth ngày)", color = Color.Gray, fontSize = 10.sp)
                                         }
-                                        
-                                        var sundayInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundays.toString())) }
-                                        LaunchedEffect(remainingSundays) {
-                                            if (sundayInputText.text != remainingSundays.toString()) {
-                                                sundayInputText = sundayInputText.copy(
-                                                    text = remainingSundays.toString(),
-                                                    selection = androidx.compose.ui.text.TextRange(remainingSundays.toString().length)
-                                                )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Ca Ngày
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("☀️ Ca ngày (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("(x${df.format(c.heSoOtChuNhat)})", color = AccentGreen, fontSize = 11.sp)
                                             }
-                                        }
-                                        
-                                        OutlinedTextField(
-                                            value = sundayInputText,
-                                            onValueChange = { newValue ->
-                                                val cleanText = newValue.text.filter { it.isDigit() }
-                                                if (cleanText.isEmpty()) {
-                                                    sundayInputText = newValue.copy(text = "")
-                                                    remainingSundays = 0
-                                                } else {
-                                                    cleanText.toIntOrNull()?.let { parsed ->
-                                                        if (parsed <= totalSundaysInMonth) {
-                                                            sundayInputText = newValue.copy(text = cleanText)
-                                                            remainingSundays = parsed
-                                                        } else {
-                                                            val cappedStr = totalSundaysInMonth.toString()
-                                                            sundayInputText = androidx.compose.ui.text.input.TextFieldValue(
-                                                                text = cappedStr,
-                                                                selection = androidx.compose.ui.text.TextRange(cappedStr.length)
-                                                            )
-                                                            remainingSundays = totalSundaysInMonth
+
+                                            var sundayDayInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysDay.toString())) }
+                                            LaunchedEffect(remainingSundaysDay) {
+                                                if (sundayDayInputText.text != remainingSundaysDay.toString()) {
+                                                    sundayDayInputText = sundayDayInputText.copy(
+                                                        text = remainingSundaysDay.toString(),
+                                                        selection = androidx.compose.ui.text.TextRange(remainingSundaysDay.toString().length)
+                                                    )
+                                                }
+                                            }
+
+                                            OutlinedTextField(
+                                                value = sundayDayInputText,
+                                                onValueChange = { newValue ->
+                                                    val cleanText = newValue.text.filter { it.isDigit() }
+                                                    if (cleanText.isEmpty()) {
+                                                        sundayDayInputText = newValue.copy(text = "")
+                                                        remainingSundaysDay = 0
+                                                    } else {
+                                                        cleanText.toIntOrNull()?.let { parsed ->
+                                                            val maxDayAllowed = (totalSundaysInMonth - remainingSundaysNight).coerceAtLeast(0)
+                                                            if (parsed <= maxDayAllowed) {
+                                                                sundayDayInputText = newValue.copy(text = cleanText)
+                                                                remainingSundaysDay = parsed
+                                                            } else {
+                                                                val cappedStr = maxDayAllowed.toString()
+                                                                sundayDayInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                                    text = cappedStr,
+                                                                    selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                                )
+                                                                remainingSundaysDay = maxDayAllowed
+                                                            }
                                                         }
                                                     }
+                                                },
+                                                modifier = Modifier.width(68.dp).height(46.dp).testTag("sunday_day_count_input"),
+                                                textStyle = androidx.compose.ui.text.TextStyle(
+                                                    textAlign = TextAlign.Center, 
+                                                    color = White, 
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                ),
+                                                singleLine = true,
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                                ),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = AccentGreen,
+                                                    unfocusedBorderColor = Color(0xFF3C3C3C),
+                                                    focusedContainerColor = Color(0xFF252525),
+                                                    unfocusedContainerColor = Color(0xFF181818),
+                                                    focusedTextColor = White,
+                                                    unfocusedTextColor = White,
+                                                    cursorColor = AccentGreen
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Ca Đêm
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text("🌙 Ca đêm (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("(x${df.format(c.heSoOtChuNhat)} + đêm)", color = NeonBlue, fontSize = 11.sp)
+                                            }
+
+                                            var sundayNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysNight.toString())) }
+                                            LaunchedEffect(remainingSundaysNight) {
+                                                if (sundayNightInputText.text != remainingSundaysNight.toString()) {
+                                                    sundayNightInputText = sundayNightInputText.copy(
+                                                        text = remainingSundaysNight.toString(),
+                                                        selection = androidx.compose.ui.text.TextRange(remainingSundaysNight.toString().length)
+                                                    )
                                                 }
-                                            },
-                                            modifier = Modifier
-                                                .width(72.dp)
-                                                .testTag("sunday_count_input"),
-                                            textStyle = androidx.compose.ui.text.TextStyle(
-                                                textAlign = TextAlign.Center, 
-                                                color = White, 
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 14.sp
-                                            ),
-                                            singleLine = true,
-                                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                                            ),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color(0xFF3C3C3C),
-                                                focusedContainerColor = Color(0xFF1E1E1E),
-                                                unfocusedContainerColor = Color(0xFF161616),
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                cursorColor = NeonBlue
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
+                                            }
+
+                                            OutlinedTextField(
+                                                value = sundayNightInputText,
+                                                onValueChange = { newValue ->
+                                                    val cleanText = newValue.text.filter { it.isDigit() }
+                                                    if (cleanText.isEmpty()) {
+                                                        sundayNightInputText = newValue.copy(text = "")
+                                                        remainingSundaysNight = 0
+                                                    } else {
+                                                        cleanText.toIntOrNull()?.let { parsed ->
+                                                            val maxNightAllowed = (totalSundaysInMonth - remainingSundaysDay).coerceAtLeast(0)
+                                                            if (parsed <= maxNightAllowed) {
+                                                                sundayNightInputText = newValue.copy(text = cleanText)
+                                                                remainingSundaysNight = parsed
+                                                            } else {
+                                                                val cappedStr = maxNightAllowed.toString()
+                                                                sundayNightInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                                    text = cappedStr,
+                                                                    selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                                )
+                                                                remainingSundaysNight = maxNightAllowed
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier.width(68.dp).height(46.dp).testTag("sunday_night_count_input"),
+                                                textStyle = androidx.compose.ui.text.TextStyle(
+                                                    textAlign = TextAlign.Center, 
+                                                    color = White, 
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                ),
+                                                singleLine = true,
+                                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                                ),
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    focusedBorderColor = NeonBlue,
+                                                    unfocusedBorderColor = Color(0xFF3C3C3C),
+                                                    focusedContainerColor = Color(0xFF252525),
+                                                    unfocusedContainerColor = Color(0xFF181818),
+                                                    focusedTextColor = White,
+                                                    unfocusedTextColor = White,
+                                                    cursorColor = NeonBlue
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -921,12 +1047,25 @@ fun PayslipScreen(
                             PayslipMoneyRow(label = "OT ngày ${df.format(c.heSoOtNgayThuong)} (${df.format(totalOtDayHours)}h)", value = totalOtDayPay, isAddition = true, isAccent = true)
                         }
 
-                        // 14. OT Chủ nhật
-                        if (s.tienChuNhat > 0.0) {
+                        // 14. OT Chủ nhật (Thực tế đã làm)
+                        if (s.tienChuNhatNgay > 0.0) {
+                            PayslipMoneyRow(label = "OT CN - Ca ngày ${df.format(c.heSoOtChuNhat)} (${df.format(s.chuNhatDayHours)}h)", value = s.tienChuNhatNgay, isAddition = true, isAccent = true)
+                        }
+                        if (s.tienChuNhatDem > 0.0) {
+                            PayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(c.heSoOtChuNhat)} (${df.format(s.chuNhatNightHours)}h)", value = s.tienChuNhatDem, isAddition = true, isAccent = true)
+                        }
+                        if (s.tienChuNhatNgay == 0.0 && s.tienChuNhatDem == 0.0 && s.tienChuNhat > 0.0) {
                             PayslipMoneyRow(label = "OT chủ nhật ${df.format(c.heSoOtChuNhat)} (${df.format(s.chuNhatHours)}h)", value = s.tienChuNhat, isAddition = true, isAccent = true)
                         }
-                        if (selectedTab == 1 && isCurrentSelectedMonth && includeSundayInProjection && remainingSundays > 0) {
-                            PayslipMoneyRow(label = "OT chủ nhật ${df.format(c.heSoOtChuNhat)} ($remainingSundays)", value = additionalSundaysPay, isAddition = true, isAccent = true)
+
+                        // 14.1 OT Chủ nhật (Dự kiến)
+                        if (selectedTab == 1 && isCurrentSelectedMonth && includeSundayInProjection) {
+                            if (remainingSundaysDay > 0) {
+                                PayslipMoneyRow(label = "Dự kiến CN - Ca ngày (${df.format(c.heSoOtChuNhat)} - $remainingSundaysDay ngày)", value = additionalSundaysDayPay, isAddition = true, isAccent = true)
+                            }
+                            if (remainingSundaysNight > 0) {
+                                PayslipMoneyRow(label = "Dự kiến CN - Ca đêm (${df.format(c.heSoOtChuNhat)} - $remainingSundaysNight ngày)", value = additionalSundaysNightPay, isAddition = true, isAccent = true)
+                            }
                         }
 
                         // 15. OT Lễ
@@ -944,10 +1083,10 @@ fun PayslipScreen(
                         }
 
                         // 16. Phụ cấp đêm
-                        val finalPcCaDemCount = if (selectedTab == 1 && selectedOt15Shift == "Đêm") s.caDemCount + customOt15DaysCount.toInt() else s.caDemCount
-                        val finalPcCaDem = if (selectedTab == 1) (s.pcCaDemVal + customNightAllowance) else s.pcCaDemVal
+                        val finalPcCaDemCount = s.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0)
+                        val finalPcCaDem = if (selectedTab == 1) (s.pcCaDemVal + customNightAllowance + additionalSundaysNightAllowance) else s.pcCaDemVal
                         if (finalPcCaDem > 0.0) {
-                            PayslipMoneyRow(label = "Phụ cấp đêm ($finalPcCaDemCount)", value = finalPcCaDem, isAddition = true)
+                            PayslipMoneyRow(label = "Phụ cấp ca đêm ($finalPcCaDemCount)", value = finalPcCaDem, isAddition = true)
                         }
 
                         // 17. Xăng xe
