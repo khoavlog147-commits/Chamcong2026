@@ -1450,25 +1450,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun isHolidayDate(dateStr: String): Boolean {
-        return try {
-            val parser = if (dateStr.contains("/")) {
-                SimpleDateFormat("dd/MM/yyyy", Locale.US)
-            } else {
-                SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            }
-            val date = parser.parse(dateStr)
-            if (date != null) {
-                val cal = Calendar.getInstance().apply { time = date }
-                val d = cal.get(Calendar.DAY_OF_MONTH)
-                val m = cal.get(Calendar.MONTH) + 1
-                val mdStr = String.format(Locale.US, "%02d-%02d", d, m)
-                mdStr == "01-01" || mdStr == "30-04" || mdStr == "01-05" || mdStr == "02-09"
-            } else {
-                false
-            }
-        } catch (e: Exception) {
-            false
-        }
+        return com.example.data.SalaryCalculator.isHoliday(dateStr)
     }
 
     private fun roundCheckInGrace(timeMs: Long): Long {

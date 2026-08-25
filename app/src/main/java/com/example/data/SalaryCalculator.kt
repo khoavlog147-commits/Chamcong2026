@@ -651,23 +651,33 @@ object SalaryCalculator {
     }
 
     // Static compatibility methods for holiday/sunday detection
-    fun isHoliday(dateString: String): Boolean {
+    fun getHolidayName(dateString: String): String? {
         return try {
             val parser = if (dateString.contains("/")) {
                 SimpleDateFormat("dd/MM/yyyy", Locale.US)
             } else {
                 SimpleDateFormat("yyyy-MM-dd", Locale.US)
             }
-            val date = parser.parse(dateString) ?: return false
+            val date = parser.parse(dateString) ?: return null
             val cal = Calendar.getInstance().apply { time = date }
             val day = cal.get(Calendar.DAY_OF_MONTH)
             val month = cal.get(Calendar.MONTH) + 1
             val md = String.format(Locale.US, "%02d/%02d", day, month)
-            val holidays = setOf("01/01", "30/04", "01/05", "02/09")
-            holidays.contains(md)
+            when (md) {
+                "01/01" -> "Tết Dương Lịch"
+                "30/04" -> "Giải Phóng Miền Nam"
+                "01/05" -> "Quốc Tế Lao Động"
+                "02/09" -> "Quốc Khánh (2/9)"
+                "03/09" -> "Nghỉ Lễ Quốc Khánh"
+                else -> null
+            }
         } catch (e: Exception) {
-            false
+            null
         }
+    }
+
+    fun isHoliday(dateString: String): Boolean {
+        return getHolidayName(dateString) != null
     }
 
     fun isSunday(dateString: String): Boolean {

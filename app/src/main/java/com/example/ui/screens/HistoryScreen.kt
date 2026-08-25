@@ -97,6 +97,25 @@ fun HistoryScreen(
         getCalendarDaysForMonth(currentMonthDate)
     }
 
+    // List of public holidays in the currently selected month
+    val holidaysInMonth = remember(daysInMonth, entries) {
+        val list = mutableListOf<Pair<String, String>>()
+        daysInMonth.filter { !it.isEmpty }.forEach { day ->
+            val holidayName = day.holidayName ?: run {
+                val e = entries.find { it.date == day.dateString }
+                if (e?.dayType == "HOLIDAY" || e?.dayType == "HOLIDAY_LEAVE") "Nghỉ lễ" else null
+            }
+            if (holidayName != null) {
+                val dStr = if (day.dateString.contains("/")) {
+                    val parts = day.dateString.split("/")
+                    "${parts.getOrNull(0)?.padStart(2, '0')}/${parts.getOrNull(1)?.padStart(2, '0')}"
+                } else day.dateString
+                list.add(Pair(dStr, holidayName))
+            }
+        }
+        list.distinctBy { it.first }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -207,6 +226,48 @@ fun HistoryScreen(
                 }
             }
 
+            // Holiday Highlights Banner for Currently Selected Month
+            AnimatedVisibility(visible = holidaysInMonth.isNotEmpty()) {
+                Surface(
+                    color = Color(0xFF2E2405),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.65f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(Color(0xFFFFD700).copy(alpha = 0.2f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("⭐", fontSize = 16.sp)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "🎉 Tháng này có ${holidaysInMonth.size} ngày Lễ Quốc Gia:",
+                                color = Color(0xFFFFD700),
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = holidaysInMonth.joinToString(" • ") { "${it.first}: ${it.second}" } + "\n(Hưởng 100% lương khi nghỉ hoặc x300% lương khi đi làm)",
+                                color = Color(0xFFFFE57F),
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                    }
+                }
+            }
+
             // Grid header: Mon -> Sun (Thứ 2 đến Chủ Nhật VN Calendar starting T2)
             Row(
                 modifier = Modifier
@@ -278,6 +339,41 @@ fun HistoryScreen(
                             }
                         )
                     }
+                }
+            }
+
+            // Quick Color Legend Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(Color(0xFFFFD700), CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Ngày Lễ", color = Color(0xFFFFD700), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(AccentGreen, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Đi làm", color = LightGray, fontSize = 11.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(NightPurple, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Ca đêm", color = LightGray, fontSize = 11.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(NeonBlue, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Phép", color = LightGray, fontSize = 11.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(AccentRed, CircleShape))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Chủ nhật", color = LightGray, fontSize = 11.sp)
                 }
             }
 
@@ -448,6 +544,39 @@ fun HistoryScreen(
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        val holidayName = day.holidayName ?: com.example.data.SalaryCalculator.getHolidayName(day.dateString)
+                        if (holidayName != null) {
+                            Surface(
+                                color = Color(0xFF2E2405),
+                                shape = RoundedCornerShape(10.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("⭐", fontSize = 18.sp)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "NGÀY LỄ QUỐC GIA: $holidayName",
+                                            color = Color(0xFFFFD700),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Nghỉ lễ hưởng 100% lương ngày công cơ bản hoặc hưởng x300% lương khi đi làm.",
+                                            color = Color(0xFFFFE57F),
+                                            fontSize = 11.sp,
+                                            lineHeight = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         val active = activeEntry
                         if (active != null && active.date != day.dateString) {
                             Card(
@@ -1284,12 +1413,14 @@ fun DayGridCell(
     }
 
     val isActualWorkingDay = entry != null && entry.checkInTime != null && entry.checkOutTime != null
-    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(entry?.dayType) && !isActualWorkingDay
+    val isHoliday = day.isHoliday || entry?.dayType == "HOLIDAY" || entry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
+    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(entry?.dayType) && !isActualWorkingDay && !isHoliday
     val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(entry?.dayType) && !isActualWorkingDay
     val isUnauthorizedLeave = entry?.dayType == "UNAUTHORIZED_LEAVE" && !isActualWorkingDay
 
     val borderColor = when {
         isSelected -> NeonBlue
+        isHoliday -> Color(0xFFFFD700)
         isPaidLeave -> NeonBlue
         isUnpaidLeave -> AccentOrange
         isUnauthorizedLeave -> Color(0xFFEB5757)
@@ -1300,7 +1431,8 @@ fun DayGridCell(
     }
 
     val backgroundColor = when {
-        isSelected -> NeonBlue.copy(alpha = 0.2f)
+        isSelected -> NeonBlue.copy(alpha = 0.25f)
+        isHoliday -> Color(0xFFFFD700).copy(alpha = 0.22f)
         isPaidLeave -> NeonBlue.copy(alpha = 0.15f)
         isUnpaidLeave -> AccentOrange.copy(alpha = 0.12f)
         isUnauthorizedLeave -> Color(0xFFEB5757).copy(alpha = 0.15f)
@@ -1316,7 +1448,7 @@ fun DayGridCell(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(10.dp))
             .background(backgroundColor)
-            .border(1.5.dp, borderColor, RoundedCornerShape(10.dp))
+            .border(if (isHoliday) 2.dp else 1.5.dp, borderColor, RoundedCornerShape(10.dp))
             .clickable { onClick() }
             .padding(4.dp),
          contentAlignment = Alignment.Center
@@ -1325,17 +1457,26 @@ fun DayGridCell(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = day.dayNumber.toString(),
-                color = if (day.isSunday) AccentRed else White,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = day.dayNumber.toString(),
+                    color = when {
+                        isHoliday -> Color(0xFFFFD700)
+                        day.isSunday -> AccentRed
+                        else -> White
+                    },
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
             // Hours label or status
             if (entry != null) {
-                when (entry.dayType) {
-                    "PAID_LEAVE" -> {
+                when {
+                    entry.dayType == "PAID_LEAVE" && !isHoliday -> {
                         Text(
                             text = "PHÉP",
                             color = NeonBlue,
@@ -1343,7 +1484,7 @@ fun DayGridCell(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    "UNPAID_LEAVE" -> {
+                    entry.dayType == "UNPAID_LEAVE" -> {
                         Text(
                             text = "VẮNG",
                             color = AccentOrange,
@@ -1351,13 +1492,35 @@ fun DayGridCell(
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    "UNAUTHORIZED_LEAVE" -> {
+                    entry.dayType == "UNAUTHORIZED_LEAVE" -> {
                         Text(
                             text = "K.PHÉP",
                             color = Color(0xFFEB5757),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
+                    }
+                    entry.dayType == "HOLIDAY" || entry.dayType == "HOLIDAY_LEAVE" || isHoliday -> {
+                        if (entry.checkInTime != null && entry.checkOutTime != null) {
+                            val processed = com.example.data.SalaryCalculator.calculateSingleEntry(entry, config)
+                            val shift = com.example.data.SalaryCalculator.getShiftForEntry(entry)
+                            val stdHrs = processed.workDay * shift.standardHours
+                            val totalHrs = stdHrs + processed.otHours
+                            val df = DecimalFormat("#.#")
+                            Text(
+                                text = "${df.format(totalHrs)}h",
+                                color = Color(0xFFFFD700),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        } else {
+                            Text(
+                                text = "LỄ",
+                                color = Color(0xFFFFD700),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     }
                     else -> {
                         if (entry.isWorking) {
@@ -1389,9 +1552,17 @@ fun DayGridCell(
                     Box(
                         modifier = Modifier
                             .size(4.dp)
-                            .background(White, CircleShape)
+                            .background(if (isHoliday) Color(0xFFFFD700) else White, CircleShape)
                     )
                 }
+            } else if (isHoliday) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "LỄ",
+                    color = Color(0xFFFFD700),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             } else {
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(modifier = Modifier.size(4.dp).background(Color(0xFF2C2C2C), RoundedCornerShape(2.dp)))
@@ -1405,6 +1576,8 @@ data class CalendarDayInfo(
     val dayNumber: Int,
     val dateString: String,
     val isSunday: Boolean,
+    val isHoliday: Boolean = false,
+    val holidayName: String? = null,
     val isEmpty: Boolean = false
 )
 
@@ -1424,14 +1597,16 @@ private fun getCalendarDaysForMonth(monthDate: Date): List<CalendarDayInfo> {
     val indexOffset = if (startDayOfWeek == Calendar.SUNDAY) 6 else startDayOfWeek - 2
 
     for (i in 0 until indexOffset) {
-        list.add(CalendarDayInfo(0, "", false, true))
+        list.add(CalendarDayInfo(0, "", false, false, null, true))
     }
 
     for (day in 1..maxDays) {
         cal.set(Calendar.DAY_OF_MONTH, day)
         val dateString = sdf.format(cal.time)
         val isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-        list.add(CalendarDayInfo(day, dateString, isSunday, false))
+        val holidayName = com.example.data.SalaryCalculator.getHolidayName(dateString)
+        val isHoliday = holidayName != null
+        list.add(CalendarDayInfo(day, dateString, isSunday, isHoliday, holidayName, false))
     }
 
     return list
