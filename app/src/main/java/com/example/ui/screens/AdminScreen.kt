@@ -3998,8 +3998,21 @@ fun EmployeePayslipView(
         0.0
     }
 
+    val unpaidDaysCount = remember(timeEntries) {
+        timeEntries.count { e -> com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "UNAUTHORIZED_LEAVE" }
+    }
+    val hasLoggedUnpaidOrAbsent = unpaidDaysCount > 0
+
+    val projectedRemainingWorkdays = remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+    val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(26.0)
+
     val soNgayCongDuKien = if (isCurrentSelectedMonth) {
-        summary.workingDays + remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val rawProjected = summary.workingDays + projectedRemainingWorkdays
+        if (unpaidDaysCount > 0) {
+            (standardTargetDays - unpaidDaysCount).coerceAtLeast(rawProjected)
+        } else {
+            maxOf(rawProjected, standardTargetDays)
+        }
     } else {
         maxOf(summary.workingDays, summary.standardWorkDays.toDouble())
     }
@@ -4011,10 +4024,10 @@ fun EmployeePayslipView(
             allowanceValue = valRaw,
             calcType = employee.getCalcTypeFor(fieldName),
             totalWorkDays = soNgayCongDuKienDouble,
-            comCaCount = summary.workingDays.toInt(),
+            comCaCount = soNgayCongDuKienDouble.toInt(),
             comOtCount = 0,
             nightShiftsCount = summary.caDemCount,
-            scheduledDaysSoFar = summary.workingDays.toInt(),
+            scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
             totalScheduledDaysInMonth = 26
         )
     }
@@ -4027,7 +4040,7 @@ fun EmployeePayslipView(
 
     val pcComCaShow = if (selectedTab == 1) {
         if (isCurrentSelectedMonth) {
-            summary.pcComCaVal + (remainingWeekdays * employee.pcComCa) + (if (includeSundayInProjection) remainingSundays * employee.pcComCa else 0.0)
+            soNgayCongDuKienDouble * employee.pcComCa
         } else {
             summary.pcComCaVal
         }
@@ -4044,10 +4057,6 @@ fun EmployeePayslipView(
     val pcKhacShow = if (selectedTab == 1) calcPr("pcCaDem", employee.pcCaDem) else summary.pcCaDemVal
     val pcKhac1Show = if (selectedTab == 1) calcPr("pcKhac1", employee.pcKhac1) else summary.pcKhac1Val
     val pcThamNienShow = if (selectedTab == 1) calcPr("pcThamNien", employee.pcThamNien) else summary.pcThamNienVal
-
-    val hasLoggedUnpaidOrAbsent = timeEntries.any { e ->
-        e.dayType == "UNPAID_LEAVE" || (e.checkInTime == null && e.dayType != "PAID_LEAVE" && e.dayType != "HOLIDAY_LEAVE")
-    }
 
     val pcChuyenCanShow = if (selectedTab == 1) {
         if (hasLoggedUnpaidOrAbsent) 0.0 else calcPr("tienChuyenCanGoc", employee.tienChuyenCanGoc)

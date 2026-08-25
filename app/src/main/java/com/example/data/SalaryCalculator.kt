@@ -651,6 +651,79 @@ object SalaryCalculator {
     }
 
     // Static compatibility methods for holiday/sunday detection
+    private val LUNAR_HOLIDAY_EXACT_MAP = mapOf(
+        // 2023
+        "20/01/2023" to "29 Tết Nguyên Đán",
+        "21/01/2023" to "30 Tết (Giao Thừa)",
+        "22/01/2023" to "Mùng 1 Tết Nguyên Đán",
+        "23/01/2023" to "Mùng 2 Tết Nguyên Đán",
+        "24/01/2023" to "Mùng 3 Tết Nguyên Đán",
+        "25/01/2023" to "Mùng 4 Tết Nguyên Đán",
+        "26/01/2023" to "Mùng 5 Tết Nguyên Đán",
+        "29/04/2023" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2024
+        "08/02/2024" to "29 Tết Nguyên Đán",
+        "09/02/2024" to "30 Tết (Giao Thừa)",
+        "10/02/2024" to "Mùng 1 Tết Nguyên Đán",
+        "11/02/2024" to "Mùng 2 Tết Nguyên Đán",
+        "12/02/2024" to "Mùng 3 Tết Nguyên Đán",
+        "13/02/2024" to "Mùng 4 Tết Nguyên Đán",
+        "14/02/2024" to "Mùng 5 Tết Nguyên Đán",
+        "18/04/2024" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2025
+        "27/01/2025" to "28 Tết Nguyên Đán",
+        "28/01/2025" to "29 Tết (Giao Thừa)",
+        "29/01/2025" to "Mùng 1 Tết Nguyên Đán",
+        "30/01/2025" to "Mùng 2 Tết Nguyên Đán",
+        "31/01/2025" to "Mùng 3 Tết Nguyên Đán",
+        "01/02/2025" to "Mùng 4 Tết Nguyên Đán",
+        "02/02/2025" to "Mùng 5 Tết Nguyên Đán",
+        "07/04/2025" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2026
+        "15/02/2026" to "28 Tết Nguyên Đán",
+        "16/02/2026" to "29 Tết (Giao Thừa)",
+        "17/02/2026" to "Mùng 1 Tết Nguyên Đán",
+        "18/02/2026" to "Mùng 2 Tết Nguyên Đán",
+        "19/02/2026" to "Mùng 3 Tết Nguyên Đán",
+        "20/02/2026" to "Mùng 4 Tết Nguyên Đán",
+        "21/02/2026" to "Mùng 5 Tết Nguyên Đán",
+        "26/04/2026" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2027
+        "05/02/2027" to "29 Tết Nguyên Đán",
+        "06/02/2027" to "30 Tết (Giao Thừa)",
+        "07/02/2027" to "Mùng 1 Tết Nguyên Đán",
+        "08/02/2027" to "Mùng 2 Tết Nguyên Đán",
+        "09/02/2027" to "Mùng 3 Tết Nguyên Đán",
+        "10/02/2027" to "Mùng 4 Tết Nguyên Đán",
+        "11/02/2027" to "Mùng 5 Tết Nguyên Đán",
+        "16/04/2027" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2028
+        "25/01/2028" to "29 Tết Nguyên Đán",
+        "26/01/2028" to "30 Tết (Giao Thừa)",
+        "27/01/2028" to "Mùng 1 Tết Nguyên Đán",
+        "28/01/2028" to "Mùng 2 Tết Nguyên Đán",
+        "29/01/2028" to "Mùng 3 Tết Nguyên Đán",
+        "30/01/2028" to "Mùng 4 Tết Nguyên Đán",
+        "31/01/2028" to "Mùng 5 Tết Nguyên Đán",
+        "04/04/2028" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2029
+        "12/02/2029" to "29 Tết (Giao Thừa)",
+        "13/02/2029" to "Mùng 1 Tết Nguyên Đán",
+        "14/02/2029" to "Mùng 2 Tết Nguyên Đán",
+        "15/02/2029" to "Mùng 3 Tết Nguyên Đán",
+        "16/02/2029" to "Mùng 4 Tết Nguyên Đán",
+        "17/02/2029" to "Mùng 5 Tết Nguyên Đán",
+        "23/04/2029" to "Giỗ Tổ Hùng Vương (10/3 ÂL)",
+        // 2030
+        "02/02/2030" to "29 Tết (Giao Thừa)",
+        "03/02/2030" to "Mùng 1 Tết Nguyên Đán",
+        "04/02/2030" to "Mùng 2 Tết Nguyên Đán",
+        "05/02/2030" to "Mùng 3 Tết Nguyên Đán",
+        "06/02/2030" to "Mùng 4 Tết Nguyên Đán",
+        "07/02/2030" to "Mùng 5 Tết Nguyên Đán",
+        "12/04/2030" to "Giỗ Tổ Hùng Vương (10/3 ÂL)"
+    )
+
     fun getHolidayName(dateString: String): String? {
         return try {
             val parser = if (dateString.contains("/")) {
@@ -662,15 +735,20 @@ object SalaryCalculator {
             val cal = Calendar.getInstance().apply { time = date }
             val day = cal.get(Calendar.DAY_OF_MONTH)
             val month = cal.get(Calendar.MONTH) + 1
+            val year = cal.get(Calendar.YEAR)
             val md = String.format(Locale.US, "%02d/%02d", day, month)
+            val dmy = String.format(Locale.US, "%02d/%02d/%04d", day, month, year)
+
+            // 1. Check fixed Solar Holidays (Chỉ các ngày lễ chính thức)
             when (md) {
-                "01/01" -> "Tết Dương Lịch"
-                "30/04" -> "Giải Phóng Miền Nam"
-                "01/05" -> "Quốc Tế Lao Động"
-                "02/09" -> "Quốc Khánh (2/9)"
-                "03/09" -> "Nghỉ Lễ Quốc Khánh"
-                else -> null
+                "01/01" -> return "Tết Dương Lịch"
+                "30/04" -> return "Giải Phóng Miền Nam"
+                "01/05" -> return "Quốc Tế Lao Động"
+                "02/09" -> return "Quốc Khánh (2/9)"
             }
+
+            // 2. Check Vietnamese Lunar Holidays (Tết Âm Lịch & Giỗ Tổ Hùng Vương)
+            LUNAR_HOLIDAY_EXACT_MAP[dmy]
         } catch (e: Exception) {
             null
         }
