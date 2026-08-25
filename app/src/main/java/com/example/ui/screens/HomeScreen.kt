@@ -42,6 +42,13 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -264,6 +271,7 @@ fun HomeScreen(
     var quickNoteText by remember { mutableStateOf("") }
     var isExpanded by remember { mutableStateOf(false) }
     var showRetroactiveDialog by remember { mutableStateOf(false) }
+    var selectedEntryForBreakdown by remember { mutableStateOf<TimeEntry?>(null) }
     LaunchedEffect(activeEntry) {
         quickNoteText = activeEntry?.note ?: ""
     }
@@ -1068,7 +1076,11 @@ fun HomeScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp),
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        selectedEntryForBreakdown = entry
+                                    }
+                                    .padding(vertical = 10.dp, horizontal = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -1161,7 +1173,15 @@ fun HomeScreen(
                                     }
                                     val formattedEarnings = DecimalFormat("#,###").format(earnings)
 
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .clickable {
+                                                selectedEntryForBreakdown = entry
+                                            }
+                                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    ) {
                                         Text(
                                             text = "$formattedEarnings đ",
                                             color = SuccessGreen,
@@ -1171,9 +1191,9 @@ fun HomeScreen(
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Icon(
                                             imageVector = Icons.Default.ChevronRight,
-                                            contentDescription = null,
-                                            tint = TextSecondary,
-                                            modifier = Modifier.size(16.dp)
+                                            contentDescription = "Xem chi tiết phụ cấp",
+                                            tint = PrimaryBlue,
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
@@ -1188,6 +1208,14 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(80.dp))
         }
+    }
+
+    if (selectedEntryForBreakdown != null) {
+        ShiftEarningsBreakdownDialog(
+            entry = selectedEntryForBreakdown!!,
+            config = configState,
+            onDismiss = { selectedEntryForBreakdown = null }
+        )
     }
 
     if (showRetroactiveDialog) {
@@ -2412,18 +2440,121 @@ fun MonthlyActivityChart(data: List<DayChartPoint>, selectedMonth: String = "") 
     }
 }
 
-private fun calculateDayEarnings(entry: TimeEntry, config: com.example.data.model.UserConfig?): Double {
-    if (config == null) return 0.0
+data class ShiftEarningsBreakdownItem(
+    val name: String,
+    val formula: String,
+    val amount: Double,
+    val icon: ImageVector,
+    val iconTint: Color
+)
+
+data class ShiftEarningsBreakdown(
+    val dateDisplay: String,
+    val shiftName: String,
+    val isNightShift: Boolean,
+    val dayTypeLabel: String,
+    val timeRangeStr: String,
+    val rawHours: Double,
+    val breakHours: Double,
+    val actualHours: Double,
+    val standardHours: Double,
+    val otHours: Double,
+    val hourlySalary: Double,
+    val items: List<ShiftEarningsBreakdownItem>,
+    val totalAmount: Double
+)
+
+private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.model.UserConfig?): ShiftEarningsBreakdown {
+    val items = mutableListOf<ShiftEarningsBreakdownItem>()
+    val formatter = SimpleDateFormat("EEEE, dd/MM/yyyy", Locale("vi", "VN"))
+    val dateDisplay = try {
+        val parser = if (entry.date.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val d = parser.parse(entry.date)
+        if (d != null) formatter.format(d).replaceFirstChar { it.uppercase() } else entry.date
+    } catch (e: Exception) {
+        entry.date
+    }
+
+    if (config == null) {
+        return ShiftEarningsBreakdown(
+            dateDisplay = dateDisplay,
+            shiftName = "Ca thường",
+            isNightShift = false,
+            dayTypeLabel = "Ngày thường",
+            timeRangeStr = "--",
+            rawHours = 0.0,
+            breakHours = 0.0,
+            actualHours = 0.0,
+            standardHours = 0.0,
+            otHours = 0.0,
+            hourlySalary = 0.0,
+            items = emptyList(),
+            totalAmount = 0.0
+        )
+    }
+
     val processed = com.example.data.SalaryCalculator.calculateSingleEntry(entry, config)
     val hourlySalary = config.luongCoBan / 26.0 / 8.0
-    
-    if (processed.dayType == "PAID_LEAVE" || processed.dayType == "HOLIDAY_LEAVE") {
-        return config.luongCoBan / 26.0
+    val dailySalary = config.luongCoBan / 26.0
+    val shift = com.example.data.SalaryCalculator.getShiftForEntry(entry)
+
+    val isPaidLeave = processed.dayType == "PAID_LEAVE" || processed.dayType == "HOLIDAY_LEAVE"
+    val isUnpaidLeave = processed.dayType == "UNPAID_LEAVE"
+
+    if (isPaidLeave) {
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Lương ngày nghỉ hưởng lương",
+                formula = "1 ngày công tiêu chuẩn (${DecimalFormat("#,###").format(dailySalary)} đ)",
+                amount = dailySalary,
+                icon = Icons.Default.CheckCircle,
+                iconTint = SuccessGreen
+            )
+        )
+        return ShiftEarningsBreakdown(
+            dateDisplay = dateDisplay,
+            shiftName = "Nghỉ phép",
+            isNightShift = false,
+            dayTypeLabel = "Nghỉ hưởng lương",
+            timeRangeStr = "Hưởng 100% lương",
+            rawHours = 8.0,
+            breakHours = 0.0,
+            actualHours = 8.0,
+            standardHours = 8.0,
+            otHours = 0.0,
+            hourlySalary = hourlySalary,
+            items = items,
+            totalAmount = dailySalary
+        )
     }
-    if (processed.dayType == "UNPAID_LEAVE" || processed.checkInTime == null) {
-        return 0.0
+
+    if (isUnpaidLeave || processed.checkInTime == null) {
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Nghỉ không hưởng lương",
+                formula = "Không phát sinh ngày công",
+                amount = 0.0,
+                icon = Icons.Default.Close,
+                iconTint = DangerRed
+            )
+        )
+        return ShiftEarningsBreakdown(
+            dateDisplay = dateDisplay,
+            shiftName = "Nghỉ",
+            isNightShift = false,
+            dayTypeLabel = "Nghỉ không lương",
+            timeRangeStr = "--",
+            rawHours = 0.0,
+            breakHours = 0.0,
+            actualHours = 0.0,
+            standardHours = 0.0,
+            otHours = 0.0,
+            hourlySalary = hourlySalary,
+            items = items,
+            totalAmount = 0.0
+        )
     }
-    
+
     val inCal = Calendar.getInstance()
     inCal.timeInMillis = processed.checkInTime!!
     val inHour = inCal.get(Calendar.HOUR_OF_DAY)
@@ -2431,43 +2562,69 @@ private fun calculateDayEarnings(entry: TimeEntry, config: com.example.data.mode
     val inTotalMin = inHour * 60 + inMin
     val isNightShift = (inTotalMin in (18 * 60)..(19 * 60 + 30)) || 
                        inHour >= 22 || inHour <= 6 || 
-                       processed.dayType == "NIGHT"
+                       processed.dayType == "NIGHT" || shift.shiftType == "NIGHT" || shift.shiftId == "ca_dem"
 
-    val isSunday = processed.dayType == "SUNDAY" || 
-                   (run {
-                       try {
-                           val parser = if (processed.date.contains("/")) {
-                               SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                           } else {
-                               SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                           }
-                           val dateVal = parser.parse(processed.date)
-                           if (dateVal != null) {
-                               val cal = Calendar.getInstance()
-                               cal.time = dateVal
-                               cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-                           } else {
-                               false
-                           }
-                       } catch (e: Exception) {
-                           false
-                       }
-                   } && processed.dayType == "NIGHT")
+    val isSunday = processed.dayType == "SUNDAY" || (run {
+        try {
+            val parser = if (processed.date.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val dateVal = parser.parse(processed.date)
+            if (dateVal != null) {
+                val cal = Calendar.getInstance()
+                cal.time = dateVal
+                cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+            } else false
+        } catch (e: Exception) { false }
+    } && (processed.dayType == "NIGHT" || isNightShift || processed.dayType == "SUNDAY"))
 
     val isHoliday = com.example.data.SalaryCalculator.isHoliday(processed.date)
 
+    val dayTypeLabel = when {
+        isHoliday -> "Ngày Lễ (Hệ số ${DecimalFormat("#.#").format(config.heSoOtNgayLe)})"
+        isSunday -> "Chủ Nhật (Hệ số ${DecimalFormat("#.#").format(config.heSoOtChuNhat)})"
+        else -> "Ngày thường (Hệ số ${DecimalFormat("#.#").format(config.heSoOtNgayThuong)})"
+    }
+
+    val shiftName = if (isNightShift) "Ca đêm" else "Ca ngày"
+
+    val timeRangeStr = if (entry.checkInTime != null && entry.checkOutTime != null) {
+        val tf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        "${tf.format(Date(entry.checkInTime!!))} → ${tf.format(Date(entry.checkOutTime!!))}"
+    } else if (entry.checkInTime != null) {
+        val tf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        "Vào ca lúc ${tf.format(Date(entry.checkInTime!!))} (Chưa ra ca)"
+    } else "--"
+
     if (processed.checkOutTime == null) {
-        if (isSunday) {
-            return 8.0 * hourlySalary * config.heSoOtChuNhat
-        } else {
-            return config.luongCoBan / 26.0
-        }
+        val amount = if (isSunday) 8.0 * hourlySalary * config.heSoOtChuNhat else dailySalary
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = if (isSunday) "Lương ca Chủ Nhật (Đang trong ca)" else "Lương ngày công tiêu chuẩn",
+                formula = if (isSunday) "8.0 giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${config.heSoOtChuNhat}" else "1 ngày công dự kiến",
+                amount = amount,
+                icon = Icons.Default.AccessTime,
+                iconTint = if (isSunday) AccentOrange else PrimaryBlue
+            )
+        )
+        return ShiftEarningsBreakdown(
+            dateDisplay = dateDisplay,
+            shiftName = shiftName,
+            isNightShift = isNightShift,
+            dayTypeLabel = dayTypeLabel,
+            timeRangeStr = timeRangeStr,
+            rawHours = 8.0,
+            breakHours = 0.0,
+            actualHours = 8.0,
+            standardHours = 8.0,
+            otHours = 0.0,
+            hourlySalary = hourlySalary,
+            items = items,
+            totalAmount = amount
+        )
     }
 
     val finalCheckIn = processed.normalizedCheckIn ?: processed.rawCheckIn ?: processed.checkInTime!!
     val finalCheckOut = processed.normalizedCheckOut ?: processed.rawCheckOut ?: processed.checkOutTime!!
     val rawDurationMs = (finalCheckOut - finalCheckIn).coerceAtLeast(0L)
-    // Round duration to the nearest minute to avoid sub-minute floating point variance
     val durationMs = Math.round(rawDurationMs / 60000.0) * 60000L
     val rawHours = durationMs / 3600000.0
     val breakHours = if (config.tinhKhauTruNghi) config.soGioNghiGiaiLao else 0.0
@@ -2476,31 +2633,439 @@ private fun calculateDayEarnings(entry: TimeEntry, config: com.example.data.mode
     val finalStandardHours = processed.workDay * 8.0
     val finalOtHours = processed.otHours
 
-    var earned = 0.0
+    // 1. Tiền lương ca làm việc cơ bản / chuẩn
     if (isSunday) {
-        earned += actualHours * hourlySalary * config.heSoOtChuNhat
+        val sunAmount = actualHours * hourlySalary * config.heSoOtChuNhat
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Tiền lương ca Chủ Nhật",
+                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtChuNhat)} (Hệ số CN)",
+                amount = sunAmount,
+                icon = Icons.Default.AccessTime,
+                iconTint = AccentOrange
+            )
+        )
     } else if (isHoliday) {
-        earned += actualHours * hourlySalary * config.heSoOtNgayLe
+        val holAmount = actualHours * hourlySalary * config.heSoOtNgayLe
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Tiền lương ca Ngày Lễ",
+                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtNgayLe)} (Hệ số Lễ)",
+                amount = holAmount,
+                icon = Icons.Default.AccessTime,
+                iconTint = DangerRed
+            )
+        )
     } else {
-        earned += finalStandardHours * hourlySalary
+        val stdAmount = finalStandardHours * hourlySalary
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Tiền lương giờ chuẩn (${DecimalFormat("#.#").format(processed.workDay)} công)",
+                formula = "${DecimalFormat("#.##").format(finalStandardHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g",
+                amount = stdAmount,
+                icon = Icons.Default.AccessTime,
+                iconTint = PrimaryBlue
+            )
+        )
         if (finalOtHours > 0.0) {
-            earned += finalOtHours * hourlySalary * config.heSoOtNgayThuong
+            val otAmount = finalOtHours * hourlySalary * config.heSoOtNgayThuong
+            items.add(
+                ShiftEarningsBreakdownItem(
+                    name = "Tiền tăng ca (OT ngày thường)",
+                    formula = "${DecimalFormat("#.##").format(finalOtHours)} giờ OT × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtNgayThuong)}",
+                    amount = otAmount,
+                    icon = Icons.Default.TrendingUp,
+                    iconTint = AccentOrange
+                )
+            )
         }
     }
 
-    if (actualHours >= 4.0) {
-        earned += config.pcComCa
-    }
-
-    if (finalOtHours >= 2.0) {
-        earned += config.pcComCa
-    }
-
+    // 2. Phụ cấp ca đêm
     if (isNightShift) {
-        earned += 100000.0
+        val pcDemVal = if (config.pcCaDem > 0) config.pcCaDem else 100000.0
+        items.add(
+            ShiftEarningsBreakdownItem(
+                name = "Phụ cấp ca đêm",
+                formula = "Hỗ trợ làm việc ca đêm (+${DecimalFormat("#,###").format(pcDemVal)} đ/ca)",
+                amount = pcDemVal,
+                icon = Icons.Default.NightsStay,
+                iconTint = NightPurple
+            )
+        )
     }
 
-    return earned
+    // 3. Phụ cấp cơm ca
+    if (actualHours >= 4.0 || processed.workDay > 0.0) {
+        val comCaVal = if (config.pcComCa > 0) config.pcComCa else if (config.tienComMoiNgay > 0) config.tienComMoiNgay else 0.0
+        if (comCaVal > 0) {
+            items.add(
+                ShiftEarningsBreakdownItem(
+                    name = "Phụ cấp cơm ca",
+                    formula = "Hỗ trợ bữa ăn ca làm việc",
+                    amount = comCaVal,
+                    icon = Icons.Default.Restaurant,
+                    iconTint = SuccessGreen
+                )
+            )
+        }
+    }
+
+    // 4. Phụ cấp cơm tăng ca (OT)
+    if (finalOtHours >= 2.0 || (finalOtHours >= 1.0 && config.pcComOt > 0)) {
+        val comOtVal = if (config.pcComOt > 0) config.pcComOt else if (config.pcComCa > 0) config.pcComCa else 0.0
+        if (comOtVal > 0) {
+            items.add(
+                ShiftEarningsBreakdownItem(
+                    name = "Phụ cấp cơm tăng ca (OT)",
+                    formula = "Tăng ca ${DecimalFormat("#.##").format(finalOtHours)} giờ (≥ 2.0g)",
+                    amount = comOtVal,
+                    icon = Icons.Default.Fastfood,
+                    iconTint = AccentOrange
+                )
+            )
+        }
+    }
+
+    val totalAmount = items.sumOf { it.amount }
+
+    return ShiftEarningsBreakdown(
+        dateDisplay = dateDisplay,
+        shiftName = shiftName,
+        isNightShift = isNightShift,
+        dayTypeLabel = dayTypeLabel,
+        timeRangeStr = timeRangeStr,
+        rawHours = rawHours,
+        breakHours = breakHours,
+        actualHours = actualHours,
+        standardHours = finalStandardHours,
+        otHours = finalOtHours,
+        hourlySalary = hourlySalary,
+        items = items,
+        totalAmount = totalAmount
+    )
+}
+
+private fun calculateDayEarnings(entry: TimeEntry, config: com.example.data.model.UserConfig?): Double {
+    return getDayEarningsBreakdown(entry, config).totalAmount
+}
+
+@Composable
+fun ShiftEarningsBreakdownDialog(
+    entry: TimeEntry,
+    config: com.example.data.model.UserConfig?,
+    onDismiss: () -> Unit
+) {
+    val breakdown = remember(entry, config) {
+        getDayEarningsBreakdown(entry, config)
+    }
+    val formattedTotal = DecimalFormat("#,###").format(breakdown.totalAmount) + " đ"
+    val formattedHourly = DecimalFormat("#,###").format(breakdown.hourlySalary) + " đ/giờ"
+    val lcbFormatted = DecimalFormat("#,###").format(config?.luongCoBan ?: 0.0) + " đ"
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = DarkContainer,
+            border = BorderStroke(1.dp, CardBorder)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(SuccessGreen.copy(alpha = 0.18f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = null,
+                                tint = SuccessGreen,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Text(
+                                text = "BẢNG KÊ THU NHẬP CA",
+                                color = White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = breakdown.dateDisplay,
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Đóng",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Shift & Time Badges
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Shift Badge
+                    Surface(
+                        color = if (breakdown.isNightShift) NightPurple.copy(alpha = 0.25f) else AccentOrange.copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, if (breakdown.isNightShift) NightPurple.copy(alpha = 0.6f) else AccentOrange.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = if (breakdown.isNightShift) "🌙 ${breakdown.shiftName}" else "☀️ ${breakdown.shiftName}",
+                            color = if (breakdown.isNightShift) Color(0xFFE9D5FF) else Color(0xFFFFEDD5),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+
+                    // Day Type Badge
+                    Surface(
+                        color = PrimaryBlue.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = breakdown.dayTypeLabel,
+                            color = NeonBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Working Hours Info Row
+                Surface(
+                    color = DarkBackground,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(14.dp))
+                            Text(
+                                text = breakdown.timeRangeStr,
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Text(
+                            text = "Làm: ${DecimalFormat("#.##").format(breakdown.actualHours)}g" +
+                                    (if (breakdown.breakHours > 0) " (Trừ nghỉ ${DecimalFormat("#.#").format(breakdown.breakHours)}g)" else ""),
+                            color = TextSecondary,
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Hero Total Earnings Card
+                Surface(
+                    color = DarkBackground,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "TỔNG THU NHẬP CA NÀY",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = formattedTotal,
+                            color = SuccessGreen,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Lương cơ bản/giờ + Giờ tăng ca + Phụ cấp ca",
+                            color = TextSecondary,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Section title: Breakdown items
+                Text(
+                    text = "CÁC KHOẢN CẤU THÀNH THU NHẬP",
+                    color = TextSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.5.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Breakdown Items List
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    breakdown.items.forEach { item ->
+                        Surface(
+                            color = DarkBackground,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, CardBorder),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(item.iconTint.copy(alpha = 0.15f), RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = item.icon,
+                                            contentDescription = null,
+                                            tint = item.iconTint,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = item.name,
+                                            color = White,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = item.formula,
+                                            color = TextSecondary,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+
+                                Text(
+                                    text = "+${DecimalFormat("#,###").format(item.amount)} đ",
+                                    color = if (item.amount > 0) SuccessGreen else TextSecondary,
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.End
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Footer note box
+                Surface(
+                    color = PrimaryBlue.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.2f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = PrimaryBlue, modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "LCB: $lcbFormatted (26 ngày/8h) • Đơn giá: $formattedHourly",
+                            color = LightGray,
+                            fontSize = 10.5.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Close Button
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Đóng",
+                        color = White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

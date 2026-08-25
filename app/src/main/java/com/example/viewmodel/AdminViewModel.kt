@@ -2,6 +2,7 @@ package com.example.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.FirestoreService
@@ -12,6 +13,7 @@ import com.example.util.ExportUtils
 import com.example.util.toTimeEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
@@ -133,6 +135,26 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _sentNotifications = MutableStateFlow<List<com.example.data.model.AdminNotification>>(emptyList())
+    val sentNotifications: StateFlow<List<com.example.data.model.AdminNotification>> = _sentNotifications.asStateFlow()
+
+    private val _isLoadingNotifications = MutableStateFlow(false)
+    val isLoadingNotifications: StateFlow<Boolean> = _isLoadingNotifications.asStateFlow()
+
+    fun loadSentNotifications() {
+        viewModelScope.launch {
+            _isLoadingNotifications.value = true
+            try {
+                val list = FirestoreService.getAllAdminNotifications()
+                _sentNotifications.value = list
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Lỗi tải danh sách thông báo đã gửi: ${e.message}")
+            } finally {
+                _isLoadingNotifications.value = false
+            }
+        }
+    }
+
     fun sendNotificationToEmployee(
         targetUid: String,
         targetName: String,
@@ -154,7 +176,29 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 isPinned = isPinned
             )
             val success = FirestoreService.sendAdminNotification(notif)
+            if (success) {
+                loadSentNotifications()
+            }
             onResult(success)
+        }
+    }
+
+    fun deleteNotificationByAdmin(
+        notificationId: String,
+        targetUid: String = "ALL",
+        onResult: (Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val success = FirestoreService.deleteAdminNotification(targetUid, notificationId)
+                if (success) {
+                    _sentNotifications.value = _sentNotifications.value.filter { it.id != notificationId }
+                }
+                onResult(success)
+            } catch (e: Exception) {
+                Log.e("AdminViewModel", "Lỗi admin xóa thông báo: ${e.message}")
+                onResult(false)
+            }
         }
     }
 

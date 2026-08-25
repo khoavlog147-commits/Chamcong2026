@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -899,6 +900,7 @@ fun AdminScreen(
     if (showSendNotifDialog) {
         SendAdminNotificationDialog(
             employees = employees,
+            adminViewModel = adminViewModel,
             onDismiss = { showSendNotifDialog = false },
             onSend = { targetUid, targetName, title, message, type, isPinned ->
                 adminViewModel.sendNotificationToEmployee(
@@ -3243,7 +3245,10 @@ fun AdminInputField(
     onValueChange: (String) -> Unit,
     isNumeric: Boolean = false,
     keyboardType: androidx.compose.ui.text.input.KeyboardType = if (isNumeric) androidx.compose.ui.text.input.KeyboardType.Number else androidx.compose.ui.text.input.KeyboardType.Text,
-    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else 6
 ) {
     androidx.compose.material3.OutlinedTextField(
         value = value,
@@ -3251,6 +3256,9 @@ fun AdminInputField(
         label = { androidx.compose.material3.Text(label) },
         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
         visualTransformation = visualTransformation,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
             focusedBorderColor = NeonBlue,
@@ -3284,152 +3292,495 @@ fun normalizeMonthYearInput(input: String): String {
 @Composable
 fun SendAdminNotificationDialog(
     employees: List<UserConfig>,
+    adminViewModel: AdminViewModel,
     onDismiss: () -> Unit,
     onSend: (targetUid: String, targetName: String, title: String, message: String, type: String, isPinned: Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: Gửi mới, 1: Quản lý & Xóa
+
     var title by remember { mutableStateOf("") }
     var message by remember { mutableStateOf("") }
     var isPinned by remember { mutableStateOf(false) }
     var expandedUserDropdown by remember { mutableStateOf(false) }
     var selectedUser by remember { mutableStateOf<UserConfig?>(null) } // null means "Tất cả nhân viên"
 
+    val sentNotifications by adminViewModel.sentNotifications.collectAsStateWithLifecycle()
+    val isLoadingNotifs by adminViewModel.isLoadingNotifications.collectAsStateWithLifecycle()
+    var notifToDelete by remember { mutableStateOf<com.example.data.model.AdminNotification?>(null) }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1) {
+            adminViewModel.loadSentNotifications()
+        }
+    }
+
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { androidx.compose.material3.Text("Gửi thông báo", color = White, fontWeight = FontWeight.Bold, fontSize = 18.sp) },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Dropdown Selector for Recipient
-                Column {
+        title = {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.Campaign, contentDescription = null, tint = NeonBlue)
                     androidx.compose.material3.Text(
-                        text = "Người nhận",
-                        color = LightGray,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                        "Quản lý Thông báo Admin",
+                        color = White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
                     )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(DarkBackground, RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.DarkGray, RoundedCornerShape(8.dp))
-                            .clickable { expandedUserDropdown = true }
-                            .padding(horizontal = 12.dp, vertical = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                // Tab Header
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = DarkBackground,
+                    contentColor = NeonBlue,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = NeonBlue
+                        )
+                    }
+                ) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = {
                             Text(
-                                text = selectedUser?.let { "${it.hoVaTen} (${it.roleName})" } ?: "Tất cả nhân viên",
-                                color = White,
-                                fontSize = 14.sp
-                            )
-                            Icon(
-                                imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = NeonBlue
+                                "Gửi thông báo",
+                                fontSize = 13.sp,
+                                fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == 0) NeonBlue else TextSecondary
                             )
                         }
-                        androidx.compose.material3.DropdownMenu(
-                            expanded = expandedUserDropdown,
-                            onDismissRequest = { expandedUserDropdown = false },
-                            modifier = Modifier
-                                .background(DarkContainer)
-                                .width(300.dp)
-                        ) {
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Tất cả nhân viên", color = White) },
-                                onClick = {
-                                    selectedUser = null
-                                    expandedUserDropdown = false
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = {
+                            selectedTab = 1
+                            adminViewModel.loadSentNotifications()
+                        },
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    "Đã gửi & Đã ghim",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selectedTab == 1) NeonBlue else TextSecondary
+                                )
+                                if (sentNotifications.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Surface(
+                                        color = if (sentNotifications.any { it.isPinned }) AccentOrange else NeonBlue,
+                                        shape = CircleShape
+                                    ) {
+                                        Text(
+                                            text = "${sentNotifications.size}",
+                                            color = White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
                                 }
-                            )
-                            employees.forEach { emp ->
+                            }
+                        }
+                    )
+                }
+            }
+        },
+        text = {
+            if (selectedTab == 0) {
+                // Tab 0: Gửi thông báo mới
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Dropdown Selector for Recipient
+                    Column {
+                        androidx.compose.material3.Text(
+                            text = "Người nhận",
+                            color = LightGray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(DarkBackground, RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.DarkGray, RoundedCornerShape(8.dp))
+                                .clickable { expandedUserDropdown = true }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = selectedUser?.let { "${it.hoVaTen} (${it.roleName})" } ?: "Tất cả nhân viên",
+                                    color = White,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = NeonBlue
+                                )
+                            }
+                            androidx.compose.material3.DropdownMenu(
+                                expanded = expandedUserDropdown,
+                                onDismissRequest = { expandedUserDropdown = false },
+                                modifier = Modifier
+                                    .background(DarkContainer)
+                                    .width(300.dp)
+                            ) {
                                 androidx.compose.material3.DropdownMenuItem(
-                                    text = { Text("${emp.hoVaTen} (${emp.roleName})", color = White) },
+                                    text = { Text("Tất cả nhân viên", color = White) },
                                     onClick = {
-                                        selectedUser = emp
+                                        selectedUser = null
                                         expandedUserDropdown = false
                                     }
                                 )
+                                employees.forEach { emp ->
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text("${emp.hoVaTen} (${emp.roleName})", color = White, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        onClick = {
+                                            selectedUser = emp
+                                            expandedUserDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    AdminInputField(
+                        label = "Tiêu đề",
+                        value = title,
+                        onValueChange = { title = it },
+                        singleLine = true,
+                        maxLines = 1
+                    )
+
+                    AdminInputField(
+                        label = "Nội dung",
+                        value = message,
+                        onValueChange = { message = it },
+                        singleLine = false,
+                        minLines = 4,
+                        maxLines = 6
+                    )
+
+                    // Pinned Notification Option
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                if (isPinned) AccentOrange.copy(alpha = 0.15f) else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .clickable { isPinned = !isPinned }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "📌",
+                                fontSize = 18.sp
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Ghim thông báo quan trọng",
+                                    color = if (isPinned) AccentOrange else White,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "Nhân viên không thể tự xóa (Admin có thể xóa sau)",
+                                    color = LightGray,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = isPinned,
+                            onCheckedChange = { isPinned = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = White,
+                                checkedTrackColor = AccentOrange
+                            )
+                        )
+                    }
+                }
+            } else {
+                // Tab 1: Danh sách thông báo đã gửi & đã ghim (Xóa được)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Danh sách thông báo (${sentNotifications.size})",
+                            color = LightGray,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        IconButton(
+                            onClick = { adminViewModel.loadSentNotifications() },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Làm mới", tint = NeonBlue, modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    if (isLoadingNotifs) {
+                        Box(modifier = Modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(color = NeonBlue, modifier = Modifier.size(28.dp))
+                        }
+                    } else if (sentNotifications.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(140.dp)
+                                .background(DarkBackground, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Chưa có thông báo nào được lưu trên máy chủ.", color = TextSecondary, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(sentNotifications, key = { it.id }) { notif ->
+                                val timeStr = SimpleDateFormat("HH:mm - dd/MM/yyyy", Locale.getDefault()).format(Date(notif.createdAt))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = DarkBackground,
+                                    border = BorderStroke(1.dp, if (notif.isPinned) AccentOrange.copy(alpha = 0.5f) else CardBorder),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                if (notif.isPinned) {
+                                                    Surface(
+                                                        color = AccentOrange.copy(alpha = 0.2f),
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "📌 ĐÃ GHIM",
+                                                            color = AccentOrange,
+                                                            fontSize = 10.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = notif.title.ifBlank { "Thông báo" },
+                                                    color = White,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.5.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = { notifToDelete = notif },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.DeleteOutline,
+                                                    contentDescription = "Xóa thông báo",
+                                                    tint = DangerRed,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = notif.message,
+                                            color = TextSecondary,
+                                            fontSize = 12.sp,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = "Tới: ${if (notif.targetUid == "ALL") "Tất cả NV" else notif.targetName}",
+                                                color = NeonBlue,
+                                                fontSize = 11.sp
+                                            )
+                                            Text(
+                                                text = timeStr,
+                                                color = TextSecondary,
+                                                fontSize = 10.5.sp
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                AdminInputField("Tiêu đề", title, { title = it })
-                AdminInputField("Nội dung", message, { message = it })
-
-                // Pinned Notification Option
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            if (isPinned) AccentOrange.copy(alpha = 0.15f) else Color.Transparent,
-                            RoundedCornerShape(8.dp)
-                        )
-                        .clickable { isPinned = !isPinned }
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "📌",
-                            fontSize = 18.sp
-                        )
-                        Column {
-                            Text(
-                                text = "Ghim thông báo quan trọng",
-                                color = if (isPinned) AccentOrange else White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 13.sp
-                            )
-                            Text(
-                                text = "Nhân viên không thể xóa thông báo này",
-                                color = LightGray,
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-                    Switch(
-                        checked = isPinned,
-                        onCheckedChange = { isPinned = it },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = White,
-                            checkedTrackColor = AccentOrange
-                        )
-                    )
-                }
             }
         },
         confirmButton = {
-            androidx.compose.material3.TextButton(
-                onClick = {
-                    val uid = selectedUser?.userId ?: "ALL"
-                    val name = selectedUser?.hoVaTen ?: "Tất cả nhân viên"
-                    onSend(uid, name, title, message, "general", isPinned)
-                },
-                enabled = title.isNotBlank() && message.isNotBlank()
-            ) {
-                androidx.compose.material3.Text("Gửi", color = if (title.isNotBlank() && message.isNotBlank()) NeonBlue else Color.Gray)
+            if (selectedTab == 0) {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        val uid = selectedUser?.userId ?: "ALL"
+                        val name = selectedUser?.hoVaTen ?: "Tất cả nhân viên"
+                        onSend(uid, name, title, message, "general", isPinned)
+                    },
+                    enabled = title.isNotBlank() && message.isNotBlank()
+                ) {
+                    androidx.compose.material3.Text("Gửi", color = if (title.isNotBlank() && message.isNotBlank()) NeonBlue else Color.Gray)
+                }
+            } else {
+                androidx.compose.material3.TextButton(onClick = onDismiss) {
+                    androidx.compose.material3.Text("Đóng", color = NeonBlue)
+                }
             }
         },
         dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                androidx.compose.material3.Text("Hủy", color = Color.Gray)
+            if (selectedTab == 0) {
+                androidx.compose.material3.TextButton(onClick = onDismiss) {
+                    androidx.compose.material3.Text("Hủy", color = Color.Gray)
+                }
             }
         },
         containerColor = DarkContainer
     )
+
+    // Delete Confirmation Dialog for Admin
+    if (notifToDelete != null) {
+        val target = notifToDelete!!
+        AlertDialog(
+            onDismissRequest = { notifToDelete = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DangerRed)
+                    Text("Xác nhận xóa thông báo", color = White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Bạn có chắc chắn muốn xóa thông báo này?",
+                        color = White,
+                        fontSize = 13.5.sp
+                    )
+                    Surface(
+                        color = DarkBackground,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = target.title,
+                                color = White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            if (target.isPinned) {
+                                Text(
+                                    text = "📌 Thông báo đã ghim",
+                                    color = AccentOrange,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = target.message,
+                                color = TextSecondary,
+                                fontSize = 11.5.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Thông báo sẽ được gỡ bỏ và xóa hoàn toàn khỏi máy chủ cũng như thiết bị của mọi nhân viên.",
+                        color = AccentOrange,
+                        fontSize = 11.5.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = target.id
+                        val targetUid = target.targetUid
+                        notifToDelete = null
+                        adminViewModel.deleteNotificationByAdmin(id, targetUid) { success ->
+                            if (success) {
+                                android.widget.Toast.makeText(context, "Đã xóa thông báo thành công", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                android.widget.Toast.makeText(context, "Lỗi khi xóa thông báo", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = White),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Xác nhận xóa", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { notifToDelete = null }) {
+                    Text("Hủy", color = TextSecondary)
+                }
+            },
+            containerColor = DarkContainer,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 }
 
 @Composable

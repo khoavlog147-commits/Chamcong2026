@@ -50,10 +50,14 @@ fun NotificationCenterScreen(
     val readIds by viewModel.readNotificationIds.collectAsStateWithLifecycle()
     val isLoading by viewModel.isRefreshingNotifications.collectAsStateWithLifecycle()
     val unreadCount by viewModel.unreadNotificationCount.collectAsStateWithLifecycle()
+    val session by viewModel.currentUserSession.collectAsStateWithLifecycle()
+    val userConfig by viewModel.userConfig.collectAsStateWithLifecycle()
+    val isAdmin = userConfig?.isAdmin == true || session?.email?.lowercase() == "khoatubexxx@gmail.com"
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("ALL") } // "ALL", "UNREAD", "ADMIN", "REMINDER"
     var selectedNotifForDetail by remember { mutableStateOf<AdminNotification?>(null) }
+    var notificationToDeleteByAdmin by remember { mutableStateOf<AdminNotification?>(null) }
 
     // Refresh notifications when screen loads
     LaunchedEffect(Unit) {
@@ -286,6 +290,7 @@ fun NotificationCenterScreen(
                         NotificationCardItem(
                             notif = notif,
                             isRead = isRead,
+                            isAdmin = isAdmin,
                             onClick = {
                                 viewModel.markNotificationAsRead(notif.id)
                                 selectedNotifForDetail = notif
@@ -293,6 +298,9 @@ fun NotificationCenterScreen(
                             onDelete = {
                                 viewModel.deleteNotificationLocally(notif.id)
                                 Toast.makeText(context, "Đã xóa khỏi lịch sử", Toast.LENGTH_SHORT).show()
+                            },
+                            onDeleteAsAdmin = {
+                                notificationToDeleteByAdmin = notif
                             }
                         )
                     }
@@ -300,6 +308,93 @@ fun NotificationCenterScreen(
             }
         }
     }
+    }
+
+    // Admin Confirmation Dialog for deleting notification (including pinned notifications)
+    if (notificationToDeleteByAdmin != null) {
+        val target = notificationToDeleteByAdmin!!
+        AlertDialog(
+            onDismissRequest = { notificationToDeleteByAdmin = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DangerRed)
+                    Text("Xác nhận xóa thông báo", color = White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Bạn đang thao tác với quyền Admin:",
+                        color = TextSecondary,
+                        fontSize = 13.sp
+                    )
+                    Surface(
+                        color = DarkBackground,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = target.title.ifBlank { "Thông báo" },
+                                color = White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            if (target.isPinned) {
+                                Text(
+                                    text = "📌 Thông báo đã ghim",
+                                    color = AccentOrange,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = target.message,
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Thông báo này sẽ được xóa vĩnh viễn khỏi toàn bộ hệ thống và thiết bị của mọi nhân viên.",
+                        color = AccentOrange,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val idToDelete = target.id
+                        notificationToDeleteByAdmin = null
+                        if (selectedNotifForDetail?.id == idToDelete) {
+                            selectedNotifForDetail = null
+                        }
+                        viewModel.deleteNotificationAsAdmin(idToDelete) { success ->
+                            if (success) {
+                                Toast.makeText(context, "Đã xóa thông báo khỏi hệ thống", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Lỗi xóa thông báo từ máy chủ", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DangerRed, contentColor = White),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Xác nhận xóa", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { notificationToDeleteByAdmin = null }) {
+                    Text("Hủy", color = TextSecondary)
+                }
+            },
+            containerColor = DarkContainer,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 
     // Notification Detail Dialog
@@ -407,7 +502,7 @@ fun NotificationCenterScreen(
                             ) {
                                 Icon(Icons.Default.PushPin, contentDescription = null, tint = AccentOrange, modifier = Modifier.size(16.dp))
                                 Text(
-                                    text = "Thông báo quan trọng đã được ghim (Không thể xóa)",
+                                    text = if (isAdmin) "Thông báo đã ghim (Admin có thể xóa)" else "Thông báo quan trọng đã được ghim (Không thể xóa)",
                                     color = AccentOrange,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium
@@ -430,7 +525,15 @@ fun NotificationCenterScreen(
                 }
             },
             dismissButton = {
-                if (!notif.isPinned) {
+                if (isAdmin) {
+                    TextButton(
+                        onClick = {
+                            notificationToDeleteByAdmin = notif
+                        }
+                    ) {
+                        Text("🗑️ Xóa thông báo (Admin)", color = DangerRed, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else if (!notif.isPinned) {
                     TextButton(
                         onClick = {
                             viewModel.deleteNotificationLocally(notif.id)
@@ -492,8 +595,10 @@ private fun FilterChipItem(
 private fun NotificationCardItem(
     notif: AdminNotification,
     isRead: Boolean,
+    isAdmin: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onDeleteAsAdmin: () -> Unit
 ) {
     val context = LocalContext.current
     val notifColor = getNotifColor(notif.type)
@@ -635,7 +740,19 @@ private fun NotificationCardItem(
             }
 
             // Quick delete option or pinned icon
-            if (notif.isPinned) {
+            if (isAdmin) {
+                IconButton(
+                    onClick = onDeleteAsAdmin,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Xóa thông báo (Admin)",
+                        tint = DangerRed.copy(alpha = 0.85f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else if (notif.isPinned) {
                 IconButton(
                     onClick = {
                         Toast.makeText(context, "📌 Thông báo đã ghim bởi Admin, không thể xóa", Toast.LENGTH_SHORT).show()

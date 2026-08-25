@@ -13,6 +13,7 @@ import com.example.data.repository.TimeRepository
 import com.example.data.repository.CloudSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -1712,10 +1713,10 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
                 val serverNotifs = com.example.data.FirestoreService.getUnreadAdminNotifications(uid, 0L)
                 
-                val currentLocal = _adminNotifications.value.filter { it.isPinned || it.id !in allDeleted }
+                val currentLocal = _adminNotifications.value.filter { it.id !in allDeleted }
                 val notifMap = mutableMapOf<String, com.example.data.model.AdminNotification>()
                 currentLocal.forEach { notifMap[it.id] = it }
-                serverNotifs.filter { it.isPinned || it.id !in allDeleted }.forEach { notifMap[it.id] = it }
+                serverNotifs.filter { it.id !in allDeleted }.forEach { notifMap[it.id] = it }
 
                 // Pinned thông báo luôn ở đầu danh sách, sau đó đến mới nhất
                 val mergedList = notifMap.values.sortedWith(
@@ -1800,6 +1801,36 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 com.example.data.FirestoreService.recordUserDeletedNotification(uid, id)
             } catch (e: Exception) {
                 android.util.Log.e("TimeSnapViewModel", "Lỗi ghi nhận user xóa thông báo", e)
+            }
+        }
+    }
+
+    fun deleteNotificationAsAdmin(id: String, onComplete: (Boolean) -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val success = com.example.data.FirestoreService.deleteAdminNotification("", id)
+                if (success) {
+                    val uid = currentUserSession.value?.uid ?: ""
+                    val updatedDeleted = _deletedNotificationIds.value.toMutableSet()
+                    updatedDeleted.add(id)
+                    _deletedNotificationIds.value = updatedDeleted
+                    if (uid.isNotBlank()) {
+                        getNotifPrefs().edit().putStringSet("deleted_ids_$uid", updatedDeleted).apply()
+                    }
+                    val newList = _adminNotifications.value.filter { it.id != id }
+                    _adminNotifications.value = newList
+                    if (uid.isNotBlank()) {
+                        saveLocalCachedNotifications(uid, newList)
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    onComplete(success)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("TimeSnapViewModel", "Lỗi admin xóa thông báo toàn cục", e)
+                withContext(Dispatchers.Main) {
+                    onComplete(false)
+                }
             }
         }
     }

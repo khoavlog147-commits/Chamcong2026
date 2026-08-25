@@ -1086,36 +1086,93 @@ object FirestoreService {
     }
 
     suspend fun getUserDeletedNotificationIds(uid: String): Set<String> {
-        if (uid.isBlank() || isDemoUser(uid)) return emptySet()
         val firestore = getDb() ?: return emptySet()
-        return try {
-            val snap = kotlinx.coroutines.withTimeoutOrNull(5000L) {
-                firestore.collection("users").document(uid)
-                    .collection("deleted_notifications")
+        val deletedSet = mutableSetOf<String>()
+
+        // 1. Đọc danh sách xóa cá nhân của user
+        if (uid.isNotBlank() && !isDemoUser(uid)) {
+            try {
+                val snap = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                    firestore.collection("users").document(uid)
+                        .collection("deleted_notifications")
+                        .get().awaitTaskFirestore()
+                }
+                snap?.documents?.forEach { deletedSet.add(it.id) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Lỗi đọc deleted_notifications cá nhân: ${e.message}")
+            }
+        }
+
+        // 2. Đọc danh sách thông báo đã bị Admin xóa toàn cục (global deleted)
+        try {
+            val globalSnap = kotlinx.coroutines.withTimeoutOrNull(5000L) {
+                firestore.collection("app_config").document("global_deleted_notifications")
+                    .collection("items")
                     .get().awaitTaskFirestore()
             }
-            snap?.documents?.map { it.id }?.toSet() ?: emptySet()
+            globalSnap?.documents?.forEach { deletedSet.add(it.id) }
         } catch (e: Exception) {
-            Log.w(TAG, "Lỗi đọc deleted_notifications: ${e.message}")
-            emptySet()
+            Log.w(TAG, "Lỗi đọc global_deleted_notifications: ${e.message}")
         }
+
+        return deletedSet
+    }
+
+    suspend fun getAllAdminNotifications(): List<com.example.data.model.AdminNotification> {
+        val firestore = getDb() ?: return emptyList()
+        val notifMap = mutableMapOf<String, com.example.data.model.AdminNotification>()
+
+        fun parseDoc(doc: DocumentSnapshot) {
+            val id = doc.id
+            val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+            val notif = com.example.data.model.AdminNotification(
+                id = id,
+                targetUid = doc.getString("targetUid") ?: "ALL",
+                targetName = doc.getString("targetName") ?: "Tất cả",
+                title = doc.getString("title") ?: "",
+                message = doc.getString("message") ?: "",
+                type = doc.getString("type") ?: "GENERAL",
+                createdAt = createdAt,
+                sentBy = doc.getString("sentBy") ?: "Admin",
+                isPinned = doc.getBoolean("isPinned") ?: false
+            )
+            notifMap[id] = notif
+        }
+
+        // Query Path 1: Root collection admin_notifications
+        try {
+            val snap = kotlinx.coroutines.withTimeoutOrNull(6000L) {
+                firestore.collection("admin_notifications")
+                    .get().awaitTaskFirestore()
+            }
+            snap?.documents?.forEach { parseDoc(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi đọc tất cả admin_notifications: ${e.message}")
+        }
+
+        // Query Path 2: app_config/admin_notifications/items
+        try {
+            val snap = kotlinx.coroutines.withTimeoutOrNull(6000L) {
+                firestore.collection("app_config").document("admin_notifications")
+                    .collection("items")
+                    .get().awaitTaskFirestore()
+            }
+            snap?.documents?.forEach { parseDoc(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi đọc app_config admin notifications: ${e.message}")
+        }
+
+        return notifMap.values.sortedWith(
+            compareByDescending<com.example.data.model.AdminNotification> { it.isPinned }
+                .thenByDescending { it.createdAt }
+        )
     }
 
     suspend fun deleteAdminNotification(uid: String, notificationId: String): Boolean {
         val firestore = getDb() ?: return false
         var success = false
 
-        if (uid.isNotBlank() && !isDemoUser(uid)) {
-            try {
-                firestore.collection("users").document(uid)
-                    .collection("notifications").document(notificationId)
-                    .delete().awaitTaskFirestore()
-                success = true
-            } catch (e: Exception) {
-                Log.e(TAG, "Lỗi xóa notification subcollection user: ${e.message}")
-            }
-        }
-
+        // 1. Xóa trong root collection admin_notifications
         try {
             firestore.collection("admin_notifications").document(notificationId)
                 .delete().awaitTaskFirestore()
@@ -1124,6 +1181,7 @@ object FirestoreService {
             Log.e(TAG, "Lỗi xóa admin_notifications: ${e.message}")
         }
 
+        // 2. Xóa trong app_config/admin_notifications/items
         try {
             firestore.collection("app_config").document("admin_notifications")
                 .collection("items").document(notificationId)
@@ -1131,6 +1189,42 @@ object FirestoreService {
             success = true
         } catch (e: Exception) {
             Log.e(TAG, "Lỗi xóa app_config notification item: ${e.message}")
+        }
+
+        // 3. Ghi vào danh sách global_deleted_notifications để mọi máy user tự động lọc bỏ
+        try {
+            firestore.collection("app_config").document("global_deleted_notifications")
+                .collection("items").document(notificationId)
+                .set(mapOf("deletedAt" to System.currentTimeMillis(), "notificationId" to notificationId))
+                .awaitTaskFirestore()
+            success = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi ghi global_deleted_notifications: ${e.message}")
+        }
+
+        // 4. Nếu có targetUid cụ thể
+        if (uid.isNotBlank() && uid != "ALL" && !isDemoUser(uid)) {
+            try {
+                firestore.collection("users").document(uid)
+                    .collection("notifications").document(notificationId)
+                    .delete().awaitTaskFirestore()
+                success = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Lỗi xóa notification subcollection user: ${e.message}")
+            }
+        } else if (uid == "ALL" || uid.isBlank()) {
+            // Xóa ngầm trong subcollection của các user
+            try {
+                val allUsers = getAllUserConfigs()
+                allUsers.forEach { user ->
+                    if (user.userId.isNotBlank() && !isDemoUser(user.userId)) {
+                        try {
+                            firestore.collection("users").document(user.userId)
+                                .collection("notifications").document(notificationId).delete()
+                        } catch (ex: Exception) {}
+                    }
+                }
+            } catch (ex: Exception) {}
         }
 
         return success
