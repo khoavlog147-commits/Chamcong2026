@@ -3946,7 +3946,7 @@ fun EmployeePayslipView(
             val parts = if (e.date.contains("/")) e.date.split("/") else e.date.split("-")
             if (e.date.contains("/")) parts.getOrNull(0)?.toIntOrNull() else parts.getOrNull(2)?.toIntOrNull()
         } catch (ex: Exception) { null }
-        day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || e.dayType == "PAID_LEAVE" || e.dayType == "UNPAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE")
+        day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) || com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "HOLIDAY_LEAVE")
     }
 
     // Projected state calculations

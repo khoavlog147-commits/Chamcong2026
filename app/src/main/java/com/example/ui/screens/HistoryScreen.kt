@@ -1284,8 +1284,8 @@ fun DayGridCell(
     }
 
     val isActualWorkingDay = entry != null && entry.checkInTime != null && entry.checkOutTime != null
-    val isPaidLeave = entry?.dayType == "PAID_LEAVE" && !isActualWorkingDay
-    val isUnpaidLeave = entry?.dayType == "UNPAID_LEAVE" && !isActualWorkingDay
+    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(entry?.dayType) && !isActualWorkingDay
+    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(entry?.dayType) && !isActualWorkingDay
     val isUnauthorizedLeave = entry?.dayType == "UNAUTHORIZED_LEAVE" && !isActualWorkingDay
 
     val borderColor = when {

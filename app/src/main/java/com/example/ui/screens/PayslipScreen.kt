@@ -215,7 +215,7 @@ fun PayslipScreen(
                 val lastLoggedDayOfMonth = remember(entries, isCurrentSelectedMonth) {
                     if (!isCurrentSelectedMonth) 0 else {
                         entries.filter { e ->
-                            e.checkInTime != null || e.isWorking || e.dayType == "PAID_LEAVE" || e.dayType == "UNPAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE"
+                            e.checkInTime != null || e.isWorking || com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) || com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "HOLIDAY_LEAVE"
                         }.mapNotNull { e ->
                             try {
                                 val parts = if (e.date.contains("/")) e.date.split("/") else e.date.split("-")
@@ -240,7 +240,7 @@ fun PayslipScreen(
                                     parts.getOrNull(2)?.toIntOrNull()
                                 }
                             } catch (ex: Exception) { null }
-                            day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || e.dayType == "PAID_LEAVE" || e.dayType == "UNPAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE")
+                            day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) || com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "HOLIDAY_LEAVE")
                         }
                     }
                 }
@@ -386,9 +386,9 @@ fun PayslipScreen(
                             }
                         })
                         if (isPastOrToday) {
-                            if (e.dayType == "UNPAID_LEAVE") {
+                            if (com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType)) {
                                 true
-                            } else if (e.checkInTime == null && e.dayType != "PAID_LEAVE" && e.dayType != "HOLIDAY") {
+                            } else if (e.checkInTime == null && !com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) && e.dayType != "HOLIDAY" && e.dayType != "HOLIDAY_LEAVE") {
                                 try {
                                     val cal = Calendar.getInstance()
                                     val partsDate = e.date.split("-", "/")

@@ -2498,8 +2498,8 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     val dailySalary = config.luongCoBan / 26.0
     val shift = com.example.data.SalaryCalculator.getShiftForEntry(entry)
 
-    val isPaidLeave = processed.dayType == "PAID_LEAVE" || processed.dayType == "HOLIDAY_LEAVE"
-    val isUnpaidLeave = processed.dayType == "UNPAID_LEAVE"
+    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(processed.dayType) || processed.dayType == "HOLIDAY_LEAVE"
+    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(processed.dayType)
 
     if (isPaidLeave) {
         items.add(

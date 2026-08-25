@@ -138,11 +138,52 @@ object SalaryCalculator {
         return s.replace("-", "/")
     }
 
+    fun normalizeToYmd(dateStr: String): String {
+        val s = dateStr.trim()
+        if (s.contains("/")) {
+            val parts = s.split("/")
+            if (parts.size == 3) {
+                val dd = parts[0].padStart(2, '0')
+                val mm = parts[1].padStart(2, '0')
+                val yyyy = parts[2]
+                return "$yyyy-$mm-$dd"
+            }
+        } else if (s.contains("-")) {
+            val parts = s.split("-")
+            if (parts.size == 3) {
+                if (parts[0].length == 4) {
+                    val yyyy = parts[0]
+                    val mm = parts[1].padStart(2, '0')
+                    val dd = parts[2].padStart(2, '0')
+                    return "$yyyy-$mm-$dd"
+                } else if (parts[2].length == 4) {
+                    val dd = parts[0].padStart(2, '0')
+                    val mm = parts[1].padStart(2, '0')
+                    val yyyy = parts[2]
+                    return "$yyyy-$mm-$dd"
+                }
+            }
+        }
+        return s
+    }
+
+    fun isPaidLeaveType(dayType: String?): Boolean {
+        if (dayType.isNullOrBlank()) return false
+        val upper = dayType.uppercase(Locale.ROOT)
+        return (upper == "PAID_LEAVE" || upper == "PAIDLEAVE" || upper == "NP" || upper == "PHEP" || upper == "PHÉP" || upper == "HOLIDAY_LEAVE" || upper == "HOLIDAYLEAVE" || upper == "ANNUAL_LEAVE" || upper.contains("PAID") || upper.contains("PHÉP") || upper.contains("PHEP")) &&
+               !upper.contains("UNPAID") && !upper.contains("UNAUTHORIZED") && !upper.contains("KP") && !upper.contains("KHONG") && !upper.contains("KHÔNG")
+    }
+
+    fun isUnpaidLeaveType(dayType: String?): Boolean {
+        if (dayType.isNullOrBlank()) return false
+        val upper = dayType.uppercase(Locale.ROOT)
+        return upper == "UNPAID_LEAVE" || upper == "UNPAIDLEAVE" || upper == "UNAUTHORIZED_LEAVE" || upper == "UNAUTHORIZEDLEAVE" || upper == "KP" || upper == "KHONGPHEP" || upper.contains("UNPAID") || upper.contains("UNAUTHORIZED") || upper.contains("KHÔNG LƯƠNG") || upper.contains("KHONG LUONG") || upper.contains("KHÔNG PHÉP") || upper.contains("KHONG PHEP")
+    }
+
     fun isLeaveType(dayType: String?): Boolean {
         if (dayType.isNullOrBlank()) return false
         val upper = dayType.uppercase(Locale.ROOT)
-        return upper == "PAID_LEAVE" || upper == "UNPAID_LEAVE" || upper == "UNAUTHORIZED_LEAVE" || upper == "HOLIDAY_LEAVE" ||
-               upper == "PAIDLEAVE" || upper == "UNPAIDLEAVE" || upper == "UNAUTHORIZEDLEAVE" || upper == "HOLIDAYLEAVE" ||
+        return isPaidLeaveType(dayType) || isUnpaidLeaveType(dayType) ||
                upper == "PAID" || upper == "UNPAID" || upper == "UNAUTHORIZED" ||
                upper == "NP" || upper == "PHEP" || upper == "KP" || upper == "KHONGPHEP" || upper == "ABSENT" ||
                upper.contains("LEAVE") || upper.contains("PHÉP") || upper.contains("PHEP") || upper.contains("NGHỈ") || upper.contains("NGHI")
@@ -373,24 +414,27 @@ object SalaryCalculator {
 
         val breakHours = if (config.tinhKhauTruNghi) config.soGioNghiGiaiLao else 0.0
 
+        val normTodayStr = normalizeToYmd(todayStr)
+
         for (e in processedEntries) {
+            val normEntryDate = normalizeToYmd(e.date)
             // Do not calculate future days/leaves as they have not happened yet if they are unworked
-            if (isCurrentSelectedMonth && e.date > todayStr && e.rawCheckIn == null) {
+            if (isCurrentSelectedMonth && normEntryDate > normTodayStr && e.rawCheckIn == null) {
                 continue
             }
 
-            val isHolidayDateVal = holidayDatesInMonth.contains(e.date)
+            val isHolidayDateVal = holidayDatesInMonth.contains(e.date) || holidayDatesInMonth.contains(normEntryDate) || holidayDatesInMonth.contains(normalizeDateToDmy(e.date))
             if (isHolidayDateVal && e.rawCheckIn == null) {
                 // Already counted automatically as unworked holiday, skip processing to avoid duplication
                 continue
             }
 
-            if (e.dayType == "PAID_LEAVE" || e.dayType == "HOLIDAY_LEAVE") {
+            if (isPaidLeaveType(e.dayType)) {
                 totalWorkDays += 1.0
                 totalStandardHours += 8.0
                 continue
             }
-            if (e.dayType == "UNPAID_LEAVE" || e.dayType == "UNAUTHORIZED_LEAVE") {
+            if (isUnpaidLeaveType(e.dayType)) {
                 continue
             }
 
@@ -474,7 +518,8 @@ object SalaryCalculator {
         var comOtCount = 0
 
         for (e in processedEntries) {
-            if (isCurrentSelectedMonth && e.date > todayStr && e.rawCheckIn == null) {
+            val normEntryDate = normalizeToYmd(e.date)
+            if (isCurrentSelectedMonth && normEntryDate > normTodayStr && e.rawCheckIn == null) {
                 continue
             }
             if (e.rawCheckIn == null) continue
@@ -514,8 +559,10 @@ object SalaryCalculator {
                 pcKhac1Pr + pcCaDemPr
 
         // 7. Calculate Chuyên cần (Diligence)
+        val normEarliestDate = earliestDate?.let { normalizeToYmd(it) }
         val hasUnpaidOrAbsent = processedEntries.any { 
-            (it.dayType == "UNPAID_LEAVE" || it.dayType == "UNAUTHORIZED_LEAVE") && (earliestDate == null || it.date >= earliestDate)
+            val normD = normalizeToYmd(it.date)
+            isUnpaidLeaveType(it.dayType) && (normEarliestDate == null || normD >= normEarliestDate)
         } || (scheduledDaysSoFar > 0 && totalWorkDays < scheduledDaysSoFar)
 
         val chuyenCanValue = if (hasUnpaidOrAbsent) {
