@@ -758,6 +758,40 @@ object SalaryCalculator {
         return getHolidayName(dateString) != null
     }
 
+    /**
+     * Checks if a date is within a flexible holiday window (e.g. adjacent to 2/9, 30/4, 1/5, Tet, etc.)
+     * allowing companies with different holiday schedules to select "Nghỉ lễ có lương" or "Lễ có lương".
+     */
+    fun isNearHolidayWindow(dateString: String, daysRange: Int = 2): Boolean {
+        if (isHoliday(dateString)) return true
+        return try {
+            val parser = if (dateString.contains("/")) {
+                SimpleDateFormat("dd/MM/yyyy", Locale.US)
+            } else {
+                SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            }
+            val date = parser.parse(dateString) ?: return false
+            val cal = Calendar.getInstance().apply { time = date }
+            
+            for (offset in -daysRange..daysRange) {
+                if (offset == 0) continue
+                val checkCal = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, offset) }
+                val checkStr = String.format(
+                    Locale.US, "%02d/%02d/%04d",
+                    checkCal.get(Calendar.DAY_OF_MONTH),
+                    checkCal.get(Calendar.MONTH) + 1,
+                    checkCal.get(Calendar.YEAR)
+                )
+                if (isHoliday(checkStr)) {
+                    return true
+                }
+            }
+            false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun isSunday(dateString: String): Boolean {
         return try {
             val parser = if (dateString.contains("-")) {

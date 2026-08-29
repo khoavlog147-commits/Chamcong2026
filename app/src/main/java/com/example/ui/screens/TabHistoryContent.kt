@@ -253,19 +253,19 @@ fun TabHistoryContent(
                                 isSelected -> Color(0xFF3A86FF).copy(alpha = 0.5f)
                                 isHolidayDate -> Color(0xFFFFD700).copy(alpha = 0.35f)
                                 record != null -> {
-                                    val hasTimes = record.clockInTime > 0 && record.clockOutTime != null && record.clockOutTime > 0
-                                    val isNight = com.example.data.SalaryCalculator.isNightShift(record.clockInTime, record.clockOutTime)
+                                    val isLeave = com.example.data.SalaryCalculator.isLeaveType(record.status)
+                                    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(record.status)
+                                    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(record.status)
                                     val stUpper = record.status.uppercase(Locale.ROOT)
-                                    val isPaidLeave = !hasTimes && (stUpper.contains("PAIDLEAVE") || stUpper == "PAID_LEAVE" || stUpper == "NP" || stUpper == "PHEP")
-                                    val isUnpaidLeave = !hasTimes && (stUpper.contains("UNPAID_LEAVE") || stUpper == "UNPAIDLEAVE" || stUpper == "UNPAID")
-                                    val isUnauthorizedLeave = !hasTimes && (stUpper.contains("UNAUTHORIZED") || stUpper == "UNAUTHORIZED_LEAVE" || stUpper == "KP" || stUpper.contains("KHONGPHEP"))
-                                    val isHolidayLeave = !hasTimes && (stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE")
+                                    val isUnauthorizedLeave = isLeave && (stUpper.contains("UNAUTHORIZED") || stUpper == "KP" || stUpper.contains("KHONGPHEP"))
+                                    val isHolidayLeave = isLeave && (stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE")
+                                    val isNight = !isLeave && com.example.data.SalaryCalculator.isNightShift(record.clockInTime, record.clockOutTime)
                                     
                                     when {
-                                        isPaidLeave || stUpper.contains("PAID") || stUpper.contains("PHÉP") -> Color(0xFFF2C94C).copy(alpha = 0.2f)
-                                        isUnpaidLeave -> Color(0xFFFF9800).copy(alpha = 0.2f)
-                                        isUnauthorizedLeave -> Color(0xFFEB5757).copy(alpha = 0.2f)
                                         isHolidayLeave -> Color(0xFF9B51E0).copy(alpha = 0.2f)
+                                        isPaidLeave -> Color(0xFFF2C94C).copy(alpha = 0.2f)
+                                        isUnauthorizedLeave -> Color(0xFFEB5757).copy(alpha = 0.2f)
+                                        isUnpaidLeave -> Color(0xFFFF9800).copy(alpha = 0.2f)
                                         isNight -> Color(0xFFFF9800).copy(alpha = 0.3f)
                                         else -> Color(0xFF2ECC71).copy(alpha = 0.2f)
                                     }
@@ -299,20 +299,21 @@ fun TabHistoryContent(
                             }
                         }
                         if (record != null) {
+                            val isLeave = com.example.data.SalaryCalculator.isLeaveType(record.status)
+                            val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(record.status)
+                            val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(record.status)
                             val stUpper = record.status.uppercase(Locale.ROOT)
-                            val isPaidLeave = stUpper.contains("PAID") || stUpper == "NP" || stUpper.contains("PHEP") || stUpper.contains("PHÉP")
-                            val isUnpaidLeave = stUpper.contains("UNPAID_LEAVE") || stUpper == "UNPAIDLEAVE" || stUpper == "UNPAID"
-                            val isUnauthorizedLeave = stUpper.contains("UNAUTHORIZED") || stUpper == "UNAUTHORIZED_LEAVE" || stUpper == "KP" || stUpper.contains("KHONGPHEP")
-                            val isHolidayLeave = stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE"
+                            val isUnauthorizedLeave = isLeave && (stUpper.contains("UNAUTHORIZED") || stUpper == "KP" || stUpper.contains("KHONGPHEP"))
+                            val isHolidayLeave = isLeave && (stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE")
 
-                            if (isPaidLeave) {
+                            if (isHolidayLeave) {
+                                Text(text = "Nghỉ lễ\ncó lương", fontSize = 9.sp, color = Color(0xFFBB6BD9), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                            } else if (isPaidLeave) {
                                 Text(text = "Nghỉ phép\ncó lương", fontSize = 9.sp, color = Color(0xFFF2C94C), textAlign = TextAlign.Center, lineHeight = 10.sp)
-                            } else if (isUnpaidLeave) {
-                                Text(text = "Nghỉ không\nlương", fontSize = 9.sp, color = Color(0xFFFF9800), textAlign = TextAlign.Center, lineHeight = 10.sp)
                             } else if (isUnauthorizedLeave) {
                                 Text(text = "Nghỉ không\nphép", fontSize = 9.sp, color = Color(0xFFEB5757), textAlign = TextAlign.Center, lineHeight = 10.sp)
-                            } else if (isHolidayLeave) {
-                                Text(text = "Nghỉ lễ\ncó lương", fontSize = 9.sp, color = Color(0xFFBB6BD9), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                            } else if (isUnpaidLeave) {
+                                Text(text = "Nghỉ không\nlương", fontSize = 9.sp, color = Color(0xFFFF9800), textAlign = TextAlign.Center, lineHeight = 10.sp)
                             } else {
                                 val inStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockInTime))
                                 val outStr = if (record.clockOutTime != null && record.clockOutTime > 0L) {
@@ -387,54 +388,50 @@ fun TabHistoryContent(
                                     dbHelper.deleteAttendanceRecord(userId, d)
                                 }
                                 "PAID_LEAVE" -> {
-                                    val cinCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 8); set(Calendar.MINUTE, 0) }
-                                    val coutCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 17); set(Calendar.MINUTE, 0) }
                                     val r = AttendanceRecord(
                                         id = attendanceMap[d]?.id ?: 0,
                                         uid = userId,
                                         dateString = d,
-                                        clockInTime = cinCal.timeInMillis,
-                                        clockOutTime = coutCal.timeInMillis,
-                                        status = "PAID_LEAVE"
+                                        clockInTime = 0L,
+                                        clockOutTime = null,
+                                        status = "PAID_LEAVE",
+                                        notes = "Nghỉ phép có lương"
                                     )
                                     recordsList.add(r)
                                 }
                                 "UNPAID_LEAVE" -> {
-                                    val cinCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 8); set(Calendar.MINUTE, 0) }
-                                    val coutCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 17); set(Calendar.MINUTE, 0) }
                                     val r = AttendanceRecord(
                                         id = attendanceMap[d]?.id ?: 0,
                                         uid = userId,
                                         dateString = d,
-                                        clockInTime = cinCal.timeInMillis,
-                                        clockOutTime = coutCal.timeInMillis,
-                                        status = "UNPAID_LEAVE"
+                                        clockInTime = 0L,
+                                        clockOutTime = null,
+                                        status = "UNPAID_LEAVE",
+                                        notes = "Nghỉ không lương"
                                     )
                                     recordsList.add(r)
                                 }
                                 "UNAUTHORIZED_LEAVE" -> {
-                                    val cinCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 8); set(Calendar.MINUTE, 0) }
-                                    val coutCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 17); set(Calendar.MINUTE, 0) }
                                     val r = AttendanceRecord(
                                         id = attendanceMap[d]?.id ?: 0,
                                         uid = userId,
                                         dateString = d,
-                                        clockInTime = cinCal.timeInMillis,
-                                        clockOutTime = coutCal.timeInMillis,
-                                        status = "UNAUTHORIZED_LEAVE"
+                                        clockInTime = 0L,
+                                        clockOutTime = null,
+                                        status = "UNAUTHORIZED_LEAVE",
+                                        notes = "Nghỉ không phép"
                                     )
                                     recordsList.add(r)
                                 }
                                 "HOLIDAY_LEAVE" -> {
-                                    val cinCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 8); set(Calendar.MINUTE, 0) }
-                                    val coutCal = (cal.clone() as Calendar).apply { set(Calendar.HOUR_OF_DAY, 17); set(Calendar.MINUTE, 0) }
                                     val r = AttendanceRecord(
                                         id = attendanceMap[d]?.id ?: 0,
                                         uid = userId,
                                         dateString = d,
-                                        clockInTime = cinCal.timeInMillis,
-                                        clockOutTime = coutCal.timeInMillis,
-                                        status = "HOLIDAY_LEAVE"
+                                        clockInTime = 0L,
+                                        clockOutTime = null,
+                                        status = "HOLIDAY_LEAVE",
+                                        notes = "Nghỉ lễ có lương"
                                     )
                                     recordsList.add(r)
                                 }
@@ -574,8 +571,8 @@ fun SingleDayEntryDialog(
                     }
                 }
 
-                val isDayHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
-                if (isDayHoliday) {
+                val isNearHoliday = com.example.data.SalaryCalculator.isNearHolidayWindow(dateStr, daysRange = 3)
+                if (isNearHoliday) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -585,7 +582,7 @@ fun SingleDayEntryDialog(
                             selected = selectedStatus == "PaidHolidayLeave" || selectedStatus == "HOLIDAY_LEAVE",
                             onClick = { selectedStatus = "HOLIDAY_LEAVE" }
                         )
-                        Text("Nghỉ lễ QDNN có lương (Cty cho nghỉ)", color = Color(0xFF2ECC71), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Nghỉ lễ có lương (Cty cho nghỉ)", color = Color(0xFFBB6BD9), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
 
@@ -722,47 +719,30 @@ fun SingleDayEntryDialog(
                                         coutMillis = cout.timeInMillis
                                     }
 
-                                    val finalStatus = if (coutHour != null && coutMin != null) {
-                                        "Completed"
-                                    } else {
+                                    val isLeave = selectedStatus == "PaidLeave" || 
+                                                  selectedStatus == "PAID_LEAVE" || 
+                                                  selectedStatus == "UnpaidLeave" || 
+                                                  selectedStatus == "UNPAID_LEAVE" || 
+                                                  selectedStatus == "UNAUTHORIZED_LEAVE" || 
+                                                  selectedStatus == "KP" ||
+                                                  selectedStatus == "PaidHolidayLeave" || 
+                                                  selectedStatus == "HOLIDAY_LEAVE" ||
+                                                  com.example.data.SalaryCalculator.isLeaveType(selectedStatus)
+
+                                    val finalStatus = if (isLeave) {
                                         when (selectedStatus) {
                                             "PaidLeave", "PAID_LEAVE" -> "PAID_LEAVE"
                                             "UnpaidLeave", "UNPAID_LEAVE" -> "UNPAID_LEAVE"
                                             "UNAUTHORIZED_LEAVE", "KP" -> "UNAUTHORIZED_LEAVE"
                                             "PaidHolidayLeave", "HOLIDAY_LEAVE" -> "HOLIDAY_LEAVE"
-                                            else -> {
-                                                if (coutMillis == null) "Active" else "Completed"
-                                            }
+                                            else -> selectedStatus
                                         }
+                                    } else {
+                                        if (coutHour != null && coutMin != null) "Completed" else "Active"
                                     }
 
-                                    val isLeave = finalStatus == "PAID_LEAVE" || 
-                                                  finalStatus == "UNPAID_LEAVE" || 
-                                                  finalStatus == "UNAUTHORIZED_LEAVE" || 
-                                                  finalStatus == "HOLIDAY_LEAVE"
-
-                                    val finalCin = if (isLeave) {
-                                        cin.apply { 
-                                            set(Calendar.HOUR_OF_DAY, 8)
-                                            set(Calendar.MINUTE, 0)
-                                            set(Calendar.SECOND, 0)
-                                            set(Calendar.MILLISECOND, 0)
-                                        }.timeInMillis
-                                    } else {
-                                        cin.timeInMillis
-                                    }
-                                    
-                                    val finalCout = if (isLeave) {
-                                        Calendar.getInstance().apply {
-                                            time = date
-                                            set(Calendar.HOUR_OF_DAY, 17)
-                                            set(Calendar.MINUTE, 0)
-                                            set(Calendar.SECOND, 0)
-                                            set(Calendar.MILLISECOND, 0)
-                                        }.timeInMillis
-                                    } else {
-                                        coutMillis
-                                    }
+                                    val finalCin = if (isLeave) 0L else cin.timeInMillis
+                                    val finalCout = if (isLeave) null else coutMillis
 
                                     onSave(finalCin, finalCout, finalStatus)
                                 } catch (e: Exception) {

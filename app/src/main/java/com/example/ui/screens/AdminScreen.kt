@@ -1653,9 +1653,10 @@ fun EmployeeDetailView(
                     }
 
                     if (todayRec == null || todayRec.clockInTime == 0L) {
+                        val isTodayHolidayOrNear = com.example.data.SalaryCalculator.isNearHolidayWindow(todayDmy, daysRange = 3)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Button(
                                 onClick = {
@@ -1677,17 +1678,37 @@ fun EmployeeDetailView(
                                 Text("Vào ca", color = White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
 
+                            if (isTodayHolidayOrNear) {
+                                Button(
+                                    onClick = {
+                                        adminViewModel.saveAttendanceRecord(
+                                            AttendanceRecord(
+                                                uid = employee.userId,
+                                                dateString = todayDmy,
+                                                clockInTime = 0L,
+                                                clockOutTime = null,
+                                                status = "HOLIDAY_LEAVE",
+                                                notes = "Nghỉ lễ có lương"
+                                            )
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                                    modifier = Modifier.weight(1f).height(32.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBB86FC))
+                                ) {
+                                    Text("Nghỉ lễ", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
                             Button(
                                 onClick = {
-                                    val cal = Calendar.getInstance()
-                                    cal.set(Calendar.HOUR_OF_DAY, 8)
-                                    cal.set(Calendar.MINUTE, 0)
-                                    val leaveTime = cal.timeInMillis
                                     adminViewModel.saveAttendanceRecord(
                                         AttendanceRecord(
                                             uid = employee.userId,
                                             dateString = todayDmy,
-                                            clockInTime = leaveTime,
+                                            clockInTime = 0L,
+                                            clockOutTime = null,
                                             status = "PAID_LEAVE",
                                             notes = "Nghỉ phép có lương"
                                         )
@@ -1706,15 +1727,12 @@ fun EmployeeDetailView(
 
                             Button(
                                 onClick = {
-                                    val cal = Calendar.getInstance()
-                                    cal.set(Calendar.HOUR_OF_DAY, 8)
-                                    cal.set(Calendar.MINUTE, 0)
-                                    val leaveTime = cal.timeInMillis
                                     adminViewModel.saveAttendanceRecord(
                                         AttendanceRecord(
                                             uid = employee.userId,
                                             dateString = todayDmy,
-                                            clockInTime = leaveTime,
+                                            clockInTime = 0L,
+                                            clockOutTime = null,
                                             status = "UNAUTHORIZED_LEAVE",
                                             notes = "Nghỉ không phép"
                                         )
@@ -2036,14 +2054,11 @@ fun EmployeeDetailView(
                     val yVal = yearStr.text.trim()
                     val dialogDateStr = "$dVal/$mVal/$yVal"
                     val isDayHoliday = com.example.data.SalaryCalculator.isHoliday(dialogDateStr)
+                    val isNearHoliday = com.example.data.SalaryCalculator.isNearHolidayWindow(dialogDateStr, daysRange = 3)
 
                     LaunchedEffect(isDayHoliday) {
                         if (isDayHoliday) {
                             recordType = "HOLIDAY_LEAVE"
-                        } else {
-                            if (recordType == "HOLIDAY_LEAVE") {
-                                recordType = "NORMAL"
-                            }
                         }
                     }
 
@@ -2115,14 +2130,14 @@ fun EmployeeDetailView(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
-                                        val types = remember(isDayHoliday) {
+                                        val types = remember(isNearHoliday) {
                                             val list = mutableListOf(
                                                 "NORMAL" to "Đi làm",
                                                 "PAID_LEAVE" to "Phép năm",
                                                 "UNPAID_LEAVE" to "Nghỉ KL",
                                                 "UNAUTHORIZED_LEAVE" to "Nghỉ KP"
                                             )
-                                            if (isDayHoliday) {
+                                            if (isNearHoliday) {
                                                 list.add("HOLIDAY_LEAVE" to "Nghỉ lễ")
                                             }
                                             list
@@ -2304,7 +2319,7 @@ fun EmployeeDetailView(
                                                   recordType == "HOLIDAY_LEAVE"
 
                                     val fullIn = if (isLeave) {
-                                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr 08:00")?.time ?: 0L
+                                        0L
                                     } else if (recordType == "NORMAL" && inH.isNotBlank() && inM.isNotBlank()) {
                                         SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr $inH:$inM")?.time ?: 0L
                                     } else {
@@ -2312,7 +2327,7 @@ fun EmployeeDetailView(
                                     }
                                     
                                     var fullOut = if (isLeave) {
-                                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr 17:00")?.time
+                                        null
                                     } else if (recordType == "NORMAL" && outHStr.isNotEmpty() && outMStr.isNotEmpty()) {
                                         val outH = outHStr.padStart(2, '0')
                                         val outM = outMStr.padStart(2, '0')
@@ -3785,6 +3800,13 @@ fun SendAdminNotificationDialog(
 
 @Composable
 fun AttendanceRecordItem(record: AttendanceRecord, employee: UserConfig, onDelete: () -> Unit) {
+    val isLeave = com.example.data.SalaryCalculator.isLeaveType(record.status)
+    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(record.status)
+    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(record.status)
+    val stUpper = record.status.uppercase(Locale.ROOT)
+    val isUnauthorized = isLeave && (stUpper.contains("UNAUTHORIZED") || stUpper == "KP" || stUpper.contains("KHONGPHEP"))
+    val isHoliday = isLeave && (stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE")
+
     val inStr = if (record.clockInTime > 0) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockInTime)) else "N/A"
     val outStr = if (record.clockOutTime != null && record.clockOutTime > 0) SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockOutTime)) else "N/A"
     Surface(
@@ -3799,7 +3821,17 @@ fun AttendanceRecordItem(record: AttendanceRecord, employee: UserConfig, onDelet
         ) {
             Column {
                 Text(record.dateString, color = White, fontWeight = FontWeight.Bold)
-                Text("In: $inStr - Out: $outStr", color = Color.Gray)
+                if (isHoliday) {
+                    Text("Nghỉ lễ có lương", color = Color(0xFFBB6BD9), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                } else if (isPaidLeave) {
+                    Text("Nghỉ phép có lương", color = Color(0xFFF2C94C), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                } else if (isUnauthorized) {
+                    Text("Nghỉ không phép (Vắng)", color = Color(0xFFEB5757), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                } else if (isUnpaidLeave) {
+                    Text("Nghỉ không lương", color = Color(0xFFFF9800), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                } else {
+                    Text("In: $inStr - Out: $outStr", color = Color.Gray)
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, contentDescription = "Delete", tint = AccentOrange)

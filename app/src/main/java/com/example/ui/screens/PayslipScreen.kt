@@ -683,7 +683,7 @@ fun PayslipScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text("Phân chia ca làm Chủ Nhật:", color = LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                            Text("(Tối đa: $totalSundaysInMonth ngày)", color = Color.Gray, fontSize = 10.sp)
+                                            Text("(Tối đa: $defaultRemainingSundays ngày còn lại)", color = Color.Gray, fontSize = 10.sp)
                                         }
 
                                         Spacer(modifier = Modifier.height(8.dp))
@@ -719,7 +719,7 @@ fun PayslipScreen(
                                                         remainingSundaysDay = 0
                                                     } else {
                                                         cleanText.toIntOrNull()?.let { parsed ->
-                                                            val maxDayAllowed = (totalSundaysInMonth - remainingSundaysNight).coerceAtLeast(0)
+                                                            val maxDayAllowed = (defaultRemainingSundays - remainingSundaysNight).coerceAtLeast(0)
                                                             if (parsed <= maxDayAllowed) {
                                                                 sundayDayInputText = newValue.copy(text = cleanText)
                                                                 remainingSundaysDay = parsed
@@ -791,7 +791,7 @@ fun PayslipScreen(
                                                         remainingSundaysNight = 0
                                                     } else {
                                                         cleanText.toIntOrNull()?.let { parsed ->
-                                                            val maxNightAllowed = (totalSundaysInMonth - remainingSundaysDay).coerceAtLeast(0)
+                                                            val maxNightAllowed = (defaultRemainingSundays - remainingSundaysDay).coerceAtLeast(0)
                                                             if (parsed <= maxNightAllowed) {
                                                                 sundayNightInputText = newValue.copy(text = cleanText)
                                                                 remainingSundaysNight = parsed

@@ -1014,18 +1014,19 @@ object ExportUtils {
 }
 
 fun AttendanceRecord.toTimeEntry(): TimeEntry {
-    var rawOut = this.clockOutTime
-    if (this.clockInTime > 0 && rawOut != null && rawOut <= this.clockInTime) {
+    val isLeave = com.example.data.SalaryCalculator.isLeaveType(this.status)
+    var rawOut = if (isLeave) null else this.clockOutTime
+    if (!isLeave && this.clockInTime > 0 && rawOut != null && rawOut <= this.clockInTime) {
         rawOut += 24 * 3600 * 1000L
     }
     return TimeEntry(
         id = this.id.toInt(),
         userId = this.uid,
         date = com.example.data.SalaryCalculator.normalizeDateToDmy(this.dateString),
-        checkInTime = this.clockInTime,
+        checkInTime = if (isLeave) null else this.clockInTime,
         checkOutTime = rawOut,
         dayType = if (this.status.isNotBlank()) this.status else "NORMAL",
-        isWorking = this.clockOutTime == null && this.clockInTime > 0,
+        isWorking = !isLeave && this.clockOutTime == null && this.clockInTime > 0,
         note = this.notes
     )
 }

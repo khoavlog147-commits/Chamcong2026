@@ -658,7 +658,7 @@ fun HistoryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             // If future day, do NOT render the standard working options - only allow PAID_LEAVE or UNPAID_LEAVE
-                            val isHoliday = com.example.data.SalaryCalculator.isHoliday(day.dateString)
+                            val isHolidayOrNear = com.example.data.SalaryCalculator.isNearHolidayWindow(day.dateString, daysRange = 3)
                                             
                             val types = if (isFutureDate) {
                                 val list = mutableListOf(
@@ -666,8 +666,8 @@ fun HistoryScreen(
                                     Triple("UNPAID_LEAVE", "Không lương", AccentOrange),
                                     Triple("UNAUTHORIZED_LEAVE", "Không phép", Color(0xFFEB5757))
                                 )
-                                if (isHoliday) {
-                                    list.add(0, Triple("HOLIDAY_LEAVE", "Lễ có lương", AccentGreen))
+                                if (isHolidayOrNear) {
+                                    list.add(0, Triple("HOLIDAY_LEAVE", "Lễ có lương", Color(0xFFBB86FC)))
                                 }
                                 list
                             } else {
@@ -677,8 +677,8 @@ fun HistoryScreen(
                                     Triple("UNPAID_LEAVE", "Không lương", AccentOrange),
                                     Triple("UNAUTHORIZED_LEAVE", "Không phép", Color(0xFFEB5757))
                                 )
-                                if (isHoliday) {
-                                    list.add(1, Triple("HOLIDAY_LEAVE", "Lễ có lương", AccentGreen))
+                                if (isHolidayOrNear) {
+                                    list.add(1, Triple("HOLIDAY_LEAVE", "Lễ có lương", Color(0xFFBB86FC)))
                                 }
                                 list
                             }
