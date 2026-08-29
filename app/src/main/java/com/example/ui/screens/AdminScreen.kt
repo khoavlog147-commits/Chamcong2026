@@ -2133,23 +2133,21 @@ fun EmployeeDetailView(
                                         val types = remember(isNearHoliday) {
                                             val list = mutableListOf(
                                                 "NORMAL" to "Đi làm",
+                                                "HOLIDAY_LEAVE" to "Lễ",
                                                 "PAID_LEAVE" to "Phép năm",
-                                                "UNPAID_LEAVE" to "Nghỉ KL",
-                                                "UNAUTHORIZED_LEAVE" to "Nghỉ KP"
+                                                "UNPAID_LEAVE" to "Phép thường",
+                                                "UNAUTHORIZED_LEAVE" to "Không phép"
                                             )
-                                            if (isNearHoliday) {
-                                                list.add("HOLIDAY_LEAVE" to "Nghỉ lễ")
-                                            }
                                             list
                                         }
                                         types.forEach { (type, label) ->
                                             val isSelected = recordType == type
                                             val chipBg = when {
                                                 !isSelected -> DarkContainer
+                                                type == "HOLIDAY_LEAVE" -> Color(0xFFBB86FC)
                                                 type == "PAID_LEAVE" -> Color(0xFFF2C94C)
                                                 type == "UNPAID_LEAVE" -> Color(0xFFFF9800)
                                                 type == "UNAUTHORIZED_LEAVE" -> Color(0xFFEB5757)
-                                                type == "HOLIDAY_LEAVE" -> Color(0xFFBB86FC)
                                                 else -> NeonBlue
                                             }
                                             val chipTextCol = if (isSelected && type == "PAID_LEAVE") Color.Black else White
@@ -2340,10 +2338,10 @@ fun EmployeeDetailView(
                                     }
 
                                     val defaultNote = when (recordType) {
-                                        "PAID_LEAVE" -> "Nghỉ phép có lương"
-                                        "UNPAID_LEAVE" -> "Nghỉ không lương"
-                                        "UNAUTHORIZED_LEAVE" -> "Nghỉ không phép"
-                                        "HOLIDAY_LEAVE" -> "Nghỉ lễ"
+                                        "PAID_LEAVE" -> "Phép năm"
+                                        "UNPAID_LEAVE" -> "Phép thường"
+                                        "UNAUTHORIZED_LEAVE" -> "Không phép"
+                                        "HOLIDAY_LEAVE" -> "Lễ"
                                         else -> ""
                                     }
                                     val finalNote = if (noteText.isNotBlank()) noteText.trim() else defaultNote
@@ -2577,17 +2575,17 @@ fun AttendanceSummaryBoard(
                         items(leaveRecords) { r ->
                             val statusUpper = r.status.uppercase(Locale.ROOT)
                             val typeLabel = when {
-                                statusUpper == "PAID_LEAVE" || statusUpper == "PAID" || statusUpper == "NP" || statusUpper == "PHEP" -> "Phép năm"
-                                statusUpper == "UNAUTHORIZED_LEAVE" || statusUpper == "KP" -> "Nghỉ không phép"
-                                statusUpper == "UNPAID_LEAVE" || statusUpper == "UNPAID" -> "Nghỉ không lương"
-                                statusUpper == "HOLIDAY_LEAVE" || statusUpper == "HOLIDAY" || statusUpper.contains("LỄ") -> "Nghỉ lễ"
-                                else -> "Nghỉ phép"
+                                statusUpper == "HOLIDAY_LEAVE" || statusUpper == "HOLIDAY" || statusUpper.contains("LỄ") || statusUpper.contains("LE") -> "Lễ"
+                                statusUpper == "PAID_LEAVE" || statusUpper == "PAID" || statusUpper == "NP" || statusUpper.contains("PHÉP NĂM") || statusUpper.contains("PHEP NAM") -> "Phép năm"
+                                statusUpper == "UNAUTHORIZED_LEAVE" || statusUpper == "KP" || statusUpper.contains("KHÔNG PHÉP") || statusUpper.contains("KHONG PHEP") -> "Không phép"
+                                statusUpper == "UNPAID_LEAVE" || statusUpper == "UNPAID" || statusUpper.contains("PHÉP THƯỜNG") || statusUpper.contains("PHEP THUONG") -> "Phép thường"
+                                else -> "Phép thường"
                             }
                             val badgeColor = when {
+                                typeLabel == "Lễ" -> Color(0xFFBB86FC)
                                 typeLabel == "Phép năm" -> Color(0xFFF2C94C)
-                                typeLabel == "Nghỉ không phép" -> Color(0xFFEB5757)
-                                typeLabel == "Nghỉ không lương" -> Color(0xFFFF9800)
-                                typeLabel == "Nghỉ lễ" -> Color(0xFFBB86FC)
+                                typeLabel == "Không phép" -> Color(0xFFEB5757)
+                                typeLabel == "Phép thường" -> Color(0xFFFF9800)
                                 else -> Color(0xFFA855F7)
                             }
 
@@ -3822,13 +3820,13 @@ fun AttendanceRecordItem(record: AttendanceRecord, employee: UserConfig, onDelet
             Column {
                 Text(record.dateString, color = White, fontWeight = FontWeight.Bold)
                 if (isHoliday) {
-                    Text("Nghỉ lễ có lương", color = Color(0xFFBB6BD9), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Lễ", color = Color(0xFFBB6BD9), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 } else if (isPaidLeave) {
-                    Text("Nghỉ phép có lương", color = Color(0xFFF2C94C), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Phép năm", color = Color(0xFFF2C94C), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 } else if (isUnauthorized) {
-                    Text("Nghỉ không phép (Vắng)", color = Color(0xFFEB5757), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Không phép", color = Color(0xFFEB5757), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 } else if (isUnpaidLeave) {
-                    Text("Nghỉ không lương", color = Color(0xFFFF9800), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Text("Phép thường", color = Color(0xFFFF9800), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 } else {
                     Text("In: $inStr - Out: $outStr", color = Color.Gray)
                 }
@@ -4025,8 +4023,9 @@ fun EmployeePayslipView(
     var includeSundayInProjection by remember(hasWorkedSunday) { mutableStateOf(hasWorkedSunday) }
 
     val additionalWeekdaysPay = remainingWeekdays * dailySalary
+    val sundayHoursPerShift = (12.0 - (if (employee.tinhKhauTruNghi) employee.soGioNghiGiaiLao else 0.0)).coerceAtLeast(8.0)
     val additionalSundaysPay = if (includeSundayInProjection) {
-        remainingSundays * dailySalary * employee.heSoOtChuNhat
+        remainingSundays * sundayHoursPerShift * hourlySalary * employee.heSoOtChuNhat
     } else {
         0.0
     }

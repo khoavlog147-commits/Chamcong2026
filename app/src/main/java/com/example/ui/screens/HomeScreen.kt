@@ -2423,9 +2423,10 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(processed.dayType)
 
     if (isPaidLeave) {
+        val isHol = processed.dayType == "HOLIDAY_LEAVE" || processed.dayType == "HOLIDAY"
         items.add(
             ShiftEarningsBreakdownItem(
-                name = "Lương ngày nghỉ hưởng lương",
+                name = if (isHol) "Lương ngày nghỉ Lễ" else "Lương ngày Phép năm",
                 formula = "1 ngày công tiêu chuẩn (${DecimalFormat("#,###").format(dailySalary)} đ)",
                 amount = dailySalary,
                 icon = Icons.Default.CheckCircle,
@@ -2434,9 +2435,9 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
         )
         return ShiftEarningsBreakdown(
             dateDisplay = dateDisplay,
-            shiftName = "Nghỉ phép",
+            shiftName = if (isHol) "Lễ" else "Phép năm",
             isNightShift = false,
-            dayTypeLabel = "Nghỉ hưởng lương",
+            dayTypeLabel = if (isHol) "Lễ" else "Phép năm",
             timeRangeStr = "Hưởng 100% lương",
             rawHours = 8.0,
             breakHours = 0.0,
@@ -2450,9 +2451,11 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     }
 
     if (isUnpaidLeave || processed.checkInTime == null) {
+        val isUnauth = processed.dayType == "UNAUTHORIZED_LEAVE" || processed.dayType == "KP"
+        val leaveTitle = if (isUnauth) "Không phép" else "Phép thường"
         items.add(
             ShiftEarningsBreakdownItem(
-                name = "Nghỉ không hưởng lương",
+                name = "Nghỉ $leaveTitle",
                 formula = "Không phát sinh ngày công",
                 amount = 0.0,
                 icon = Icons.Default.Close,
@@ -2461,9 +2464,9 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
         )
         return ShiftEarningsBreakdown(
             dateDisplay = dateDisplay,
-            shiftName = "Nghỉ",
+            shiftName = leaveTitle,
             isNightShift = false,
-            dayTypeLabel = "Nghỉ không lương",
+            dayTypeLabel = leaveTitle,
             timeRangeStr = "--",
             rawHours = 0.0,
             breakHours = 0.0,

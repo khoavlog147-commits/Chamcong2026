@@ -465,7 +465,7 @@ object ExportUtils {
         currentY += 20f
         drawSectionHeader("THU NHẬP CHI TIẾT (+)")
         
-        val luongDuKienBaseSalary = Math.round((config.luongCoBan / 26.0) * soNgayCongDuKienDouble).toDouble()
+        val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
         val baseSalaryLabel = if (selectedTab == 1) "LCB thực nhận ($effectiveSoNgayCong / ${summary.standardWorkDays})" 
                               else "LCB thực nhận (${summary.workingDays} / ${summary.standardWorkDays})"
         val baseSalaryValue = if (selectedTab == 1) luongDuKienBaseSalary else summary.baseBasicSalary
@@ -776,7 +776,9 @@ object ExportUtils {
             currentY += 16f
         }
 
-        val baseSalaryValue = if (selectedTab == 1) Math.round((config.luongCoBan / 26.0) * soNgayCongDuKienDouble).toDouble() else summary.baseBasicSalary
+        val baseSalaryValue = if (selectedTab == 1) {
+            if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
+        } else summary.baseBasicSalary
         val baseSalaryLabelText = if (selectedTab == 1) "Lương theo công thực tế ($effectiveSoNgayCong công)" 
                               else "Lương theo công thực tế (${summary.workingDays} công)"
         drawPdfRow(baseSalaryLabelText, baseSalaryValue, 0.0)
@@ -936,12 +938,13 @@ object ExportUtils {
 
                 val (friendlyStatus, statusColor) = run {
                     val dtUpper = entry.dayType.uppercase()
-                    if (dtUpper in listOf("OFF", "NGHỈ", "LEAVE", "NGHỈ PHÉP", "PAID_LEAVE", "ABSENT", "VẮNG MẶT", "UNPAID_LEAVE")) {
-                        when (dtUpper) {
-                            "LEAVE", "NGHỈ PHÉP", "PAID_LEAVE" -> "Nghỉ phép" to greenColor
-                            "ABSENT", "VẮNG MẶT" -> "Vắng mặt" to redColor
-                            "UNPAID_LEAVE" -> "Nghỉ ko lương" to redColor
-                            else -> "Nghỉ" to textColor
+                    if (dtUpper in listOf("OFF", "NGHỈ", "LEAVE", "NGHỈ PHÉP", "PAID_LEAVE", "ABSENT", "VẮNG MẶT", "UNPAID_LEAVE", "UNAUTHORIZED_LEAVE", "HOLIDAY_LEAVE", "HOLIDAY", "KP", "NP", "PHÉP NĂM", "PHÉP THƯỜNG", "KHÔNG PHÉP")) {
+                        when {
+                            dtUpper in listOf("HOLIDAY_LEAVE", "HOLIDAY", "LỄ") -> "Lễ" to primaryColor
+                            dtUpper in listOf("PAID_LEAVE", "LEAVE", "NGHỈ PHÉP", "NP", "PHÉP NĂM") -> "Phép năm" to greenColor
+                            dtUpper in listOf("UNAUTHORIZED_LEAVE", "ABSENT", "VẮNG MẶT", "KP", "KHÔNG PHÉP") -> "Không phép" to redColor
+                            dtUpper in listOf("UNPAID_LEAVE", "PHÉP THƯỜNG") -> "Phép thường" to redColor
+                            else -> "Phép thường" to textColor
                         }
                     } else {
                         val shiftNameStr = if (isNightShift) "Ca đêm" else "Ca ngày"

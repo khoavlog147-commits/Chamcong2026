@@ -662,24 +662,20 @@ fun HistoryScreen(
                                             
                             val types = if (isFutureDate) {
                                 val list = mutableListOf(
-                                    Triple("PAID_LEAVE", "Có lương", AccentGreen),
-                                    Triple("UNPAID_LEAVE", "Không lương", AccentOrange),
+                                    Triple("HOLIDAY_LEAVE", "Lễ", Color(0xFFBB86FC)),
+                                    Triple("PAID_LEAVE", "Phép năm", Color(0xFFF2C94C)),
+                                    Triple("UNPAID_LEAVE", "Phép thường", Color(0xFFFF9800)),
                                     Triple("UNAUTHORIZED_LEAVE", "Không phép", Color(0xFFEB5757))
                                 )
-                                if (isHolidayOrNear) {
-                                    list.add(0, Triple("HOLIDAY_LEAVE", "Lễ có lương", Color(0xFFBB86FC)))
-                                }
                                 list
                             } else {
                                 val list = mutableListOf(
                                     Triple("NORMAL", "Đi làm", NeonBlue),
-                                    Triple("PAID_LEAVE", "Có lương", AccentGreen),
-                                    Triple("UNPAID_LEAVE", "Không lương", AccentOrange),
+                                    Triple("HOLIDAY_LEAVE", "Lễ", Color(0xFFBB86FC)),
+                                    Triple("PAID_LEAVE", "Phép năm", Color(0xFFF2C94C)),
+                                    Triple("UNPAID_LEAVE", "Phép thường", Color(0xFFFF9800)),
                                     Triple("UNAUTHORIZED_LEAVE", "Không phép", Color(0xFFEB5757))
                                 )
-                                if (isHolidayOrNear) {
-                                    list.add(1, Triple("HOLIDAY_LEAVE", "Lễ có lương", Color(0xFFBB86FC)))
-                                }
                                 list
                             }
 
@@ -1478,26 +1474,29 @@ fun DayGridCell(
                 when {
                     entry.dayType == "PAID_LEAVE" && !isHoliday -> {
                         Text(
-                            text = "PHÉP",
-                            color = NeonBlue,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            text = "PHÉP NĂM",
+                            color = Color(0xFFF2C94C),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
                         )
                     }
                     entry.dayType == "UNPAID_LEAVE" -> {
                         Text(
-                            text = "VẮNG",
-                            color = AccentOrange,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            text = "P.THƯỜNG",
+                            color = Color(0xFFFF9800),
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
                         )
                     }
                     entry.dayType == "UNAUTHORIZED_LEAVE" -> {
                         Text(
                             text = "K.PHÉP",
                             color = Color(0xFFEB5757),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
                         )
                     }
                     entry.dayType == "HOLIDAY" || entry.dayType == "HOLIDAY_LEAVE" || isHoliday -> {

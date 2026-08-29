@@ -307,13 +307,13 @@ fun TabHistoryContent(
                             val isHolidayLeave = isLeave && (stUpper.contains("HOLIDAY") || stUpper == "PAIDHOLIDAYLEAVE" || stUpper == "HOLIDAY_LEAVE")
 
                             if (isHolidayLeave) {
-                                Text(text = "Nghỉ lễ\ncó lương", fontSize = 9.sp, color = Color(0xFFBB6BD9), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                                Text(text = "Lễ", fontSize = 9.sp, color = Color(0xFFBB6BD9), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
                             } else if (isPaidLeave) {
-                                Text(text = "Nghỉ phép\ncó lương", fontSize = 9.sp, color = Color(0xFFF2C94C), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                                Text(text = "Phép năm", fontSize = 9.sp, color = Color(0xFFF2C94C), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
                             } else if (isUnauthorizedLeave) {
-                                Text(text = "Nghỉ không\nphép", fontSize = 9.sp, color = Color(0xFFEB5757), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                                Text(text = "Không phép", fontSize = 9.sp, color = Color(0xFFEB5757), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
                             } else if (isUnpaidLeave) {
-                                Text(text = "Nghỉ không\nlương", fontSize = 9.sp, color = Color(0xFFFF9800), textAlign = TextAlign.Center, lineHeight = 10.sp)
+                                Text(text = "Phép thường", fontSize = 9.sp, color = Color(0xFFFF9800), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
                             } else {
                                 val inStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockInTime))
                                 val outStr = if (record.clockOutTime != null && record.clockOutTime > 0L) {
@@ -395,7 +395,7 @@ fun TabHistoryContent(
                                         clockInTime = 0L,
                                         clockOutTime = null,
                                         status = "PAID_LEAVE",
-                                        notes = "Nghỉ phép có lương"
+                                        notes = "Phép năm"
                                     )
                                     recordsList.add(r)
                                 }
@@ -407,7 +407,7 @@ fun TabHistoryContent(
                                         clockInTime = 0L,
                                         clockOutTime = null,
                                         status = "UNPAID_LEAVE",
-                                        notes = "Nghỉ không lương"
+                                        notes = "Phép thường"
                                     )
                                     recordsList.add(r)
                                 }
@@ -419,7 +419,7 @@ fun TabHistoryContent(
                                         clockInTime = 0L,
                                         clockOutTime = null,
                                         status = "UNAUTHORIZED_LEAVE",
-                                        notes = "Nghỉ không phép"
+                                        notes = "Không phép"
                                     )
                                     recordsList.add(r)
                                 }
@@ -431,7 +431,7 @@ fun TabHistoryContent(
                                         clockInTime = 0L,
                                         clockOutTime = null,
                                         status = "HOLIDAY_LEAVE",
-                                        notes = "Nghỉ lễ có lương"
+                                        notes = "Lễ"
                                     )
                                     recordsList.add(r)
                                 }
@@ -546,43 +546,39 @@ fun SingleDayEntryDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         
                         RadioButton(
-                            selected = selectedStatus == "PaidLeave" || selectedStatus == "PAID_LEAVE",
-                            onClick = { selectedStatus = "PAID_LEAVE" }
+                            selected = selectedStatus == "PaidHolidayLeave" || selectedStatus == "HOLIDAY_LEAVE",
+                            onClick = { selectedStatus = "HOLIDAY_LEAVE" }
                         )
-                        Text("Nghỉ có lương", color = Color.White, fontSize = 13.sp)
+                        Text("Lễ", color = Color(0xFFBB6BD9), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        RadioButton(
+                            selected = selectedStatus == "PaidLeave" || selectedStatus == "PAID_LEAVE",
+                            onClick = { selectedStatus = "PAID_LEAVE" }
+                        )
+                        Text("Phép năm", color = Color(0xFFF2C94C), fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        
                         RadioButton(
                             selected = selectedStatus == "UnpaidLeave" || selectedStatus == "UNPAID_LEAVE",
                             onClick = { selectedStatus = "UNPAID_LEAVE" }
                         )
-                        Text("Nghỉ không lương", color = Color(0xFFFF9800), fontSize = 13.sp)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        
-                        RadioButton(
-                            selected = selectedStatus == "UNAUTHORIZED_LEAVE" || selectedStatus == "KP",
-                            onClick = { selectedStatus = "UNAUTHORIZED_LEAVE" }
-                        )
-                        Text("Nghỉ không phép", color = Color(0xFFEB5757), fontSize = 13.sp)
+                        Text("Phép thường", color = Color(0xFFFF9800), fontSize = 13.sp)
                     }
-                }
 
-                val isNearHoliday = com.example.data.SalaryCalculator.isNearHolidayWindow(dateStr, daysRange = 3)
-                if (isNearHoliday) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
-                            selected = selectedStatus == "PaidHolidayLeave" || selectedStatus == "HOLIDAY_LEAVE",
-                            onClick = { selectedStatus = "HOLIDAY_LEAVE" }
+                            selected = selectedStatus == "UNAUTHORIZED_LEAVE" || selectedStatus == "KP",
+                            onClick = { selectedStatus = "UNAUTHORIZED_LEAVE" }
                         )
-                        Text("Nghỉ lễ có lương (Cty cho nghỉ)", color = Color(0xFFBB6BD9), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Không phép", color = Color(0xFFEB5757), fontSize = 13.sp)
                     }
                 }
 
@@ -809,20 +805,20 @@ fun BatchEntryDialog(
                         Text("Chấm công làm việc (Vào / Ra)", color = Color.White, fontSize = 13.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = selectedAction == "HOLIDAY_LEAVE", onClick = { selectedAction = "HOLIDAY_LEAVE" })
+                        Text("Ghi nhận Lễ", color = Color(0xFFBB6BD9), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = selectedAction == "PAID_LEAVE", onClick = { selectedAction = "PAID_LEAVE" })
-                        Text("Ghi nhận Nghỉ phép có lương", color = Color(0xFFF2C94C), fontSize = 13.sp)
+                        Text("Ghi nhận Phép năm", color = Color(0xFFF2C94C), fontSize = 13.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = selectedAction == "UNPAID_LEAVE", onClick = { selectedAction = "UNPAID_LEAVE" })
-                        Text("Ghi nhận Nghỉ không lương", color = Color(0xFFFF9800), fontSize = 13.sp)
+                        Text("Ghi nhận Phép thường", color = Color(0xFFFF9800), fontSize = 13.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = selectedAction == "UNAUTHORIZED_LEAVE", onClick = { selectedAction = "UNAUTHORIZED_LEAVE" })
-                        Text("Ghi nhận Nghỉ không phép (Vắng)", color = Color(0xFFEB5757), fontSize = 13.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = selectedAction == "HOLIDAY_LEAVE", onClick = { selectedAction = "HOLIDAY_LEAVE" })
-                        Text("Ghi nhận Nghỉ lễ có lương", color = Color(0xFFBB6BD9), fontSize = 13.sp)
+                        Text("Ghi nhận Không phép", color = Color(0xFFEB5757), fontSize = 13.sp)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = selectedAction == "DELETE", onClick = { selectedAction = "DELETE" })
