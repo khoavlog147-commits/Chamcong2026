@@ -346,8 +346,10 @@ fun PayslipScreen(
                     includeSundayInProjection = hasWorkedSunday
                 }
 
-                val dailySalary = remember(c.luongCoBan) {
-                    c.luongCoBan / 26.0
+                val standardTargetDays = (if (isCurrentSelectedMonth) s.expectedWorkDays else s.standardWorkDays).toDouble().coerceAtLeast(1.0)
+
+                val dailySalary = remember(c.luongCoBan, standardTargetDays) {
+                    c.luongCoBan / standardTargetDays
                 }
                 val hourlySalary = dailySalary / 8.0
 
@@ -377,18 +379,17 @@ fun PayslipScreen(
                 }
                 val hasLoggedUnpaidOrAbsent = unpaidDaysCount > 0
 
-                val projectedRemainingWorkdays = remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-                val standardTargetDays = (if (isCurrentSelectedMonth) s.expectedWorkDays else s.standardWorkDays).toDouble().coerceAtLeast(26.0)
+                val projectedRemainingWorkdays = remainingWeekdays.toDouble()
 
                 val soNgayCongDuKien = if (isCurrentSelectedMonth) {
                     val rawProjected = s.workingDays + projectedRemainingWorkdays
                     if (unpaidDaysCount > 0) {
-                        (standardTargetDays - unpaidDaysCount).coerceAtLeast(rawProjected)
+                        (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0).coerceAtMost(standardTargetDays)
                     } else {
-                        maxOf(rawProjected, standardTargetDays)
+                        standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
                     }
                 } else {
-                    maxOf(s.workingDays, s.standardWorkDays.toDouble())
+                    s.workingDays.coerceAtMost(standardTargetDays)
                 }
                 val soNgayCongDuKienDouble = soNgayCongDuKien
 
@@ -402,7 +403,7 @@ fun PayslipScreen(
                         comOtCount = 0,
                         nightShiftsCount = s.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0),
                         scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
-                        totalScheduledDaysInMonth = 26
+                        totalScheduledDaysInMonth = standardTargetDays.toInt()
                     )
                 }
 
@@ -439,7 +440,7 @@ fun PayslipScreen(
                     s.phuCapChuyenCan
                 }
 
-                val luongDuKienBaseSalary = Math.round((c.luongCoBan / 26.0) * soNgayCongDuKienDouble).toDouble()
+                val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) c.luongCoBan else Math.round((c.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
 
                 val currentProratedAllowancesSum = s.pcKyThuatVal + s.pcTrachNhiemVal + s.pcChucVuVal + s.pcHieuSuatVal +
                         s.pcSanPhamVal + s.pcComCaVal + s.pcComOtVal + s.pcNhaOVal + s.pcDocHaiVal + 

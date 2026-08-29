@@ -4014,7 +4014,8 @@ fun EmployeePayslipView(
         count
     }
 
-    val dailySalary = employee.luongCoBan / 26.0
+    val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+    val dailySalary = employee.luongCoBan / standardTargetDays
     val hourlySalary = dailySalary / 8.0
 
     val hasWorkedSunday = timeEntries.any { e ->
@@ -4035,18 +4036,17 @@ fun EmployeePayslipView(
     }
     val hasLoggedUnpaidOrAbsent = unpaidDaysCount > 0
 
-    val projectedRemainingWorkdays = remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-    val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(26.0)
+    val projectedRemainingWorkdays = remainingWeekdays.toDouble()
 
     val soNgayCongDuKien = if (isCurrentSelectedMonth) {
         val rawProjected = summary.workingDays + projectedRemainingWorkdays
         if (unpaidDaysCount > 0) {
-            (standardTargetDays - unpaidDaysCount).coerceAtLeast(rawProjected)
+            (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0).coerceAtMost(standardTargetDays)
         } else {
-            maxOf(rawProjected, standardTargetDays)
+            standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
         }
     } else {
-        maxOf(summary.workingDays, summary.standardWorkDays.toDouble())
+        summary.workingDays.coerceAtMost(standardTargetDays)
     }
     val soNgayCongDuKienDouble = soNgayCongDuKien
 
@@ -4060,7 +4060,7 @@ fun EmployeePayslipView(
             comOtCount = 0,
             nightShiftsCount = summary.caDemCount,
             scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
-            totalScheduledDaysInMonth = 26
+            totalScheduledDaysInMonth = standardTargetDays.toInt()
         )
     }
 
@@ -4096,7 +4096,7 @@ fun EmployeePayslipView(
         summary.phuCapChuyenCan
     }
 
-    val luongDuKienBaseSalary = Math.round((employee.luongCoBan / 26.0) * soNgayCongDuKienDouble).toDouble()
+    val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) employee.luongCoBan else Math.round((employee.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
 
     val currentProratedAllowancesSum = summary.pcKyThuatVal + summary.pcTrachNhiemVal + summary.pcChucVuVal + summary.pcHieuSuatVal +
             summary.pcSanPhamVal + summary.pcComCaVal + summary.pcComOtVal + summary.pcNhaOVal + summary.pcDocHaiVal + 

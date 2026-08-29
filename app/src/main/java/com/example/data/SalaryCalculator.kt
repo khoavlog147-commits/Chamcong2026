@@ -335,10 +335,10 @@ object SalaryCalculator {
         scheduledDaysSoFar: Int,
         totalScheduledDaysInMonth: Int
     ): Double {
+        val stdDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
         return when (calcType) {
             "MONTHLY_PRO_RATED" -> {
-                // Pro-rata based on actual work days out of 26 standard days, capped at 100% (1.0)
-                val ratio = (totalWorkDays / 26.0).coerceAtMost(1.0)
+                val ratio = (totalWorkDays / stdDays).coerceAtMost(1.0)
                 allowanceValue * ratio
             }
             "MONTHLY_FLAT" -> {
@@ -358,7 +358,7 @@ object SalaryCalculator {
                 nightShiftsCount * allowanceValue
             }
             else -> {
-                val ratio = (totalWorkDays / 26.0).coerceAtMost(1.0)
+                val ratio = (totalWorkDays / stdDays).coerceAtMost(1.0)
                 allowanceValue * ratio
             }
         }
@@ -379,7 +379,8 @@ object SalaryCalculator {
         holidayDatesInMonth: Set<String>
     ): SalarySummary {
         val luongBasic = config.luongCoBan
-        val dailySalary = luongBasic / 26.0
+        val stdMonthDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
+        val dailySalary = luongBasic / stdMonthDays
         val hourlySalary = dailySalary / 8.0
 
         // Process all entries through steps 1-6
@@ -618,7 +619,7 @@ object SalaryCalculator {
             luongThucNhan = luongThucNhan,
             baseBasicSalary = baseBasicSalary,
             expectedWorkDays = totalScheduledDaysInMonth,
-            standardWorkDays = 26,
+            standardWorkDays = totalScheduledDaysInMonth,
             scheduledDaysSoFar = scheduledDaysSoFar,
             isCurrentMonth = isCurrentSelectedMonth,
             

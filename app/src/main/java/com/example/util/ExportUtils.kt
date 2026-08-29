@@ -326,15 +326,15 @@ object ExportUtils {
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
         // UI Pre-calculations
-        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(26.0)
+        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (isCurrentSelectedMonth) {
-                val rawProjected = summary.workingDays + remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-                maxOf(rawProjected, standardTargetDays)
+                val rawProjected = summary.workingDays + remainingWeekdays.toDouble()
+                standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
             } else {
-                maxOf(summary.workingDays, summary.standardWorkDays.toDouble())
+                summary.workingDays.coerceAtMost(standardTargetDays)
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
@@ -348,7 +348,7 @@ object ExportUtils {
                 comOtCount = 0,
                 nightShiftsCount = summary.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0),
                 scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
-                totalScheduledDaysInMonth = 26
+                totalScheduledDaysInMonth = standardTargetDays.toInt()
             )
         }
 
@@ -589,15 +589,15 @@ object ExportUtils {
         val currentMonth = todayCal.get(Calendar.MONTH) + 1
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
-        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(26.0)
+        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (isCurrentSelectedMonth) {
-                val rawProjected = summary.workingDays + remainingWeekdays.toDouble() + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-                maxOf(rawProjected, standardTargetDays)
+                val rawProjected = summary.workingDays + remainingWeekdays.toDouble()
+                standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
             } else {
-                maxOf(summary.workingDays, summary.standardWorkDays.toDouble())
+                summary.workingDays.coerceAtMost(standardTargetDays)
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
@@ -611,7 +611,7 @@ object ExportUtils {
                 comOtCount = 0,
                 nightShiftsCount = summary.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0),
                 scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
-                totalScheduledDaysInMonth = 26
+                totalScheduledDaysInMonth = standardTargetDays.toInt()
             )
         }
 
