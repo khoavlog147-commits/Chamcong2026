@@ -850,7 +850,11 @@ fun PayslipScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Dự kiến OT (${if (selectedOt15Shift == "Đêm") df.format(c.heSoOtDem) else df.format(c.heSoOtNgayThuong)}):", color = LightGray, fontSize = 13.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Dự kiến OT (${if (selectedOt15Shift == "Đêm") df.format(c.heSoOtDem) else df.format(c.heSoOtNgayThuong)}):", color = LightGray, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(Tối đa: $remainingWeekdays ngày thường)", color = Color.Gray, fontSize = 11.sp)
+                                    }
                                     if (customOt15DaysCount > 0.0) {
                                         Text(
                                             text = "+${fmt.format(customOt15Pay)}đ dự kiến",
@@ -888,6 +892,11 @@ fun PayslipScreen(
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         var textFieldValue by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(if (customOt15DaysCount == 0.0) "" else df.format(customOt15DaysCount))) }
+                                        LaunchedEffect(remainingWeekdays) {
+                                            if (customOt15DaysCount > remainingWeekdays) {
+                                                customOt15DaysCount = remainingWeekdays.toDouble()
+                                            }
+                                        }
                                         LaunchedEffect(customOt15DaysCount) {
                                             val str = if (customOt15DaysCount == 0.0) "" else df.format(customOt15DaysCount)
                                             if (textFieldValue.text != str && textFieldValue.text.toDoubleOrNull() != customOt15DaysCount) {
@@ -907,7 +916,7 @@ fun PayslipScreen(
                                             onValueChange = {
                                                 textFieldValue = it
                                                 val raw = it.text.toDoubleOrNull() ?: 0.0
-                                                val maxPossible = (remainingWeekdays + (if (includeSundayInProjection) remainingSundays else 0)).toDouble()
+                                                val maxPossible = remainingWeekdays.toDouble()
                                                 if (raw > maxPossible) {
                                                     customOt15DaysCount = maxPossible
                                                     val cappedStr = df.format(maxPossible)
