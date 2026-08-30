@@ -48,11 +48,17 @@ import com.example.ui.theme.*
 import com.example.util.AiApiKeyManager
 import com.example.viewmodel.TimeSnapViewModel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.ui.draw.alpha
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.geometry.Offset
 
 data class AiChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -97,14 +103,34 @@ fun GlobalAiAssistantWidget(
     var isGeneratingResponse by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
+    // Auto-dimming logic when AI floating bubble is idle / unused
+    var lastActivityTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var isIdle by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isChatOpen, isGeneratingResponse, lastActivityTime, currentTab) {
+        if (isChatOpen || isGeneratingResponse) {
+            isIdle = false
+        } else {
+            isIdle = false
+            delay(3000L) // Wait 3 seconds of inactivity before dimming
+            isIdle = true
+        }
+    }
+
+    val bubbleAlpha by animateFloatAsState(
+        targetValue = if (isIdle && !isChatOpen) 0.35f else 1.0f,
+        animationSpec = tween(durationMillis = 700),
+        label = "bubbleAlpha"
+    )
+
     // Observe App State for context
     val userConfig by viewModel.userConfig.collectAsStateWithLifecycle()
     val summaryState by viewModel.salarySummaryState.collectAsStateWithLifecycle()
     val timeEntries by viewModel.monthTimeEntries.collectAsStateWithLifecycle(emptyList())
 
-    // Scroll to bottom when new message arrives or when soft keyboard IME opens
-    val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    LaunchedEffect(chatMessages.size, isGeneratingResponse, imeBottomPadding) {
+    // Scroll to bottom when new message arrives or when soft keyboard opens
+    val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
+    LaunchedEffect(chatMessages.size, isGeneratingResponse, isImeVisible) {
         if (chatMessages.isNotEmpty()) {
             listState.animateScrollToItem(chatMessages.size - 1)
         }
@@ -123,18 +149,43 @@ fun GlobalAiAssistantWidget(
 
     val contextDataStr = remember(currentTab, userConfig, summaryState, timeEntries) {
         val fmt = DecimalFormat("#,###")
-        val configInfo = userConfig?.let {
-            "Họ tên: ${it.hoVaTen}, Mã NV: ${it.maNhanVien}, Chức vụ: ${it.roleName}, Lương cơ bản: ${fmt.format(it.luongCoBan)}đ"
-        } ?: "Thông tin nhân viên chưa cập nhật"
+        val configInfo = userConfig?.let { c ->
+            val totalPhuCap = c.pcKyThuat + c.pcTrachNhiem + c.pcChucVu + c.pcHieuSuat +
+                    c.pcSanPham + c.pcComCa + c.pcComOt + c.pcNhaO + c.pcDocHai +
+                    c.pcDtDoanhThu + c.pcXangXe + c.pcThamNien + c.pcCaDem + c.pcKhac1
+            """
+            * CÀI ĐẶT LƯƠNG & QUY ĐỊNH CÔNG TY CỦA NHÂN VIÊN:
+            - Họ tên: ${c.hoVaTen} | Mã NV: ${c.maNhanVien} | Chức vụ: ${c.roleName.ifBlank { "Nhân viên" }} | Bộ phận: ${c.boPhan.ifBlank { "Chưa phân bổ" }}
+            - Công ty: ${c.companyName} | Ca/Lịch trình: ${c.lichTrinh} | Ngày vào làm: ${c.ngayVaoLam.ifBlank { "Chưa cập nhật" }}
+            - Lương cơ bản (LCB): ${fmt.format(c.luongCoBan)}đ | Lương đóng BHXH: ${fmt.format(c.luongDongBaoHiem)}đ
+            - Mức trừ BHXH: ${c.tiLeDongBaoHiem}% | Đoàn phí công đoàn: ${fmt.format(c.doanPhiCongDoan)}đ | Ngày chốt lương hàng tháng: Ngày ${c.ngayChotLuong}
+            - Hệ số tăng ca OT: Ngày thường x${c.heSoOtNgayThuong}, Chủ nhật x${c.heSoOtChuNhat}, Ngày lễ x${c.heSoOtNgayLe}, Ca đêm x${c.heSoOtDem} (Giờ ca đêm: ${c.caDemStart} - ${c.caDemEnd})
+            - Giờ giải lao mỗi ca: ${c.soGioNghiGiaiLao}g (${if (c.tinhKhauTruNghi) "Có trừ vào tổng giờ công" else "Không trừ vào tổng giờ công"})
+            - Tiền chuyên cần gốc: ${fmt.format(c.tienChuyenCanGoc)}đ | Quỹ phép năm: ${c.soNgayPhepNam} ngày (Còn lại: ${c.phepNamConLai} ngày)
+            - Chi tiết 12 phụ cấp & hỗ trợ:
+              + Cơm ca: ${fmt.format(c.pcComCa)}đ/ngày công | Cơm OT: ${fmt.format(c.pcComOt)}đ/suất OT
+              + Xăng xe: ${fmt.format(c.pcXangXe)}đ | Nhà ở: ${fmt.format(c.pcNhaO)}đ | Điện thoại: ${fmt.format(c.pcDtDoanhThu)}đ
+              + Trách nhiệm: ${fmt.format(c.pcTrachNhiem)}đ | Kỹ thuật: ${fmt.format(c.pcKyThuat)}đ | Chức vụ: ${fmt.format(c.pcChucVu)}đ
+              + Hiệu suất: ${fmt.format(c.pcHieuSuat)}đ | Sản phẩm: ${fmt.format(c.pcSanPham)}đ | Độc hại: ${fmt.format(c.pcDocHai)}đ
+              + Thâm niên: ${fmt.format(c.pcThamNien)}đ | Ca đêm: ${fmt.format(c.pcCaDem)}đ | Phụ cấp khác: ${fmt.format(c.pcKhac1)}đ
+              => Tổng phụ cấp: ${fmt.format(totalPhuCap)}đ
+            """.trimIndent()
+        } ?: "Thông tin & cài đặt nhân viên chưa được thiết lập"
 
         val summaryInfo = summaryState?.let { s ->
-            "Công thực tế: ${s.workingDays}/${s.standardWorkDays} ngày. OT ngày: ${s.otDayHours}g, OT đêm: ${s.otNightHours}g, Lương thực nhận: ${fmt.format(s.luongThucNhan)}đ"
+            """
+            * THỐNG KÊ LƯƠNG & CHẤM CÔNG THÁNG HIỆN TẠI:
+            - Ngày công thực tế: ${s.workingDays}/${s.standardWorkDays} ngày công | Giờ làm chuẩn: ${s.standardHours}g | Số ca đêm: ${s.caDemCount} ca
+            - OT ngày thường: ${s.otDayHours}g | OT đêm: ${s.otNightHours}g | Giờ Chủ nhật: ${s.chuNhatHours}g | OT Lễ: ${s.otLeHours}g
+            - Khấu trừ BHXH: ${fmt.format(s.tienBh)}đ | Đoàn phí: ${fmt.format(s.doanPhi)}đ | Phạt/trừ nghỉ: ${fmt.format(s.tienKhauTruNghi)}đ
+            - LƯƠNG THỰC NHẬN (NET): ${fmt.format(s.luongThucNhan)}đ
+            """.trimIndent()
         } ?: "Chưa có tổng hợp công tháng này"
 
         """
-        - Màn hình hiện tại: $tabNameVi
-        - Nhân viên: $configInfo
-        - Thống kê tháng: $summaryInfo
+        - Màn hình người dùng đang mở: $tabNameVi
+        $configInfo
+        $summaryInfo
         """.trimIndent()
     }
 
@@ -188,12 +239,17 @@ fun GlobalAiAssistantWidget(
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .alpha(bubbleAlpha)
                 .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        offsetX += dragAmount.x
-                        offsetY += dragAmount.y
-                    }
+                    detectDragGestures(
+                        onDragStart = { lastActivityTime = System.currentTimeMillis() },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            offsetX += dragAmount.x
+                            offsetY += dragAmount.y
+                            lastActivityTime = System.currentTimeMillis()
+                        }
+                    )
                 }
                 .shadow(12.dp, CircleShape)
                 .clip(CircleShape)
@@ -207,7 +263,10 @@ fun GlobalAiAssistantWidget(
                     )
                 )
                 .border(1.5.dp, Color.White.copy(alpha = 0.6f), CircleShape)
-                .clickable { isChatOpen = true }
+                .clickable {
+                    lastActivityTime = System.currentTimeMillis()
+                    isChatOpen = true
+                }
                 .padding(14.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -242,8 +301,23 @@ fun GlobalAiAssistantWidget(
 
     // BOTTOM SHEET CHAT DIALOG
     if (isChatOpen) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val chatNestedScrollConnection = remember {
+            object : NestedScrollConnection {
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource
+                ): Offset {
+                    // Consume leftover vertical scroll delta so scrolling inside LazyColumn never drags or shifts the ModalBottomSheet
+                    return available
+                }
+            }
+        }
+
         ModalBottomSheet(
             onDismissRequest = { isChatOpen = false },
+            sheetState = sheetState,
             containerColor = Color(0xFF141A24),
             scrimColor = Color.Black.copy(alpha = 0.65f),
             dragHandle = {
@@ -358,6 +432,16 @@ fun GlobalAiAssistantWidget(
                                 )
                             }
                         }
+                        IconButton(
+                            onClick = { isChatOpen = false },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Đóng",
+                                tint = LightGray
+                            )
+                        }
                     }
                 }
 
@@ -419,9 +503,9 @@ fun GlobalAiAssistantWidget(
                 val quickChips = when (currentTab) {
                     "payslip" -> listOf(
                         "💡 Giải thích tổng lương tháng này",
-                        "💡 Cách tính tiền tăng ca chủ nhật 2.0",
-                        "💡 Tiền chuyên cần & phụ cấp tính sao?",
-                        "💡 Các khoản khấu trừ gồm những gì?"
+                        "💡 Các khoản phụ cấp của tôi gồm những gì?",
+                        "💡 Tỷ lệ trừ BHXH & Công đoàn phí",
+                        "💡 Hệ số OT ngày thường, Chủ nhật & Ca đêm?"
                     )
                     "history" -> listOf(
                         "💡 Tổng công làm việc tháng này là bao nhiêu?",
@@ -431,20 +515,20 @@ fun GlobalAiAssistantWidget(
                     )
                     "home" -> listOf(
                         "💡 Giờ quy định vào ca ngày & ca đêm",
-                        "💡 Hướng dẫn cách chấm công nhanh",
+                        "💡 Quy định ngày chốt lương & giờ nghỉ giải lao",
                         "💡 Ngày công chuẩn tháng này là bao nhiêu?",
-                        "💡 Quy định tính tăng ca OT công ty"
+                        "💡 Các khoản phụ cấp của tôi"
                     )
                     "settings" -> listOf(
+                        "💡 Kiểm tra toàn bộ cài đặt lương của tôi",
                         "💡 Hướng dẫn tạo Gemini API Key miễn phí",
-                        "💡 Key của tôi được lưu bảo mật ở đâu?",
                         "💡 Hướng dẫn xuất file phiếu lương PDF/PNG",
                         "💡 Đổi mật khẩu & Bảo mật tài khoản"
                     )
                     else -> listOf(
-                        "💡 Giải đáp bảng lương & chấm công",
-                        "💡 Hướng dẫn sử dụng ứng dụng",
-                        "💡 Lợi ích của Gemini AI Key cá nhân"
+                        "💡 Chi tiết cài đặt lương của tôi",
+                        "💡 Tỷ lệ trừ BHXH & các phụ cấp",
+                        "💡 Hướng dẫn sử dụng ứng dụng"
                     )
                 }
 
@@ -476,7 +560,8 @@ fun GlobalAiAssistantWidget(
                     state = listState,
                     modifier = Modifier
                         .weight(1f)
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .nestedScroll(chatNestedScrollConnection),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
