@@ -514,35 +514,82 @@ fun SettingsScreen(
                 }
             }
 
-            // CATEGORY AI: CẤU HÌNH TRỢ LÝ AI (GEMINI)
-            CategoryLayout(title = "CẤU HÌNH TRỢ LÝ AI (GEMINI)", icon = Icons.Default.AutoAwesome) {
+            // CATEGORY AI: CẤU HÌNH TRỢ LÝ AI
+            CategoryLayout(title = "CẤU HÌNH TRỢ LÝ AI", icon = Icons.Default.AutoAwesome) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    var selectedProvider by remember { mutableStateOf(com.example.util.AiApiKeyManager.getProvider(context)) }
                     var currentAiKey by remember { mutableStateOf(com.example.util.AiApiKeyManager.getApiKey(context)) }
+                    var backupAiKey by remember { mutableStateOf(com.example.util.AiApiKeyManager.getBackupApiKey(context)) }
+                    var openRouterKey by remember { mutableStateOf(com.example.util.AiApiKeyManager.getOpenRouterKey(context)) }
+                    var openRouterModel by remember { mutableStateOf(com.example.util.AiApiKeyManager.getOpenRouterModel(context)) }
+                    
                     var isEditingKey by remember { mutableStateOf(false) }
                     var isTestingInSettings by remember { mutableStateOf(false) }
                     val coroutineScope = rememberCoroutineScope()
 
                     Text(
-                        text = "Trợ lý AI giúp giải đáp thắc mắc về phiếu lương, lịch sử chấm công và quy định công ty. Mã API Key được lưu trực tiếp và mã hóa bảo mật trên thiết bị.",
+                        text = "Chọn Dịch vụ Trợ Lý AI của bạn. Hệ thống hỗ trợ Google Gemini hoặc OpenRouter (tích hợp hàng chục AI miễn phí với hạn mức cao như Llama 3.3, DeepSeek R1).",
                         color = LightGray,
                         fontSize = 12.sp
                     )
 
+                    // Provider Selection Tabs
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Surface(
+                            onClick = {
+                                selectedProvider = "gemini"
+                                com.example.util.AiApiKeyManager.saveProvider(context, "gemini")
+                            },
+                            color = if (selectedProvider == "gemini") NeonBlue.copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(1.5.dp, if (selectedProvider == "gemini") NeonBlue else Color.Transparent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "♊ Google Gemini",
+                                color = if (selectedProvider == "gemini") NeonBlue else LightGray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 10.dp)
+                            )
+                        }
+
+                        Surface(
+                            onClick = {
+                                selectedProvider = "openrouter"
+                                com.example.util.AiApiKeyManager.saveProvider(context, "openrouter")
+                            },
+                            color = if (selectedProvider == "openrouter") Color(0xFFFF9800).copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(1.5.dp, if (selectedProvider == "openrouter") Color(0xFFFF9800) else Color.Transparent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "🌐 OpenRouter (Free AI)",
+                                color = if (selectedProvider == "openrouter") Color(0xFFFF9800) else LightGray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 10.dp)
+                            )
+                        }
+                    }
+
+                    if (selectedProvider == "gemini") {
                         OutlinedTextField(
                             value = currentAiKey,
                             onValueChange = { 
                                 currentAiKey = it 
                                 isEditingKey = true
                             },
-                            label = { Text("Gemini API Key cá nhân", color = LightGray) },
+                            label = { Text("Gemini API Key chính", color = LightGray) },
                             placeholder = { Text("AIzaSy...") },
                             singleLine = true,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = White,
                                 unfocusedTextColor = White,
@@ -551,62 +598,197 @@ fun SettingsScreen(
                             )
                         )
 
+                        OutlinedTextField(
+                            value = backupAiKey,
+                            onValueChange = { 
+                                backupAiKey = it 
+                                isEditingKey = true
+                            },
+                            label = { Text("Gemini API Key dự phòng (Fallback)", color = LightGray) },
+                            placeholder = { Text("AIzaSy... (Dùng khi Key chính lỗi/hết hạn)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = White,
+                                unfocusedTextColor = White,
+                                focusedBorderColor = Color(0xFFFF9800),
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://aistudio.google.com/app/apikey"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("👉 Lấy Gemini API Key miễn phí từ Google AI Studio", color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        // OpenRouter Settings
+                        Text(
+                            text = "Chọn Mô hình AI Miễn phí:",
+                            color = White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        val openRouterModels = listOf(
+                            Pair("🦙 Llama 3.3 70B (Siêu Nhanh)", "meta-llama/llama-3.3-70b-instruct:free"),
+                            Pair("🧠 DeepSeek R1 (Tư duy sâu)", "deepseek/deepseek-r1:free"),
+                            Pair("💎 Gemini 2.0 Flash Lite", "google/gemini-2.0-flash-lite-001:free"),
+                            Pair("🤖 Auto (Tự chọn AI tốt nhất)", "openrouter/auto")
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            openRouterModels.forEach { (label, modelKey) ->
+                                val isSelected = openRouterModel == modelKey
+                                Surface(
+                                    onClick = {
+                                        openRouterModel = modelKey
+                                        com.example.util.AiApiKeyManager.saveOpenRouterModel(context, modelKey)
+                                    },
+                                    color = if (isSelected) Color(0xFFFF9800).copy(alpha = 0.2f) else Color(0xFF1E2838),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF9800) else Color.Transparent),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = {
+                                                openRouterModel = modelKey
+                                                com.example.util.AiApiKeyManager.saveOpenRouterModel(context, modelKey)
+                                            },
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFF9800))
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(text = label, color = White, fontSize = 12.5.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                    }
+                                }
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = openRouterKey,
+                            onValueChange = { 
+                                openRouterKey = it 
+                                isEditingKey = true
+                            },
+                            label = { Text("OpenRouter API Key", color = LightGray) },
+                            placeholder = { Text("sk-or-v1-...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = White,
+                                unfocusedTextColor = White,
+                                focusedBorderColor = Color(0xFFFF9800),
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://openrouter.ai/keys"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("👉 Lấy OpenRouter API Key miễn phí (Không cần thẻ)", color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Button(
                             onClick = {
-                                val keyToSave = currentAiKey.trim()
-                                if (keyToSave.isBlank()) {
-                                    com.example.util.AiApiKeyManager.clearApiKey(context)
-                                    currentAiKey = ""
-                                    isEditingKey = false
-                                    Toast.makeText(context, "Đã xóa Gemini API Key", Toast.LENGTH_SHORT).show()
+                                if (selectedProvider == "gemini") {
+                                    val primaryToSave = currentAiKey.trim()
+                                    val backupToSave = backupAiKey.trim()
+
+                                    if (primaryToSave.isBlank() && backupToSave.isBlank()) {
+                                        com.example.util.AiApiKeyManager.clearApiKey(context)
+                                        com.example.util.AiApiKeyManager.clearBackupApiKey(context)
+                                        currentAiKey = ""
+                                        backupAiKey = ""
+                                        isEditingKey = false
+                                        Toast.makeText(context, "Đã xóa tất cả Gemini API Key", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        isTestingInSettings = true
+                                        coroutineScope.launch {
+                                            val testKey = if (primaryToSave.isNotBlank()) primaryToSave else backupToSave
+                                            val res = com.example.data.GeminiAiService.generateContent(
+                                                apiKey = testKey,
+                                                userPrompt = "Ping",
+                                                contextData = "Test Key"
+                                            )
+                                            isTestingInSettings = false
+                                            res.onSuccess {
+                                                if (primaryToSave.isNotBlank()) com.example.util.AiApiKeyManager.saveApiKey(context, primaryToSave) else com.example.util.AiApiKeyManager.clearApiKey(context)
+                                                if (backupToSave.isNotBlank()) com.example.util.AiApiKeyManager.saveBackupApiKey(context, backupToSave) else com.example.util.AiApiKeyManager.clearBackupApiKey(context)
+                                                isEditingKey = false
+                                                Toast.makeText(context, "Đã lưu Gemini API Key thành công!", Toast.LENGTH_SHORT).show()
+                                            }.onFailure { err ->
+                                                Toast.makeText(context, "Lỗi kiểm tra API Key: ${err.message}", Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    }
                                 } else {
-                                    isTestingInSettings = true
-                                    coroutineScope.launch {
-                                        val res = com.example.data.GeminiAiService.generateContent(
-                                            apiKey = keyToSave,
-                                            userPrompt = "Ping",
-                                            contextData = "Test Key"
-                                        )
-                                        isTestingInSettings = false
-                                        res.onSuccess {
-                                            com.example.util.AiApiKeyManager.saveApiKey(context, keyToSave)
-                                            isEditingKey = false
-                                            Toast.makeText(context, "Đã lưu Gemini API Key thành công!", Toast.LENGTH_SHORT).show()
-                                        }.onFailure { err ->
-                                            Toast.makeText(context, "Lỗi API Key: ${err.message}", Toast.LENGTH_LONG).show()
+                                    val orToSave = openRouterKey.trim()
+                                    if (orToSave.isBlank()) {
+                                        com.example.util.AiApiKeyManager.clearOpenRouterKey(context)
+                                        openRouterKey = ""
+                                        isEditingKey = false
+                                        Toast.makeText(context, "Đã xóa OpenRouter API Key", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        isTestingInSettings = true
+                                        coroutineScope.launch {
+                                            val res = com.example.data.OpenRouterAiService.generateContent(
+                                                apiKey = orToSave,
+                                                model = openRouterModel,
+                                                userPrompt = "Ping",
+                                                contextData = "Test Key"
+                                            )
+                                            isTestingInSettings = false
+                                            res.onSuccess {
+                                                com.example.util.AiApiKeyManager.saveOpenRouterKey(context, orToSave)
+                                                com.example.util.AiApiKeyManager.saveOpenRouterModel(context, openRouterModel)
+                                                isEditingKey = false
+                                                Toast.makeText(context, "Đã lưu OpenRouter API Key & Mô hình thành công!", Toast.LENGTH_SHORT).show()
+                                            }.onFailure { err ->
+                                                Toast.makeText(context, "Lỗi OpenRouter API Key: ${err.message}", Toast.LENGTH_LONG).show()
+                                            }
                                         }
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = NeonBlue, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedProvider == "openrouter") Color(0xFFFF9800) else NeonBlue,
+                                contentColor = Color.White
+                            ),
                             shape = RoundedCornerShape(8.dp),
                             enabled = !isTestingInSettings
                         ) {
                             if (isTestingInSettings) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             } else {
-                                Text(if (isEditingKey) "Lưu Key" else "Đã lưu", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isEditingKey) "Lưu cấu hình AI" else "Đã lưu Cấu hình", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                    }
-
-                    TextButton(
-                        onClick = {
-                            try {
-                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://aistudio.google.com/app/apikey"))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Không thể mở trình duyệt", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            text = "👉 Lấy Gemini API Key miễn phí từ Google AI Studio",
-                            color = NeonBlue,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }

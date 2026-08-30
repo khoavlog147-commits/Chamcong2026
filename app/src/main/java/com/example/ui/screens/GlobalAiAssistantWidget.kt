@@ -228,15 +228,16 @@ fun GlobalAiAssistantWidget(
     var isListeningVoice by remember { mutableStateOf(false) }
 
     DisposableEffect(context) {
-        val tts = TextToSpeech(context) { status ->
+        var ttsRef: TextToSpeech? = null
+        ttsRef = TextToSpeech(context) { status ->
             if (status == TextToSpeech.SUCCESS) {
-                ttsInstance?.language = Locale("vi", "VN")
+                ttsRef?.language = Locale("vi", "VN")
             }
         }
-        ttsInstance = tts
+        ttsInstance = ttsRef
         onDispose {
-            tts.stop()
-            tts.shutdown()
+            ttsRef?.stop()
+            ttsRef?.shutdown()
         }
     }
 
@@ -252,22 +253,63 @@ fun GlobalAiAssistantWidget(
         } else {
             ttsInstance?.stop()
             
-            // Adjust Pitch & Speed according to user's selected gender & speed
-            val pitch = if (voiceGender == "male") 0.65f else 1.30f
-            ttsInstance?.setPitch(pitch)
+            // Standard 1.0f pitch - no artificial pitch modification
+            ttsInstance?.setPitch(1.0f)
             ttsInstance?.setSpeechRate(voiceSpeed)
 
-            // Select matching system voice engine if available
+            // Select matching female or male Voice object from Android TextToSpeech engine
             try {
                 val voices = ttsInstance?.voices
                 if (!voices.isNullOrEmpty()) {
-                    val viVoices = voices.filter { it.locale.language == "vi" || it.locale == Locale("vi", "VN") }
+                    val viVoices = voices.filter { 
+                        it.locale.language == "vi" || 
+                        it.locale.country == "VN" || 
+                        it.locale.toString().lowercase().contains("vi") 
+                    }.ifEmpty { voices.toList() }
+
+                    val isFemaleTarget = (voiceGender == "female")
+
                     val targetVoice = viVoices.find { v ->
                         val vName = v.name.lowercase()
-                        if (voiceGender == "male") {
-                            vName.contains("male") || vName.contains("man") || vName.contains("vic") || vName.contains("vib") || vName.contains("vie") || vName.contains("m0") || vName.contains("m1")
+                        val features = try { v.features } catch (e: Exception) { null }
+                        val isFemale = features?.any { it.contains("gender=female") } == true ||
+                                vName.contains("female") ||
+                                vName.contains("woman") ||
+                                vName.contains("vif") ||
+                                vName.contains("via") ||
+                                vName.contains("vid") ||
+                                vName.contains("wavenet-a") ||
+                                vName.contains("wavenet-c") ||
+                                vName.contains("standard-a") ||
+                                vName.contains("standard-c") ||
+                                vName.contains("f0") ||
+                                vName.contains("f1") ||
+                                vName.contains("f2") ||
+                                vName.contains("-f-")
+
+                        val isMale = features?.any { it.contains("gender=male") } == true ||
+                                vName.contains("male") ||
+                                vName.contains("man") ||
+                                vName.contains("vic") ||
+                                vName.contains("vib") ||
+                                vName.contains("vie") ||
+                                vName.contains("wavenet-b") ||
+                                vName.contains("standard-b") ||
+                                vName.contains("m0") ||
+                                vName.contains("m1") ||
+                                vName.contains("-m-")
+
+                        if (isFemaleTarget) {
+                            isFemale && !isMale
                         } else {
-                            vName.contains("female") || vName.contains("woman") || vName.contains("via") || vName.contains("vid") || vName.contains("vif") || vName.contains("f0") || vName.contains("f1")
+                            isMale && !isFemale
+                        }
+                    } ?: viVoices.find { v ->
+                        val vName = v.name.lowercase()
+                        if (isFemaleTarget) {
+                            !vName.contains("male") && !vName.contains("vic") && !vName.contains("vib") && !vName.contains("m0")
+                        } else {
+                            !vName.contains("female") && !vName.contains("vif") && !vName.contains("via") && !vName.contains("f0")
                         }
                     } ?: viVoices.firstOrNull()
 
@@ -296,7 +338,8 @@ fun GlobalAiAssistantWidget(
                 showApiKeyDialog = true
             } else {
                 stopSpeaking()
-                val currentKey = AiApiKeyManager.getApiKey(context)
+                val primaryKey = AiApiKeyManager.getApiKey(context)
+                val backupKey = AiApiKeyManager.getBackupApiKey(context)
                 chatMessages.add(AiChatMessage(sender = "user", text = prompt))
                 userPromptText = ""
                 isGeneratingResponse = true
@@ -306,8 +349,8 @@ fun GlobalAiAssistantWidget(
                         Pair(if (it.sender == "user") "user" else "model", it.text) 
                     }
 
-                    val result = GeminiAiService.generateContent(
-                        apiKey = currentKey,
+                    val result = com.example.data.AiServiceManager.generateContent(
+                        context = context,
                         userPrompt = prompt,
                         contextData = contextDataStr,
                         chatHistory = historyPairs
@@ -961,7 +1004,12 @@ fun GlobalAiAssistantWidget(
 
     // DIALOG SETUP API KEY
     if (showApiKeyDialog) {
+        var selectedProvider by remember { mutableStateOf(AiApiKeyManager.getProvider(context)) }
         var inputKey by remember { mutableStateOf(AiApiKeyManager.getApiKey(context)) }
+        var inputBackupKey by remember { mutableStateOf(AiApiKeyManager.getBackupApiKey(context)) }
+        var openRouterKey by remember { mutableStateOf(AiApiKeyManager.getOpenRouterKey(context)) }
+        var openRouterModel by remember { mutableStateOf(AiApiKeyManager.getOpenRouterModel(context)) }
+
         var isTestingKey by remember { mutableStateOf(false) }
         var testErrorText by remember { mutableStateOf<String?>(null) }
 
@@ -979,7 +1027,7 @@ fun GlobalAiAssistantWidget(
                         modifier = Modifier.size(24.dp)
                     )
                     Text(
-                        text = "Cấu hình Gemini API Key",
+                        text = "Cấu hình Trợ lý AI",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
@@ -991,41 +1039,192 @@ fun GlobalAiAssistantWidget(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.verticalScroll(rememberScrollState())
                 ) {
-                    GeminiApiPricingCard(
-                        onOpenGoogleStudio = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
+                    // Provider Tabs
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            onClick = {
+                                selectedProvider = "gemini"
+                                testErrorText = null
+                            },
+                            color = if (selectedProvider == "gemini") NeonBlue.copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(1.5.dp, if (selectedProvider == "gemini") NeonBlue else Color.Transparent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "♊ Gemini",
+                                color = if (selectedProvider == "gemini") NeonBlue else LightGray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+
+                        Surface(
+                            onClick = {
+                                selectedProvider = "openrouter"
+                                testErrorText = null
+                            },
+                            color = if (selectedProvider == "openrouter") Color(0xFFFF9800).copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(1.5.dp, if (selectedProvider == "openrouter") Color(0xFFFF9800) else Color.Transparent),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "🌐 OpenRouter Free",
+                                color = if (selectedProvider == "openrouter") Color(0xFFFF9800) else LightGray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+
+                    if (selectedProvider == "gemini") {
+                        Text(
+                            text = "Nhập API Key Gemini chính và dự phòng của bạn:",
+                            color = LightGray,
+                            fontSize = 12.sp
+                        )
+
+                        OutlinedTextField(
+                            value = inputKey,
+                            onValueChange = { 
+                                inputKey = it 
+                                testErrorText = null
+                            },
+                            label = { Text("Gemini API Key chính", color = LightGray) },
+                            placeholder = { Text("AIzaSy...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = NeonBlue,
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+
+                        OutlinedTextField(
+                            value = inputBackupKey,
+                            onValueChange = { 
+                                inputBackupKey = it 
+                                testErrorText = null
+                            },
+                            label = { Text("Gemini API Key dự phòng (Fallback)", color = LightGray) },
+                            placeholder = { Text("AIzaSy...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFFFF9800),
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = "👉 Lấy Gemini API Key miễn phí từ Google",
+                                color = NeonBlue,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        // OpenRouter Form
+                        Text(
+                            text = "Mô hình AI Miễn phí:",
+                            color = Color.White,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        val models = listOf(
+                            Pair("🦙 Llama 3.3 70B (Siêu Nhanh)", "meta-llama/llama-3.3-70b-instruct:free"),
+                            Pair("🧠 DeepSeek R1 (Tư duy sâu)", "deepseek/deepseek-r1:free"),
+                            Pair("💎 Gemini 2.0 Flash Lite", "google/gemini-2.0-flash-lite-001:free"),
+                            Pair("🤖 Auto (Tự chọn AI tốt nhất)", "openrouter/auto")
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            models.forEach { (label, modelKey) ->
+                                val isSelected = openRouterModel == modelKey
+                                Surface(
+                                    onClick = { openRouterModel = modelKey },
+                                    color = if (isSelected) Color(0xFFFF9800).copy(alpha = 0.2f) else Color(0xFF1E2838),
+                                    border = BorderStroke(1.dp, if (isSelected) Color(0xFFFF9800) else Color.Transparent),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = { openRouterModel = modelKey },
+                                            colors = RadioButtonDefaults.colors(selectedColor = Color(0xFFFF9800))
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(text = label, color = Color.White, fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                    }
+                                }
                             }
                         }
-                    )
 
-                    Text(
-                        text = "Vui lòng dán mã Gemini API Key của bạn để sử dụng Trợ lý AI cá nhân. Key của bạn sẽ được lưu mã hóa an toàn trực tiếp trên điện thoại này.",
-                        color = LightGray,
-                        fontSize = 12.5.sp,
-                        lineHeight = 17.sp
-                    )
-
-                    OutlinedTextField(
-                        value = inputKey,
-                        onValueChange = { 
-                            inputKey = it 
-                            testErrorText = null
-                        },
-                        label = { Text("Gemini API Key", color = LightGray) },
-                        placeholder = { Text("AIzaSy...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = NeonBlue,
-                            unfocusedBorderColor = Color.Gray
+                        OutlinedTextField(
+                            value = openRouterKey,
+                            onValueChange = { 
+                                openRouterKey = it 
+                                testErrorText = null
+                            },
+                            label = { Text("OpenRouter API Key", color = LightGray) },
+                            placeholder = { Text("sk-or-v1-...") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFFFF9800),
+                                unfocusedBorderColor = Color.Gray
+                            )
                         )
-                    )
+
+                        TextButton(
+                            onClick = {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://openrouter.ai/keys"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = "👉 Lấy OpenRouter API Key miễn phí",
+                                color = Color(0xFFFF9800),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
                     if (testErrorText != null) {
                         Text(
@@ -1035,60 +1234,83 @@ fun GlobalAiAssistantWidget(
                             lineHeight = 15.sp
                         )
                     }
-
-                    TextButton(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/app/apikey"))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Mở trình duyệt thất bại", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        contentPadding = PaddingValues(0.dp)
-                    ) {
-                        Text(
-                            text = "👉 Nhấn vào đây để lấy Gemini API Key miễn phí từ Google",
-                            color = NeonBlue,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val keyTrimmed = inputKey.trim()
-                        if (keyTrimmed.isBlank()) {
-                            AiApiKeyManager.clearApiKey(context)
-                            apiKey = ""
-                            showApiKeyDialog = false
-                            Toast.makeText(context, "Đã xóa API Key.", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
+                        AiApiKeyManager.saveProvider(context, selectedProvider)
+                        if (selectedProvider == "gemini") {
+                            val keyTrimmed = inputKey.trim()
+                            val backupTrimmed = inputBackupKey.trim()
 
-                        isTestingKey = true
-                        testErrorText = null
-
-                        coroutineScope.launch {
-                            val testRes = GeminiAiService.generateContent(
-                                apiKey = keyTrimmed,
-                                userPrompt = "Xin chào, hãy trả lời đúng từ OK",
-                                contextData = "Kiểm tra API Key"
-                            )
-                            isTestingKey = false
-                            testRes.onSuccess {
-                                AiApiKeyManager.saveApiKey(context, keyTrimmed)
-                                apiKey = keyTrimmed
+                            if (keyTrimmed.isBlank() && backupTrimmed.isBlank()) {
+                                AiApiKeyManager.clearApiKey(context)
+                                AiApiKeyManager.clearBackupApiKey(context)
+                                apiKey = ""
                                 showApiKeyDialog = false
-                                Toast.makeText(context, "Đã lưu API Key thành công! Trợ lý AI đã sẵn sàng.", Toast.LENGTH_LONG).show()
-                            }.onFailure { err ->
-                                testErrorText = err.message ?: "Key không hợp lệ."
+                                Toast.makeText(context, "Đã xóa toàn bộ Gemini API Key.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            isTestingKey = true
+                            testErrorText = null
+
+                            coroutineScope.launch {
+                                val activeTestKey = if (keyTrimmed.isNotBlank()) keyTrimmed else backupTrimmed
+                                val testRes = GeminiAiService.generateContent(
+                                    apiKey = activeTestKey,
+                                    userPrompt = "Xin chào, hãy trả lời đúng từ OK",
+                                    contextData = "Kiểm tra API Key"
+                                )
+                                isTestingKey = false
+                                testRes.onSuccess {
+                                    if (keyTrimmed.isNotBlank()) AiApiKeyManager.saveApiKey(context, keyTrimmed) else AiApiKeyManager.clearApiKey(context)
+                                    if (backupTrimmed.isNotBlank()) AiApiKeyManager.saveBackupApiKey(context, backupTrimmed) else AiApiKeyManager.clearBackupApiKey(context)
+                                    apiKey = activeTestKey
+                                    showApiKeyDialog = false
+                                    Toast.makeText(context, "Đã lưu Gemini API Key thành công!", Toast.LENGTH_LONG).show()
+                                }.onFailure { err ->
+                                    testErrorText = err.message ?: "Key không hợp lệ."
+                                }
+                            }
+                        } else {
+                            val orKeyTrimmed = openRouterKey.trim()
+                            if (orKeyTrimmed.isBlank()) {
+                                AiApiKeyManager.clearOpenRouterKey(context)
+                                apiKey = ""
+                                showApiKeyDialog = false
+                                Toast.makeText(context, "Đã xóa OpenRouter API Key.", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
+                            isTestingKey = true
+                            testErrorText = null
+
+                            coroutineScope.launch {
+                                val testRes = com.example.data.OpenRouterAiService.generateContent(
+                                    apiKey = orKeyTrimmed,
+                                    model = openRouterModel,
+                                    userPrompt = "Xin chào, hãy trả lời OK",
+                                    contextData = "Kiểm tra API Key"
+                                )
+                                isTestingKey = false
+                                testRes.onSuccess {
+                                    AiApiKeyManager.saveOpenRouterKey(context, orKeyTrimmed)
+                                    AiApiKeyManager.saveOpenRouterModel(context, openRouterModel)
+                                    apiKey = orKeyTrimmed
+                                    showApiKeyDialog = false
+                                    Toast.makeText(context, "Đã lưu OpenRouter API Key thành công!", Toast.LENGTH_LONG).show()
+                                }.onFailure { err ->
+                                    testErrorText = err.message ?: "OpenRouter Key không hợp lệ."
+                                }
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentGreen, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedProvider == "openrouter") Color(0xFFFF9800) else AccentGreen,
+                        contentColor = Color.White
+                    ),
                     shape = RoundedCornerShape(8.dp),
                     enabled = !isTestingKey
                 ) {

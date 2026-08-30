@@ -10,8 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-object GeminiAiService {
-    private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent"
+object OpenRouterAiService {
+    private const val BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -21,21 +21,27 @@ object GeminiAiService {
 
     suspend fun generateContent(
         apiKey: String,
+        model: String = "meta-llama/llama-3.3-70b-instruct:free",
         userPrompt: String,
         contextData: String,
         chatHistory: List<Pair<String, String>> = emptyList()
     ): Result<String> = withContext(Dispatchers.IO) {
-        if (apiKey.isBlank()) {
-            return@withContext Result.failure(IllegalArgumentException("Chưa cài đặt Gemini API Key."))
+        val key = apiKey.trim()
+        if (key.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Chưa cài đặt OpenRouter API Key."))
         }
 
         try {
             val requestJson = JSONObject()
+            val selectedModel = if (model.isBlank()) "meta-llama/llama-3.3-70b-instruct:free" else model
+            requestJson.put("model", selectedModel)
+
+            val messagesArray = JSONArray()
 
             // System instruction
-            val systemInstruction = JSONObject()
-            val systemPart = JSONObject()
-            systemPart.put("text", """
+            val systemMsg = JSONObject()
+            systemMsg.put("role", "system")
+            systemMsg.put("content", """
                 Bạn là Trợ lý AI Thông minh & Chuyên gia Lương kiêm Cố vấn Hệ thống duy nhất chính thức của ứng dụng TimeSnap Pro.
                 
                 QUYỀN HẠN & TRUY CẬP DỮ LIỆU:
@@ -66,48 +72,40 @@ object GeminiAiService {
                    - Nghỉ phép năm (PAID_LEAVE): Tính 100% lương ngày công chuẩn, trừ vào quỹ phép năm còn lại.
                    - Nghỉ không lương (UNPAID_LEAVE): Không tính lương, khấu trừ tiền công tương ứng.
                 9. PHÂN BIỆT RÕ 2 BẢNG LƯƠNG (CỰC KỲ QUAN TRỌNG):
-                   - Bảng Lương Thực Tế: Nguyên tắc "Làm đến đâu tính đến đó". Chỉ tính ngày công, OT, ca đêm, phụ cấp thực tế phát sinh từ ngày 1 đến HÔM NAY. Bất kỳ ngày tương lai nào (dù đã bấm đăng ký Phép năm/Nghỉ lễ) sẽ CHƯA cộng vào Bảng Thực tế.
-                   - Bảng Lương Dự Kiến: Bằng [Công Thực tế đến hôm nay] + [Dự báo các ngày còn lại trong tháng]. Các ngày ở tương lai nếu đã đăng ký Phép năm, Nghỉ lễ, hoặc Lịch làm việc chuẩn sẽ được tính vào để dự báo 100% Lương NET tròn tháng.
+                   - Bảng Lương Thực Tế: Nguyên tắc "Làm đến đâu tính đến đó". Chỉ tính ngày công, OT, ca đêm, phụ cấp thực tế phát sinh từ ngày 1 đến HÔM NAY.
+                   - Bảng Lương Dự Kiến: Bằng [Công Thực tế đến hôm nay] + [Dự báo các ngày còn lại trong tháng].
                 
                 QUY TẮC TRẢ LỜI (BẮT BUỘC):
                 1. TRẢ LỜI ĐÚNG TRỌNG TÂM, NGẮN GỌN, SÚC TÍCH.
                 2. VÀO THẲNG CÂU TRẢ LỜI & CON SỐ, KHÔNG CHÀO HỎI LÊ THÊ, KHÔNG DÀI DÒNG VÒNG VÈO.
-                3. Khi người dùng hỏi tính tiền (ví dụ: tiền ca đêm Chủ nhật, tiền OT ngày lễ, tiền phụ cấp...): Trình bày ngắn gọn phép tính: [Số giờ/ca] x [Đơn giá/Hệ số] = [KẾT QUẢ TIỀN].
-                4. Khi hỏi so sánh: Nêu rõ Tăng/Giảm bao nhiêu tiền (%) giữa tháng này và tháng trước kèm 1-2 lý do chính ngắn gọn.
-                5. Khi hỏi cách dùng app: Hướng dẫn ngắn gọn từng bước (1..., 2..., 3...).
                 
                 DỮ LIỆU THỰC TẾ & CẤU HÌNH NGƯỜI DÙNG:
                 $contextData
             """.trimIndent())
-            systemInstruction.put("parts", JSONArray().put(systemPart))
-            requestJson.put("systemInstruction", systemInstruction)
+            messagesArray.put(systemMsg)
 
-            // Contents array
-            val contentsArray = JSONArray()
-
-            // Add conversation history
+            // Conversation history
             for (turn in chatHistory) {
                 val turnObj = JSONObject()
-                turnObj.put("role", if (turn.first == "user") "user" else "model")
-                val parts = JSONArray()
-                parts.put(JSONObject().put("text", turn.second))
-                turnObj.put("parts", parts)
-                contentsArray.put(turnObj)
+                turnObj.put("role", if (turn.first == "user") "user" else "assistant")
+                turnObj.put("content", turn.second)
+                messagesArray.put(turnObj)
             }
 
-            // Current turn
-            val currentTurn = JSONObject()
-            currentTurn.put("role", "user")
-            val currentParts = JSONArray()
-            currentParts.put(JSONObject().put("text", userPrompt))
-            currentTurn.put("parts", currentParts)
-            contentsArray.put(currentTurn)
+            // Current prompt
+            val userMsg = JSONObject()
+            userMsg.put("role", "user")
+            userMsg.put("content", userPrompt)
+            messagesArray.put(userMsg)
 
-            requestJson.put("contents", contentsArray)
+            requestJson.put("messages", messagesArray)
 
             val body = requestJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             val request = Request.Builder()
-                .url("$BASE_URL?key=$apiKey")
+                .url(BASE_URL)
+                .addHeader("Authorization", "Bearer $key")
+                .addHeader("HTTP-Referer", "https://timesnap.app")
+                .addHeader("X-Title", "TimeSnap Pro")
                 .post(body)
                 .build()
 
@@ -117,13 +115,13 @@ object GeminiAiService {
             if (!response.isSuccessful) {
                 val errorMsg = try {
                     val errObj = JSONObject(responseBodyStr).optJSONObject("error")
-                    val message = errObj?.optString("message") ?: "Lỗi kết nối (${response.code})"
-                    if (response.code == 400 || message.lowercase().contains("key")) {
-                        "API Key không hợp lệ hoặc không có quyền truy cập Gemini API. Vui lòng kiểm tra lại Key!"
+                    val message = errObj?.optString("message") ?: "Lỗi kết nối OpenRouter (${response.code})"
+                    if (response.code == 401 || message.lowercase().contains("api key")) {
+                        "OpenRouter API Key không hợp lệ. Vui lòng kiểm tra lại Key!"
                     } else if (response.code == 429) {
-                        "Đã vượt quá hạn mức sử dụng API Key (Rate limit/Quota). Vui lòng thử lại sau giây lát!"
+                        "Đã vượt quá hạn mức sử dụng OpenRouter. Vui lòng thử lại sau giây lát!"
                     } else {
-                        "Lỗi Gemini: $message"
+                        "Lỗi OpenRouter: $message"
                     }
                 } catch (e: Exception) {
                     "Yêu cầu thất bại (Mã lỗi ${response.code})"
@@ -132,53 +130,18 @@ object GeminiAiService {
             }
 
             val resObj = JSONObject(responseBodyStr)
-            val candidates = resObj.optJSONArray("candidates")
-            val firstCandidate = candidates?.optJSONObject(0)
-            val contentObj = firstCandidate?.optJSONObject("content")
-            val partsArr = contentObj?.optJSONArray("parts")
-            val textResult = partsArr?.optJSONObject(0)?.optString("text")
+            val choices = resObj.optJSONArray("choices")
+            val firstChoice = choices?.optJSONObject(0)
+            val messageObj = firstChoice?.optJSONObject("message")
+            val textResult = messageObj?.optString("content")
 
             if (!textResult.isNullOrBlank()) {
                 Result.success(textResult)
             } else {
-                Result.failure(Exception("Gemini không phản hồi nội dung."))
+                Result.failure(Exception("OpenRouter AI không phản hồi nội dung."))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    suspend fun generateContentWithFallback(
-        primaryKey: String,
-        backupKey: String,
-        userPrompt: String,
-        contextData: String,
-        chatHistory: List<Pair<String, String>> = emptyList()
-    ): Result<String> {
-        val primary = primaryKey.trim()
-        val backup = backupKey.trim()
-
-        val activeKey = if (primary.isNotBlank()) primary else backup
-        if (activeKey.isBlank()) {
-            return Result.failure(IllegalArgumentException("Chưa cài đặt Gemini API Key (Chính hoặc Dự phòng)."))
-        }
-
-        val primaryResult = generateContent(activeKey, userPrompt, contextData, chatHistory)
-        if (primaryResult.isSuccess) {
-            return primaryResult
-        }
-
-        // If primary key call failed and we have a backup key distinct from activeKey
-        if (backup.isNotBlank() && backup != activeKey) {
-            val backupResult = generateContent(backup, userPrompt, contextData, chatHistory)
-            if (backupResult.isSuccess) {
-                return backupResult
-            }
-            return Result.failure(
-                Exception("Cả API Key chính và API Key dự phòng đều thất bại. Key dự phòng báo lỗi: ${backupResult.exceptionOrNull()?.message}")
-            )
-        }
-
-        return primaryResult
     }
 }
