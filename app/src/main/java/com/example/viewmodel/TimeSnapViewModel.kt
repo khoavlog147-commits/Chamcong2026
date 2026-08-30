@@ -1379,6 +1379,33 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun deleteEntryByDateString(inputDateStr: String) {
+        val session = currentUserSession.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val dateTrimmed = inputDateStr.trim()
+            val altDateStr = try {
+                if (dateTrimmed.contains("-")) {
+                    val p = dateTrimmed.split("-")
+                    if (p.size == 3) "${p[2]}/${p[1]}/${p[0]}" else dateTrimmed
+                } else if (dateTrimmed.contains("/")) {
+                    val p = dateTrimmed.split("/")
+                    if (p.size == 3) "${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}" else dateTrimmed
+                } else dateTrimmed
+            } catch (e: Exception) { dateTrimmed }
+
+            val existing = repository.getEntryByDate(session.uid, dateTrimmed)
+                ?: repository.getEntryByDate(session.uid, altDateStr)
+
+            if (existing != null) {
+                deleteEntry(existing)
+            } else {
+                recordDeletedDate(session.uid, dateTrimmed)
+                recordDeletedDate(session.uid, altDateStr)
+                triggerSync()
+            }
+        }
+    }
+
     fun deleteBulkEntries(selectedDatesList: List<String>) {
         val session = currentUserSession.value ?: return
         viewModelScope.launch(Dispatchers.IO) {

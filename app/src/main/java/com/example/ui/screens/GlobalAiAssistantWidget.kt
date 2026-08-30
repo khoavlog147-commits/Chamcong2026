@@ -142,7 +142,7 @@ fun GlobalAiAssistantWidget(
         }
     }
 
-    // Prepare Context Information for Gemini AI
+    // Active Screen Name for UI display and AI context
     val tabNameVi = when (currentTab) {
         "home" -> "Trang chủ Chấm công"
         "history" -> "Lịch sử Chấm công"
@@ -153,66 +153,15 @@ fun GlobalAiAssistantWidget(
         else -> "Màn hình ứng dụng"
     }
 
+    // Prepare Context Information for AI via real-time Screen Context Buffer
     val contextDataStr = remember(currentTab, userConfig, summaryState, timeEntries, salaryHistory) {
-        val fmt = DecimalFormat("#,###")
-        val configInfo = userConfig?.let { c ->
-            val totalPhuCap = c.pcKyThuat + c.pcTrachNhiem + c.pcChucVu + c.pcHieuSuat +
-                    c.pcSanPham + c.pcComCa + c.pcComOt + c.pcNhaO + c.pcDocHai +
-                    c.pcDtDoanhThu + c.pcXangXe + c.pcThamNien + c.pcCaDem + c.pcKhac1
-            """
-            * CÀI ĐẶT LƯƠNG & QUY ĐỊNH CÔNG TY CỦA NHÂN VIÊN:
-            - Họ tên: ${c.hoVaTen} | Mã NV: ${c.maNhanVien} | Chức vụ: ${c.roleName.ifBlank { "Nhân viên" }} | Bộ phận: ${c.boPhan.ifBlank { "Chưa phân bổ" }}
-            - Công ty: ${c.companyName} | Ca/Lịch trình: ${c.lichTrinh} | Ngày vào làm: ${c.ngayVaoLam.ifBlank { "Chưa cập nhật" }}
-            - Lương cơ bản (LCB): ${fmt.format(c.luongCoBan)}đ | Lương đóng BHXH: ${fmt.format(c.luongDongBaoHiem)}đ
-            - Mức trừ BHXH: ${c.tiLeDongBaoHiem}% | Đoàn phí công đoàn: ${fmt.format(c.doanPhiCongDoan)}đ | Ngày chốt lương hàng tháng: Ngày ${c.ngayChotLuong}
-            - Hệ số tăng ca OT: Ngày thường x${c.heSoOtNgayThuong}, Chủ nhật x${c.heSoOtChuNhat}, Ngày lễ x${c.heSoOtNgayLe}, Ca đêm x${c.heSoOtDem} (Giờ ca đêm: ${c.caDemStart} - ${c.caDemEnd})
-            - Giờ giải lao mỗi ca: ${c.soGioNghiGiaiLao}g (${if (c.tinhKhauTruNghi) "Có trừ vào tổng giờ công" else "Không trừ vào tổng giờ công"})
-            - Tiền chuyên cần gốc: ${fmt.format(c.tienChuyenCanGoc)}đ | Quỹ phép năm: ${c.soNgayPhepNam} ngày (Còn lại: ${c.phepNamConLai} ngày)
-            - Chi tiết 12 phụ cấp & hỗ trợ:
-              + Cơm ca: ${fmt.format(c.pcComCa)}đ/ngày công | Cơm OT: ${fmt.format(c.pcComOt)}đ/suất OT
-              + Xăng xe: ${fmt.format(c.pcXangXe)}đ | Nhà ở: ${fmt.format(c.pcNhaO)}đ | Điện thoại: ${fmt.format(c.pcDtDoanhThu)}đ
-              + Trách nhiệm: ${fmt.format(c.pcTrachNhiem)}đ | Kỹ thuật: ${fmt.format(c.pcKyThuat)}đ | Chức vụ: ${fmt.format(c.pcChucVu)}đ
-              + Hiệu suất: ${fmt.format(c.pcHieuSuat)}đ | Sản phẩm: ${fmt.format(c.pcSanPham)}đ | Độc hại: ${fmt.format(c.pcDocHai)}đ
-              + Thâm niên: ${fmt.format(c.pcThamNien)}đ | Ca đêm: ${fmt.format(c.pcCaDem)}đ | Phụ cấp khác: ${fmt.format(c.pcKhac1)}đ
-              => Tổng phụ cấp: ${fmt.format(totalPhuCap)}đ
-            """.trimIndent()
-        } ?: "Thông tin & cài đặt nhân viên chưa được thiết lập"
-
-        val summaryInfo = summaryState?.let { s ->
-            val hourlyRate = if (s.standardWorkDays > 0 && s.baseBasicSalary > 0) s.baseBasicSalary / (s.standardWorkDays * 8.0) else 0.0
-            """
-            * THỐNG KÊ CHI TIẾT LƯƠNG & CÔNG THÁNG HIỆN TẠI:
-            - Đơn giá 1 giờ công chuẩn (LCB / Công chuẩn / 8g): ${fmt.format(hourlyRate)}đ/giờ
-            - Ngày công thực tế: ${s.workingDays}/${s.standardWorkDays} ngày công | Giờ làm chuẩn: ${s.standardHours}g | Số ca đêm: ${s.caDemCount} ca
-            - Chi tiết các loại giờ & Tiền công tương ứng:
-              + OT ngày thường: ${s.otDayHours}g => Tiền: ${fmt.format(s.tienOtNgay)}đ
-              + OT ca đêm: ${s.otNightHours}g => Tiền: ${fmt.format(s.tienOtDem)}đ
-              + Giờ Chủ nhật (Tổng): ${s.chuNhatHours}g (Ngày: ${s.chuNhatDayHours}g, Đêm: ${s.chuNhatNightHours}g) => Tổng tiền CN: ${fmt.format(s.tienChuNhat)}đ (CN Ngày: ${fmt.format(s.tienChuNhatNgay)}đ, CN Đêm: ${fmt.format(s.tienChuNhatDem)}đ)
-              + OT Ngày lễ: ${s.otLeHours}g => Tiền: ${fmt.format(s.tienOtLe)}đ
-            - Tổng tiền cơm: ${fmt.format(s.tongTienCom)}đ | Tổng phụ cấp: ${fmt.format(s.phuCap)}đ | Thưởng: ${fmt.format(s.thuong)}đ
-            - Các khoản khấu trừ: BHXH (${fmt.format(s.tienBh)}đ), Đoàn phí (${fmt.format(s.doanPhi)}đ), Phạt/Nghỉ (${fmt.format(s.tienKhauTruNghi)}đ)
-            - LƯƠNG THỰC NHẬN (NET): ${fmt.format(s.luongThucNhan)}đ
-            """.trimIndent()
-        } ?: "Chưa có tổng hợp công tháng này"
-
-        val historyInfo = if (salaryHistory.isNotEmpty()) {
-            val historyListStr = salaryHistory.joinToString("\n") { p ->
-                "  + Tháng ${p.monthStr}: Lương NET = ${fmt.format(p.luongThucNhan)}đ, Ngày công = ${p.workingDays} ngày"
-            }
-            """
-            * DỮ LIỆU LỊCH SỬ LƯƠNG & NGÀY CÔNG (6 THÁNG GẦN NHẤT ĐỂ SO SÁNH):
-            $historyListStr
-            """.trimIndent()
-        } else {
-            "* LỊCH SỬ LƯƠNG CÁC THÁNG TRƯỚC: Chưa ghi nhận dữ liệu tháng trước."
-        }
-
-        """
-        - Màn hình người dùng đang mở: $tabNameVi
-        $configInfo
-        $summaryInfo
-        $historyInfo
-        """.trimIndent()
+        com.example.util.AiContextBuffer.buildScreenContextBuffer(
+            currentTab = currentTab,
+            userConfig = userConfig,
+            summaryState = summaryState,
+            timeEntries = timeEntries,
+            salaryHistory = salaryHistory
+        )
     }
 
     // TTS Voice Engine State & SharedPreferences Preferences
@@ -253,8 +202,10 @@ fun GlobalAiAssistantWidget(
         } else {
             ttsInstance?.stop()
             
-            // Standard 1.0f pitch - no artificial pitch modification
-            ttsInstance?.setPitch(1.0f)
+            val isFemaleTarget = (voiceGender == "female")
+            
+            // Adjust pitch to complement selected gender (Female higher 1.15, Male deeper 0.85)
+            ttsInstance?.setPitch(if (isFemaleTarget) 1.15f else 0.85f)
             ttsInstance?.setSpeechRate(voiceSpeed)
 
             // Select matching female or male Voice object from Android TextToSpeech engine
@@ -267,17 +218,16 @@ fun GlobalAiAssistantWidget(
                         it.locale.toString().lowercase().contains("vi") 
                     }.ifEmpty { voices.toList() }
 
-                    val isFemaleTarget = (voiceGender == "female")
-
                     val targetVoice = viVoices.find { v ->
                         val vName = v.name.lowercase()
                         val features = try { v.features } catch (e: Exception) { null }
                         val isFemale = features?.any { it.contains("gender=female") } == true ||
                                 vName.contains("female") ||
                                 vName.contains("woman") ||
-                                vName.contains("vif") ||
-                                vName.contains("via") ||
-                                vName.contains("vid") ||
+                                vName.contains("vic") || // Google TTS vi-VN-x-vic = Female
+                                vName.contains("vie") || // Google TTS vi-VN-x-vie = Female
+                                vName.contains("gfm") || // Google Female Model
+                                vName.contains("vdf") ||
                                 vName.contains("wavenet-a") ||
                                 vName.contains("wavenet-c") ||
                                 vName.contains("standard-a") ||
@@ -290,11 +240,15 @@ fun GlobalAiAssistantWidget(
                         val isMale = features?.any { it.contains("gender=male") } == true ||
                                 vName.contains("male") ||
                                 vName.contains("man") ||
-                                vName.contains("vic") ||
+                                vName.contains("vif") || // Google TTS vi-VN-x-vif = Male
+                                vName.contains("vid") || // Google TTS vi-VN-x-vid = Male
+                                vName.contains("gmm") || // Google Male Model
+                                vName.contains("vdm") ||
                                 vName.contains("vib") ||
-                                vName.contains("vie") ||
                                 vName.contains("wavenet-b") ||
+                                vName.contains("wavenet-d") ||
                                 vName.contains("standard-b") ||
+                                vName.contains("standard-d") ||
                                 vName.contains("m0") ||
                                 vName.contains("m1") ||
                                 vName.contains("-m-")
@@ -307,9 +261,9 @@ fun GlobalAiAssistantWidget(
                     } ?: viVoices.find { v ->
                         val vName = v.name.lowercase()
                         if (isFemaleTarget) {
-                            !vName.contains("male") && !vName.contains("vic") && !vName.contains("vib") && !vName.contains("m0")
+                            !vName.contains("male") && !vName.contains("vif") && !vName.contains("vid") && !vName.contains("gmm") && !vName.contains("m0")
                         } else {
-                            !vName.contains("female") && !vName.contains("vif") && !vName.contains("via") && !vName.contains("f0")
+                            !vName.contains("female") && !vName.contains("vic") && !vName.contains("vie") && !vName.contains("gfm") && !vName.contains("f0")
                         }
                     } ?: viVoices.firstOrNull()
 
@@ -358,10 +312,46 @@ fun GlobalAiAssistantWidget(
 
                     isGeneratingResponse = false
                     result.onSuccess { responseText ->
-                        val newAiMsg = AiChatMessage(sender = "ai", text = responseText)
+                        var cleanText = responseText
+
+                        // Parse and execute AI Action Commands (e.g. [[ACTION:DELETE_DATE:YYYY-MM-DD]])
+                        val actionRegex = Regex("\\[\\[ACTION:([A-Z_]+)(?::([^\\]]+))?\\]\\]")
+                        val matchResults = actionRegex.findAll(responseText).toList()
+
+                        for (match in matchResults) {
+                            val actionType = match.groupValues.getOrNull(1) ?: ""
+                            val actionParam = match.groupValues.getOrNull(2) ?: ""
+
+                            when (actionType) {
+                                "DELETE_DATE" -> {
+                                    if (actionParam.isNotBlank()) {
+                                        val dStr = actionParam.trim()
+                                        viewModel.deleteEntryByDateString(dStr)
+                                        Toast.makeText(context, "⚡ AI đã thực thi xóa ngày công: $dStr", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "DELETE_DATES" -> {
+                                    if (actionParam.isNotBlank()) {
+                                        val dateList = actionParam.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                        for (d in dateList) {
+                                            viewModel.deleteEntryByDateString(d)
+                                        }
+                                        Toast.makeText(context, "⚡ AI đã thực thi xóa ${dateList.size} ngày công", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "CLEAR_MONTH" -> {
+                                    viewModel.clearAllEntriesInSelectedMonth()
+                                    Toast.makeText(context, "⚡ AI đã thực thi xóa toàn bộ công tháng này", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+
+                        cleanText = responseText.replace(actionRegex, "").trim()
+
+                        val newAiMsg = AiChatMessage(sender = "ai", text = cleanText)
                         chatMessages.add(newAiMsg)
                         if (isFromVoice || autoSpeakVoice) {
-                            speakText(newAiMsg.id, responseText)
+                            speakText(newAiMsg.id, cleanText)
                         }
                     }.onFailure { error ->
                         val errText = error.message ?: "Có lỗi xảy ra khi gọi Gemini API."
