@@ -79,11 +79,11 @@ fun GlobalAiAssistantWidget(
     var apiKey by remember { mutableStateOf(AiApiKeyManager.getApiKey(context)) }
     val hasApiKey = apiKey.isNotBlank()
 
-    // Auto display API Pricing / Key dialog when user opens AI assistant for the first time without API key
+    // Auto display Key dialog when user opens AI assistant without API key
     LaunchedEffect(isChatOpen) {
         if (isChatOpen && !hasApiKey) {
             showApiKeyDialog = true
-            showPricingCard = true
+            showPricingCard = false
         }
     }
 
@@ -102,8 +102,9 @@ fun GlobalAiAssistantWidget(
     val summaryState by viewModel.salarySummaryState.collectAsStateWithLifecycle()
     val timeEntries by viewModel.monthTimeEntries.collectAsStateWithLifecycle(emptyList())
 
-    // Scroll to bottom when new message arrives
-    LaunchedEffect(chatMessages.size, isGeneratingResponse) {
+    // Scroll to bottom when new message arrives or when soft keyboard IME opens
+    val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    LaunchedEffect(chatMessages.size, isGeneratingResponse, imeBottomPadding) {
         if (chatMessages.isNotEmpty()) {
             listState.animateScrollToItem(chatMessages.size - 1)
         }
@@ -259,7 +260,9 @@ fun GlobalAiAssistantWidget(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.85f)
+                    .fillMaxHeight(0.9f)
+                    .imePadding()
+                    .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
             ) {
                 // Header Bar
@@ -360,8 +363,8 @@ fun GlobalAiAssistantWidget(
 
                 Divider(color = Color.White.copy(alpha = 0.1f))
 
-                // Gemini API Pricing Card (Show automatically if no key or toggled)
-                if (showPricingCard || !hasApiKey) {
+                // Gemini API Pricing Card (Show ONLY if user toggles Info button)
+                if (showPricingCard) {
                     GeminiApiPricingCard(
                         onOpenGoogleStudio = {
                             try {
@@ -376,7 +379,7 @@ fun GlobalAiAssistantWidget(
                 }
 
                 // Welcome / Instructions Card if empty
-                if (chatMessages.isEmpty() && hasApiKey && !showPricingCard) {
+                if (chatMessages.isEmpty() && !showPricingCard) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
