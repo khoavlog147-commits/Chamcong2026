@@ -602,7 +602,8 @@ object SalaryCalculator {
         val tienKhauTruNghi = 0.0
 
         // 8. Calculate Monthly Salary
-        val baseBasicSalary = Math.round(totalWorkDays * dailySalary).toDouble()
+        val lcbWorkDays = totalWorkDays.coerceAtMost(totalScheduledDaysInMonth.toDouble())
+        val baseBasicSalary = Math.round(lcbWorkDays * dailySalary).toDouble()
 
         val roundedOtDay = Math.round(otDayPay).toDouble()
         val roundedOtLePay = Math.round(otLePay).toDouble()

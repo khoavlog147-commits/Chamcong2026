@@ -423,157 +423,165 @@ fun MainTabScreenContainer(viewModel: TimeSnapViewModel) {
     // Track selected destination for the bottom bar active states
     var currentTab by remember { mutableStateOf("home") }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        bottomBar = {
-            NavigationBar(
-                containerColor = com.example.ui.theme.DarkContainer.copy(alpha = 0.88f),
-                tonalElevation = 0.dp,
-                modifier = Modifier
-                    .testTag("bottom_nav_bar")
-                    .border(androidx.compose.foundation.BorderStroke(1.dp, com.example.ui.theme.CardBorder))
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            bottomBar = {
+                NavigationBar(
+                    containerColor = com.example.ui.theme.DarkContainer.copy(alpha = 0.88f),
+                    tonalElevation = 0.dp,
+                    modifier = Modifier
+                        .testTag("bottom_nav_bar")
+                        .border(androidx.compose.foundation.BorderStroke(1.dp, com.example.ui.theme.CardBorder))
+                ) {
+                    // Item 1: Trang chu
+                    NavigationBarItem(
+                        selected = currentTab == "home",
+                        onClick = {
+                            currentTab = "home"
+                            tabNavController.navigate("home") {
+                                popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Home, contentDescription = "Trang chủ", modifier = Modifier.size(22.dp)) },
+                        label = { Text("Trang chủ", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = White,
+                            selectedTextColor = com.example.ui.theme.PrimaryBlue,
+                            indicatorColor = com.example.ui.theme.PrimaryBlue,
+                            unselectedIconColor = com.example.ui.theme.TextSecondary,
+                            unselectedTextColor = com.example.ui.theme.TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_home_tab")
+                    )
+
+                    // Item 2: Lịch sử Chấm công
+                    NavigationBarItem(
+                        selected = currentTab == "history",
+                        onClick = {
+                            currentTab = "history"
+                            tabNavController.navigate("history") {
+                                popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Lịch sử", modifier = Modifier.size(22.dp)) },
+                        label = { Text("Lịch sử", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = White,
+                            selectedTextColor = com.example.ui.theme.PrimaryBlue,
+                            indicatorColor = com.example.ui.theme.PrimaryBlue,
+                            unselectedIconColor = com.example.ui.theme.TextSecondary,
+                            unselectedTextColor = com.example.ui.theme.TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_history_tab")
+                    )
+
+                    // Item 3: Phieu luong
+                    NavigationBarItem(
+                        selected = currentTab == "payslip",
+                        onClick = {
+                            currentTab = "payslip"
+                            tabNavController.navigate("payslip") {
+                                popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Payments, contentDescription = "Phiếu lương", modifier = Modifier.size(22.dp)) },
+                        label = { Text("Phiếu lương", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = White,
+                            selectedTextColor = com.example.ui.theme.PrimaryBlue,
+                            indicatorColor = com.example.ui.theme.PrimaryBlue,
+                            unselectedIconColor = com.example.ui.theme.TextSecondary,
+                            unselectedTextColor = com.example.ui.theme.TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_payslip_tab")
+                    )
+
+                    // Item 4: Cai dat
+                    NavigationBarItem(
+                        selected = currentTab == "settings",
+                        onClick = {
+                            currentTab = "settings"
+                            tabNavController.navigate("settings") {
+                                popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Settings, contentDescription = "Cài đặt", modifier = Modifier.size(22.dp)) },
+                        label = { Text("Cài đặt", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = White,
+                            selectedTextColor = com.example.ui.theme.PrimaryBlue,
+                            indicatorColor = com.example.ui.theme.PrimaryBlue,
+                            unselectedIconColor = com.example.ui.theme.TextSecondary,
+                            unselectedTextColor = com.example.ui.theme.TextSecondary
+                        ),
+                        modifier = Modifier.testTag("nav_settings_tab")
+                    )
+                }
+            }
+        ) { innerPadding ->
+            NavHost(
+                navController = tabNavController,
+                startDestination = "home",
+                modifier = Modifier.padding(innerPadding)
             ) {
-                // Item 1: Trang chu
-                NavigationBarItem(
-                    selected = currentTab == "home",
-                    onClick = {
-                        currentTab = "home"
-                        tabNavController.navigate("home") {
-                            popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                composable("home") {
+                    HomeScreen(
+                        viewModel = viewModel,
+                        onNavigateToLogin = {},
+                        onNavigateToNotifications = {
+                            tabNavController.navigate("notifications")
                         }
-                    },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Trang chủ", modifier = Modifier.size(22.dp)) },
-                    label = { Text("Trang chủ", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = White,
-                        selectedTextColor = com.example.ui.theme.PrimaryBlue,
-                        indicatorColor = com.example.ui.theme.PrimaryBlue,
-                        unselectedIconColor = com.example.ui.theme.TextSecondary,
-                        unselectedTextColor = com.example.ui.theme.TextSecondary
-                    ),
-                    modifier = Modifier.testTag("nav_home_tab")
-                )
-
-                // Item 2: Lịch sử Chấm công
-                NavigationBarItem(
-                    selected = currentTab == "history",
-                    onClick = {
-                        currentTab = "history"
-                        tabNavController.navigate("history") {
-                            popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                    )
+                }
+                composable("history") {
+                    HistoryScreen(viewModel = viewModel)
+                }
+                composable("payslip") {
+                    PayslipScreen(viewModel = viewModel)
+                }
+                composable("settings") {
+                    SettingsScreen(
+                        viewModel = viewModel,
+                        onNavigateToAdmin = {
+                            currentTab = "admin"
+                            tabNavController.navigate("admin")
                         }
-                    },
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = "Lịch sử", modifier = Modifier.size(22.dp)) },
-                    label = { Text("Lịch sử", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = White,
-                        selectedTextColor = com.example.ui.theme.PrimaryBlue,
-                        indicatorColor = com.example.ui.theme.PrimaryBlue,
-                        unselectedIconColor = com.example.ui.theme.TextSecondary,
-                        unselectedTextColor = com.example.ui.theme.TextSecondary
-                    ),
-                    modifier = Modifier.testTag("nav_history_tab")
-                )
-
-                // Item 3: Phieu luong
-                NavigationBarItem(
-                    selected = currentTab == "payslip",
-                    onClick = {
-                        currentTab = "payslip"
-                        tabNavController.navigate("payslip") {
-                            popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    icon = { Icon(Icons.Default.Payments, contentDescription = "Phiếu lương", modifier = Modifier.size(22.dp)) },
-                    label = { Text("Phiếu lương", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = White,
-                        selectedTextColor = com.example.ui.theme.PrimaryBlue,
-                        indicatorColor = com.example.ui.theme.PrimaryBlue,
-                        unselectedIconColor = com.example.ui.theme.TextSecondary,
-                        unselectedTextColor = com.example.ui.theme.TextSecondary
-                    ),
-                    modifier = Modifier.testTag("nav_payslip_tab")
-                )
-
-                // Item 4: Cai dat
-                NavigationBarItem(
-                    selected = currentTab == "settings",
-                    onClick = {
+                    )
+                }
+                composable("admin") {
+                    AdminScreen(onBack = {
                         currentTab = "settings"
-                        tabNavController.navigate("settings") {
-                            popUpTo(tabNavController.graph.findStartDestination().id) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+                        val popped = tabNavController.popBackStack("settings", false)
+                        if (!popped) {
+                            tabNavController.popBackStack()
                         }
-                    },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Cài đặt", modifier = Modifier.size(22.dp)) },
-                    label = { Text("Cài đặt", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = White,
-                        selectedTextColor = com.example.ui.theme.PrimaryBlue,
-                        indicatorColor = com.example.ui.theme.PrimaryBlue,
-                        unselectedIconColor = com.example.ui.theme.TextSecondary,
-                        unselectedTextColor = com.example.ui.theme.TextSecondary
-                    ),
-                    modifier = Modifier.testTag("nav_settings_tab")
-                )
+                    })
+                }
+                composable("notifications") {
+                    NotificationCenterScreen(
+                        viewModel = viewModel,
+                        onBack = {
+                            tabNavController.popBackStack()
+                        }
+                    )
+                }
             }
         }
-    ) { innerPadding ->
-        NavHost(
-            navController = tabNavController,
-            startDestination = "home",
-            modifier = Modifier.padding(innerPadding)
-        ) {
-            composable("home") {
-                HomeScreen(
-                    viewModel = viewModel,
-                    onNavigateToLogin = {},
-                    onNavigateToNotifications = {
-                        tabNavController.navigate("notifications")
-                    }
-                )
-            }
-            composable("history") {
-                HistoryScreen(viewModel = viewModel)
-            }
-            composable("payslip") {
-                PayslipScreen(viewModel = viewModel)
-            }
-            composable("settings") {
-                SettingsScreen(
-                    viewModel = viewModel,
-                    onNavigateToAdmin = {
-                        currentTab = "admin"
-                        tabNavController.navigate("admin")
-                    }
-                )
-            }
-            composable("admin") {
-                AdminScreen(onBack = {
-                    currentTab = "settings"
-                    val popped = tabNavController.popBackStack("settings", false)
-                    if (!popped) {
-                        tabNavController.popBackStack()
-                    }
-                })
-            }
-            composable("notifications") {
-                NotificationCenterScreen(
-                    viewModel = viewModel,
-                    onBack = {
-                        tabNavController.popBackStack()
-                    }
-                )
-            }
-        }
+
+        // Global Floating AI Assistant Widget
+        GlobalAiAssistantWidget(
+            currentTab = currentTab,
+            viewModel = viewModel
+        )
     }
 }

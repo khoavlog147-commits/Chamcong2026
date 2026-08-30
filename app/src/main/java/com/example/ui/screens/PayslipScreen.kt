@@ -1,5 +1,6 @@
 
 package com.example.ui.screens
+import com.example.data.model.TimeEntry
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -399,6 +400,90 @@ fun PayslipScreen(
                 }
                 val soNgayCongDuKienDouble = soNgayCongDuKien
 
+                val fullEntriesForExport = remember(
+                    entries, selectedTab, isCurrentSelectedMonth, remainingWeekdays,
+                    remainingSundays, includeSundayInProjection, remainingSundaysDay,
+                    remainingSundaysNight, customOt15DaysCount, selectedOt15Shift
+                ) {
+                    if (selectedTab != 1 || !isCurrentSelectedMonth) {
+                        entries
+                    } else {
+                        val list = entries.toMutableList()
+                        val cal = Calendar.getInstance()
+                        val currentYear = cal.get(Calendar.YEAR)
+                        val currentMonth = cal.get(Calendar.MONTH)
+                        val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        val todayDay = cal.get(Calendar.DAY_OF_MONTH)
+
+                        val existingDates = entries.map { it.date }.toSet()
+
+                        var sunDayLeft = if (includeSundayInProjection) remainingSundaysDay else 0
+                        var sunNightLeft = if (includeSundayInProjection) remainingSundaysNight else 0
+                        var ot15Left = customOt15DaysCount.toInt()
+
+                        for (day in (todayDay + 1)..daysInMonth) {
+                            val dCal = Calendar.getInstance().apply { set(currentYear, currentMonth, day) }
+                            val dateStr = String.format(Locale.US, "%02d/%02d/%04d", day, currentMonth + 1, currentYear)
+                            if (existingDates.contains(dateStr)) continue
+
+                            val isSun = dCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                            if (isSun) {
+                                if (sunDayLeft > 0) {
+                                    list.add(
+                                        TimeEntry(
+                                            id = 0,
+                                            userId = c.maNhanVien,
+                                            date = dateStr,
+                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
+                                            shiftType = "DAY",
+                                            dayType = "SUNDAY",
+                                            note = "Dự kiến (OT CN Ca ngày)"
+                                        )
+                                    )
+                                    sunDayLeft--
+                                } else if (sunNightLeft > 0) {
+                                    list.add(
+                                        TimeEntry(
+                                            id = 0,
+                                            userId = c.maNhanVien,
+                                            date = dateStr,
+                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                            shiftType = "NIGHT",
+                                            dayType = "SUNDAY",
+                                            note = "Dự kiến (OT CN Ca đêm)"
+                                        )
+                                    )
+                                    sunNightLeft--
+                                }
+                            } else {
+                                val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
+                                if (!isHoliday) {
+                                    val hasOt15 = ot15Left > 0
+                                    if (hasOt15) ot15Left--
+                                    val shiftT = if (hasOt15 && selectedOt15Shift == "Đêm") "NIGHT" else "DAY"
+                                    val noteStr = if (hasOt15) "Dự kiến (OT 1.5)" else "Dự kiến (Thường)"
+                                    
+                                    list.add(
+                                        TimeEntry(
+                                            id = 0,
+                                            userId = c.maNhanVien,
+                                            date = dateStr,
+                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 17, 30, 0) }.timeInMillis,
+                                            shiftType = shiftT,
+                                            dayType = "NORMAL",
+                                            note = noteStr
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                        list
+                    }
+                }
+
                 fun calcPr(fieldName: String, valRaw: Double): Double {
                     return com.example.data.SalaryCalculator.calculateAllowanceValue(
                         fieldName = fieldName,
@@ -629,10 +714,15 @@ fun PayslipScreen(
                         PayslipProfileRow(label = "Mã nhân viên (UID):", value = employeeCode, isMono = true)
                         PayslipProfileRow(label = "Mức lương cơ bản:", value = "${fmt.format(c.luongCoBan)}đ")
                         
+                        val totalActualWorkDays = s.workingDays
+                        val lcbActualWorkDays = s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
+                        val totalProjectedWorkDays = soNgayCongDuKienDouble + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
+                        val lcbProjectedWorkDays = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
+
                         if (selectedTab == 1) {
                             PayslipProfileRow(
-                                label = "Số ngày công dự kiến:", 
-                                value = "${soNgayCongDuKien.toInt()} / ${if (isCurrentSelectedMonth) s.expectedWorkDays else s.standardWorkDays} ngày"
+                                label = "Công làm việc dự kiến:", 
+                                value = "${df.format(totalProjectedWorkDays)} / ${standardTargetDays.toInt()} ngày"
                             )
                             if (isCurrentSelectedMonth) {
                                 val sundayDetails = buildString {
@@ -648,8 +738,8 @@ fun PayslipScreen(
                             }
                         } else {
                             PayslipProfileRow(
-                                label = "Số ngày chấm công:", 
-                                value = "${df.format(s.workingDays)} / ${if (s.isCurrentMonth) s.expectedWorkDays else s.standardWorkDays} ngày"
+                                label = "Công làm việc:", 
+                                value = "${df.format(totalActualWorkDays)} / ${s.standardWorkDays} ngày"
                             )
                         }
 
@@ -968,9 +1058,9 @@ fun PayslipScreen(
 
                         // 1. Lương cơ bản
                         if (selectedTab == 1) {
-                            PayslipMoneyRow(label = "LCB thực nhận (${df.format(soNgayCongDuKien)} / ${s.standardWorkDays})", value = luongDuKienBaseSalary, isAddition = true)
+                            PayslipMoneyRow(label = "LCB thực nhận (${df.format(lcbProjectedWorkDays)} / ${standardTargetDays.toInt()})", value = luongDuKienBaseSalary, isAddition = true)
                         } else {
-                            PayslipMoneyRow(label = "LCB thực nhận (${df.format(s.workingDays)} / ${s.standardWorkDays})", value = s.baseBasicSalary, isAddition = true)
+                            PayslipMoneyRow(label = "LCB thực nhận (${df.format(lcbActualWorkDays)} / ${s.standardWorkDays})", value = s.baseBasicSalary, isAddition = true)
                         }
                         
                         // 2. Chuyên cần
@@ -1231,7 +1321,7 @@ fun PayslipScreen(
                     onClick = {
                         com.example.util.ExportUtils.sharePayslipAndAttendanceAsPdf(
                             context = context,
-                            entries = entries,
+                            entries = fullEntriesForExport,
                             summary = s,
                             config = c,
                             userSession = userSession,
@@ -1288,7 +1378,7 @@ fun PayslipProfileRow(label: String, value: String, isMono: Boolean = false) {
             color = MediumGray, 
             fontSize = 13.sp,
             modifier = Modifier.weight(1f),
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -1299,7 +1389,8 @@ fun PayslipProfileRow(label: String, value: String, isMono: Boolean = false) {
             fontWeight = FontWeight.Bold,
             fontFamily = if (isMono) FontFamily.Monospace else FontFamily.Default,
             textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
@@ -1315,7 +1406,7 @@ fun PayslipMoneyRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 5.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1325,7 +1416,7 @@ fun PayslipMoneyRow(
             fontSize = 13.sp,
             fontWeight = if (isAccent) FontWeight.Bold else FontWeight.Normal,
             modifier = Modifier.weight(1f),
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Spacer(modifier = Modifier.width(8.dp))
@@ -1335,7 +1426,8 @@ fun PayslipMoneyRow(
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.End,
-            modifier = Modifier.weight(1f)
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

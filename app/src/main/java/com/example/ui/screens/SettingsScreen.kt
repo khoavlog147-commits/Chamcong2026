@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
@@ -510,6 +511,103 @@ fun SettingsScreen(
                         fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
+                }
+            }
+
+            // CATEGORY AI: CẤU HÌNH TRỢ LÝ AI (GEMINI)
+            CategoryLayout(title = "CẤU HÌNH TRỢ LÝ AI (GEMINI)", icon = Icons.Default.AutoAwesome) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    var currentAiKey by remember { mutableStateOf(com.example.util.AiApiKeyManager.getApiKey(context)) }
+                    var isEditingKey by remember { mutableStateOf(false) }
+                    var isTestingInSettings by remember { mutableStateOf(false) }
+                    val coroutineScope = rememberCoroutineScope()
+
+                    Text(
+                        text = "Trợ lý AI giúp giải đáp thắc mắc về phiếu lương, lịch sử chấm công và quy định công ty. Mã API Key được lưu trực tiếp và mã hóa bảo mật trên thiết bị.",
+                        color = LightGray,
+                        fontSize = 12.sp
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = currentAiKey,
+                            onValueChange = { 
+                                currentAiKey = it 
+                                isEditingKey = true
+                            },
+                            label = { Text("Gemini API Key cá nhân", color = LightGray) },
+                            placeholder = { Text("AIzaSy...") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = White,
+                                unfocusedTextColor = White,
+                                focusedBorderColor = NeonBlue,
+                                unfocusedBorderColor = Color.Gray
+                            )
+                        )
+
+                        Button(
+                            onClick = {
+                                val keyToSave = currentAiKey.trim()
+                                if (keyToSave.isBlank()) {
+                                    com.example.util.AiApiKeyManager.clearApiKey(context)
+                                    currentAiKey = ""
+                                    isEditingKey = false
+                                    Toast.makeText(context, "Đã xóa Gemini API Key", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    isTestingInSettings = true
+                                    coroutineScope.launch {
+                                        val res = com.example.data.GeminiAiService.generateContent(
+                                            apiKey = keyToSave,
+                                            userPrompt = "Ping",
+                                            contextData = "Test Key"
+                                        )
+                                        isTestingInSettings = false
+                                        res.onSuccess {
+                                            com.example.util.AiApiKeyManager.saveApiKey(context, keyToSave)
+                                            isEditingKey = false
+                                            Toast.makeText(context, "Đã lưu Gemini API Key thành công!", Toast.LENGTH_SHORT).show()
+                                        }.onFailure { err ->
+                                            Toast.makeText(context, "Lỗi API Key: ${err.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonBlue, contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                            enabled = !isTestingInSettings
+                        ) {
+                            if (isTestingInSettings) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(if (isEditingKey) "Lưu Key" else "Đã lưu", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    TextButton(
+                        onClick = {
+                            try {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://aistudio.google.com/app/apikey"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Không thể mở trình duyệt", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "👉 Lấy Gemini API Key miễn phí từ Google AI Studio",
+                            color = NeonBlue,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 

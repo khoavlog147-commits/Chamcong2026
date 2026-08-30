@@ -4150,7 +4150,7 @@ fun EmployeePayslipView(
                 fontSize = 13.sp,
                 fontWeight = if (isAccent) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier.weight(1f),
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -4160,7 +4160,8 @@ fun EmployeePayslipView(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End,
-                modifier = Modifier.weight(1f)
+                maxLines = 1,
+                softWrap = false
             )
         }
     }
@@ -4247,26 +4248,31 @@ fun EmployeePayslipView(
 
                 // Employee Metadata
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Nhân viên:", color = LightGray, fontSize = 13.sp)
-                        Text(employee.hoVaTen, color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Nhân viên:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(employee.hoVaTen, color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Chức vụ / Vai trò:", color = LightGray, fontSize = 13.sp)
-                        Text(employee.roleName, color = White, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Chức vụ / Vai trò:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(employee.roleName, color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Lương cơ bản (26 ngày):", color = LightGray, fontSize = 13.sp)
-                        Text("${fmt.format(employee.luongCoBan)}đ", color = White, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Lương cơ bản (26 ngày):", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("${fmt.format(employee.luongCoBan)}đ", color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Ngày công chuẩn:", color = LightGray, fontSize = 13.sp)
-                        Text("${summary.standardWorkDays} ngày", color = White, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Ngày công chuẩn:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("${summary.standardWorkDays} ngày", color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Ngày công thực tế tính luơng:", color = LightGray, fontSize = 13.sp)
-                        val daysShow = if (selectedTab == 1) soNgayCongDuKienDouble else summary.workingDays.toDouble()
-                        Text("${df.format(daysShow)} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Công làm việc:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val totalWorkDaysShow = if (selectedTab == 1) soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0) else summary.workingDays.toDouble()
+                        Text("${df.format(totalWorkDaysShow)} / ${summary.standardWorkDays} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
                 }
 
@@ -4277,9 +4283,9 @@ fun EmployeePayslipView(
 
                 // 1. Base Salary
                 if (selectedTab == 1) {
-                    LocalPayslipMoneyRow(label = "Lương cơ bản thực nhận (dự kiến)", value = luongDuKienBaseSalary, isAddition = true)
+                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(soNgayCongDuKienDouble.coerceAtMost(standardTargetDays))} / ${summary.standardWorkDays})", value = luongDuKienBaseSalary, isAddition = true)
                 } else {
-                    LocalPayslipMoneyRow(label = "Lương cơ bản thực nhận", value = summary.baseBasicSalary, isAddition = true)
+                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(summary.workingDays.toDouble().coerceAtMost(summary.standardWorkDays.toDouble()))} / ${summary.standardWorkDays})", value = summary.baseBasicSalary, isAddition = true)
                 }
 
                 // 2. Allowances

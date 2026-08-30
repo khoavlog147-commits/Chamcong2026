@@ -457,8 +457,12 @@ object ExportUtils {
         }
         drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
         
-        val attendanceInfo = if (selectedTab == 1) "$effectiveSoNgayCong / ${summary.standardWorkDays} ngày" 
-                             else "${summary.workingDays} / ${if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays} ngày"
+        val totalProjectedWorkDaysPNG = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
+        val lcbActualWorkDaysPNG = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
+
+        val attendanceInfo = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPNG)} / ${summary.standardWorkDays} ngày" 
+                             else "${df.format(summary.workingDays)} / ${summary.standardWorkDays} ngày"
         drawRow("Công làm việc:", attendanceInfo)
 
         // Section 2: Thu nhập chi tiết
@@ -466,8 +470,8 @@ object ExportUtils {
         drawSectionHeader("THU NHẬP CHI TIẾT (+)")
         
         val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
-        val baseSalaryLabel = if (selectedTab == 1) "LCB thực nhận ($effectiveSoNgayCong / ${summary.standardWorkDays})" 
-                              else "LCB thực nhận (${summary.workingDays} / ${summary.standardWorkDays})"
+        val baseSalaryLabel = if (selectedTab == 1) "LCB thực nhận (${df.format(lcbProjectedWorkDaysPNG)} / ${summary.standardWorkDays})" 
+                              else "LCB thực nhận (${df.format(lcbActualWorkDaysPNG)} / ${summary.standardWorkDays})"
         val baseSalaryValue = if (selectedTab == 1) luongDuKienBaseSalary else summary.baseBasicSalary
         drawRow(baseSalaryLabel, "+${fmt.format(baseSalaryValue)}đ", paintGreen)
         
@@ -601,6 +605,9 @@ object ExportUtils {
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
+        val totalProjectedWorkDaysPDF = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val lcbProjectedWorkDaysPDF = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
+        val lcbActualWorkDaysPDF = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
         fun calcPrPDF(fieldName: String, valRaw: Double): Double {
             return com.example.data.SalaryCalculator.calculateAllowanceValue(
                 fieldName = fieldName,
@@ -720,8 +727,8 @@ object ExportUtils {
         currentY += 18f
         canvas1.drawText("Mã nhân viên:", 45f, currentY, paintLabel)
         canvas1.drawText(empCode, 150f, currentY, paintValNormal)
-        canvas1.drawText("Công thực tế:", 320f, currentY, paintLabel)
-        val actualDaysVal = if (selectedTab == 1) "$effectiveSoNgayCong ngày" else "${summary.workingDays} ngày"
+        canvas1.drawText("Công làm việc:", 320f, currentY, paintLabel)
+        val actualDaysVal = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPDF)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.workingDays)} / ${summary.standardWorkDays} ngày"
         canvas1.drawText(actualDaysVal, 440f, currentY, paintValBold)
 
         // Row 3
@@ -779,8 +786,8 @@ object ExportUtils {
         val baseSalaryValue = if (selectedTab == 1) {
             if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
         } else summary.baseBasicSalary
-        val baseSalaryLabelText = if (selectedTab == 1) "Lương theo công thực tế ($effectiveSoNgayCong công)" 
-                              else "Lương theo công thực tế (${summary.workingDays} công)"
+        val baseSalaryLabelText = if (selectedTab == 1) "LCB thực nhận (${df.format(lcbProjectedWorkDaysPDF)} / ${summary.standardWorkDays})" 
+                              else "LCB thực nhận (${df.format(lcbActualWorkDaysPDF)} / ${summary.standardWorkDays})"
         drawPdfRow(baseSalaryLabelText, baseSalaryValue, 0.0)
 
         // OT Lương
