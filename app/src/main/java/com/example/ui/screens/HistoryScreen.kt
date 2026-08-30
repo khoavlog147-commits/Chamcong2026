@@ -3,6 +3,7 @@ package com.example.ui.screens
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LibraryAddCheck
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -694,6 +696,9 @@ fun HistoryScreen(
                                         )
                                         .clickable { 
                                             selectedDayType = typeKey 
+                                            if (typeKey == "PAID_LEAVE" && (configState?.phepNamConLai ?: 0) <= 0) {
+                                                Toast.makeText(context, "⚠️ Quỹ phép năm của bạn đã HẾT (0 ngày)! Hệ thống sẽ tự động chuyển sang Phép thường.", Toast.LENGTH_LONG).show()
+                                            }
                                         }
                                         .padding(vertical = 10.dp),
                                     contentAlignment = Alignment.Center
@@ -703,6 +708,29 @@ fun HistoryScreen(
                                         color = if (isChosen) typeColor else LightGray,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        if (selectedDayType == "PAID_LEAVE" && (configState?.phepNamConLai ?: 0) <= 0) {
+                            Surface(
+                                color = Color(0xFF4A1525),
+                                border = BorderStroke(1.dp, Color(0xFFFF4D4D)),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Warning, contentDescription = null, tint = Color(0xFFFF4D4D), modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "⚠️ Quỹ phép năm của bạn đã HẾT (0 ngày còn lại)! Đăng ký sẽ tự động thành Phép thường (Không lương).",
+                                        color = Color(0xFFFFB3B3),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
                             }

@@ -2,6 +2,7 @@ package com.example.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.auth.AuthController
@@ -1179,6 +1180,13 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     if (currentRemaining <= 0) {
                         // Out of leave quota, coerce to unpaid leave
                         finalDayType = "UNPAID_LEAVE"
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            Toast.makeText(
+                                getApplication(),
+                                "⚠️ Quỹ phép năm của bạn đã HẾT (0 ngày)! Đã tự động chuyển sang Phép thường (Nghỉ không hưởng lương).",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     } else {
                         // Valid leave, consume 1
                         phepNamDelta -= 1
