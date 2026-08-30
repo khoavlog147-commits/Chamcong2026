@@ -1079,13 +1079,14 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
     ) {
         val session = currentUserSession.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
+            val normDateStr = com.example.data.SalaryCalculator.normalizeDateToDmy(dateStr)
             val todayDate = Date()
             val parser = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             val todayStr = parser.format(todayDate)
             
             var isFuture = false
             try {
-                val parsedDate = parser.parse(dateStr)
+                val parsedDate = parser.parse(normDateStr)
                 if (parsedDate != null) {
                     val cal1 = Calendar.getInstance().apply { time = todayDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
                     val cal2 = Calendar.getInstance().apply { time = parsedDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
@@ -1096,14 +1097,14 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             // Check if day is Sunday or Holiday
             var dayType = "NORMAL"
             try {
-                val dateVal = parser.parse(dateStr)
+                val dateVal = parser.parse(normDateStr)
                 if (dateVal != null) {
                     val cal = Calendar.getInstance()
                     cal.time = dateVal
                     val isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
                     if (isSunday) {
                         dayType = "SUNDAY"
-                    } else if (isHolidayDate(dateStr)) {
+                    } else if (isHolidayDate(normDateStr)) {
                         dayType = "HOLIDAY"
                     }
                 }
@@ -1132,10 +1133,10 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             }
 
             val baseCal = Calendar.getInstance()
-            val parts = if (dateStr.contains("/")) dateStr.split("/") else dateStr.split("-")
-            val yr = if (dateStr.contains("/")) parts[2].toInt() else parts[0].toInt()
+            val parts = if (normDateStr.contains("/")) normDateStr.split("/") else normDateStr.split("-")
+            val yr = if (normDateStr.contains("/")) parts[2].toInt() else parts[0].toInt()
             val mo = parts[1].toInt() - 1
-            val dy = if (dateStr.contains("/")) parts[0].toInt() else parts[2].toInt()
+            val dy = if (normDateStr.contains("/")) parts[0].toInt() else parts[2].toInt()
 
             baseCal.set(yr, mo, dy, checkInHour, checkInMin, 0)
             val checkInMs = baseCal.timeInMillis
@@ -1155,7 +1156,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
             // Ensure no duplicate active shifts across dates
             val priorActive = repository.getActiveEntry(session.uid)
-            if (priorActive != null && priorActive.date != dateStr && isWorking) {
+            if (priorActive != null && priorActive.date != normDateStr && isWorking) {
                 val closedPrior = priorActive.copy(
                     checkOutTime = priorActive.checkOutTime ?: System.currentTimeMillis(),
                     isWorking = false
@@ -1164,7 +1165,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 repository.insertOrUpdate(calculatedPrior)
             }
 
-            val existing = repository.getEntryByDate(session.uid, dateStr)
+            val existing = repository.getEntryByDate(session.uid, normDateStr)
+                ?: repository.getEntryByDate(session.uid, dateStr)
             
             // Re-evaluate annual leave delta
             val config = repository.getConfigDirect(session.uid)
@@ -1189,7 +1191,6 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                         }
                     } else {
                         // Valid leave, consume 1
-                        phepNamDelta -= 1
                     }
                 }
                 if (phepNamDelta != 0) {
@@ -1207,7 +1208,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             val newEntry = TimeEntry(
                 id = existing?.id ?: 0,
                 userId = session.uid,
-                date = dateStr,
+                date = normDateStr,
                 checkInTime = if (isLeave) null else checkInMs,
                 checkOutTime = if (isLeave) null else checkOutMs,
                 isWorking = isWorking,
@@ -1226,7 +1227,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             if (isLeave) {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                 val todayDmy = com.example.data.SalaryCalculator.normalizeDateToDmy(todayStr)
-                val entryNormDate = com.example.data.SalaryCalculator.normalizeDateToDmy(dateStr)
+                val entryNormDate = com.example.data.SalaryCalculator.normalizeDateToDmy(normDateStr)
                 if (entryNormDate == todayDmy) {
                     com.example.notification.NotificationHelper.cancelAutoCheckIn(getApplication(), session.uid)
                     com.example.notification.NotificationHelper.cancelAutoCheckOut(getApplication(), session.uid)
@@ -1254,7 +1255,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             val parser = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
             val todayStr = parser.format(todayDate)
             
-            for (dateStr in selectedDates) {
+            for (rawDateStr in selectedDates) {
+                val dateStr = com.example.data.SalaryCalculator.normalizeDateToDmy(rawDateStr)
                 var isFuture = false
                 try {
                     val parsedDate = parser.parse(dateStr)
@@ -1310,6 +1312,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 val checkOutMs = outCal.timeInMillis
 
                 val existing = repository.getEntryByDate(session.uid, dateStr)
+                    ?: repository.getEntryByDate(session.uid, rawDateStr)
                 
                 // If existing was PAID_LEAVE and is being overwritten by work, restore 1 leave
                 if (existing?.dayType == "PAID_LEAVE") {
