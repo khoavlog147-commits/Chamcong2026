@@ -191,7 +191,7 @@ object ExportUtils {
         }
 
         if (isCurrentSelectedMonth) {
-            for (day in 1 until todayDayOfMonth) {
+            for (day in 1..todayDayOfMonth) {
                 val dateStr = String.format(Locale.US, "%04d-%02d-%02d", currentYear, currentMonth, day)
                 if (effectiveJoinDateYmd != null && dateStr < effectiveJoinDateYmd) {
                     continue
@@ -324,7 +324,7 @@ object ExportUtils {
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
         // UI Pre-calculations
-        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
@@ -591,7 +591,7 @@ object ExportUtils {
         val currentMonth = todayCal.get(Calendar.MONTH) + 1
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
-        val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {

@@ -3902,7 +3902,7 @@ fun EmployeePayslipView(
     }
 
     if (isCurrentSelectedMonth) {
-        for (day in 1 until todayDayOfMonth) {
+        for (day in 1..todayDayOfMonth) {
             val dateStr = String.format(Locale.US, "%04d-%02d-%02d", currentYear, currentMonth, day)
             if (effectiveJoinDate != null && dateStr < effectiveJoinDate) {
                 continue
@@ -4010,7 +4010,7 @@ fun EmployeePayslipView(
         count
     }
 
-    val standardTargetDays = (if (isCurrentSelectedMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+    val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
     val dailySalary = employee.luongCoBan / standardTargetDays
     val hourlySalary = dailySalary / 8.0
 

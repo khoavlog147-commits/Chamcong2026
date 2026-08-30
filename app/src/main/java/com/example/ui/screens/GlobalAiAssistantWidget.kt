@@ -253,7 +253,7 @@ fun GlobalAiAssistantWidget(
             ttsInstance?.stop()
             
             // Adjust Pitch & Speed according to user's selected gender & speed
-            val pitch = if (voiceGender == "male") 0.78f else 1.18f
+            val pitch = if (voiceGender == "male") 0.65f else 1.30f
             ttsInstance?.setPitch(pitch)
             ttsInstance?.setSpeechRate(voiceSpeed)
 
@@ -265,9 +265,9 @@ fun GlobalAiAssistantWidget(
                     val targetVoice = viVoices.find { v ->
                         val vName = v.name.lowercase()
                         if (voiceGender == "male") {
-                            vName.contains("male") || vName.contains("man") || vName.contains("vic") || vName.contains("vib")
+                            vName.contains("male") || vName.contains("man") || vName.contains("vic") || vName.contains("vib") || vName.contains("vie") || vName.contains("m0") || vName.contains("m1")
                         } else {
-                            vName.contains("female") || vName.contains("woman") || vName.contains("via") || vName.contains("vid") || vName.contains("vif")
+                            vName.contains("female") || vName.contains("woman") || vName.contains("via") || vName.contains("vid") || vName.contains("vif") || vName.contains("f0") || vName.contains("f1")
                         }
                     } ?: viVoices.firstOrNull()
 

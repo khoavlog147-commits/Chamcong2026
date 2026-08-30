@@ -347,7 +347,10 @@ fun PayslipScreen(
                     includeSundayInProjection = hasWorkedSunday
                 }
 
-                val standardTargetDays = (if (isCurrentSelectedMonth) s.expectedWorkDays else s.standardWorkDays).toDouble().coerceAtLeast(1.0)
+                // TAB / SEGMENT CONTROL
+                var selectedTab by remember { mutableStateOf(0) }
+
+                val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) s.expectedWorkDays else s.standardWorkDays).toDouble().coerceAtLeast(1.0)
 
                 val dailySalary = remember(c.luongCoBan, standardTargetDays) {
                     c.luongCoBan / standardTargetDays
@@ -377,9 +380,6 @@ fun PayslipScreen(
                 }
                 val additionalSundaysPay = additionalSundaysDayPay + additionalSundaysNightPay
                 val projectedSundays = if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight) else 0
-
-                // TAB / SEGMENT CONTROL
-                var selectedTab by remember { mutableStateOf(0) }
 
                 val unpaidDaysCount = remember(entries) {
                     entries.count { e -> com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "UNAUTHORIZED_LEAVE" }

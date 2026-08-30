@@ -1545,7 +1545,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         }
 
         if (isCurrentSelectedMonth) {
-            for (day in 1 until todayDayOfMonth) {
+            for (day in 1..todayDayOfMonth) {
                 val dateStr = String.format(Locale.US, "%04d-%02d-%02d", currentYear, currentMonth, day)
                 if (effectiveJoinDate != null && dateStr < effectiveJoinDate) {
                     continue
