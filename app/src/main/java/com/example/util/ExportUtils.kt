@@ -72,7 +72,8 @@ data class SalarySummary(
     val chuNhatDayHours: Double = 0.0,
     val chuNhatNightHours: Double = 0.0,
     val otLeHours: Double = 0.0,
-    val tienOtLe: Double = 0.0
+    val tienOtLe: Double = 0.0,
+    val actualPresenceDays: Double = 0.0
 )
 
 object ExportUtils {
@@ -291,7 +292,8 @@ object ExportUtils {
             chuNhatDayHours = vmSummary.chuNhatDayHours,
             chuNhatNightHours = vmSummary.chuNhatNightHours,
             otLeHours = vmSummary.otLeHours,
-            tienOtLe = vmSummary.tienOtLe
+            tienOtLe = vmSummary.tienOtLe,
+            actualPresenceDays = vmSummary.actualPresenceDays
         )
     }
 
@@ -454,14 +456,16 @@ object ExportUtils {
             drawRow("Email:", config.emailDangKy)
         }
         drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
+        drawRow("Tiến độ tháng:", "${summary.standardWorkDays} ngày")
         
         val totalProjectedWorkDaysPNG = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
         val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
         val lcbActualWorkDaysPNG = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
 
         val attendanceInfo = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPNG)} / ${summary.standardWorkDays} ngày" 
-                             else "${df.format(summary.workingDays)} / ${summary.standardWorkDays} ngày"
-        drawRow("Công làm việc:", attendanceInfo)
+                             else "${df.format(summary.actualPresenceDays)} / ${summary.standardWorkDays} ngày"
+        val attendanceLabel = if (selectedTab == 1) "Ngày công (Dự kiến):" else "Ngày công (Thực tế):"
+        drawRow(attendanceLabel, attendanceInfo)
 
         // Section 2: Thu nhập chi tiết
         currentY += 20f
@@ -726,7 +730,7 @@ object ExportUtils {
         canvas1.drawText("Mã nhân viên:", 45f, currentY, paintLabel)
         canvas1.drawText(empCode, 150f, currentY, paintValNormal)
         canvas1.drawText("Công làm việc:", 320f, currentY, paintLabel)
-        val actualDaysVal = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPDF)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.workingDays)} / ${summary.standardWorkDays} ngày"
+        val actualDaysVal = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPDF)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualPresenceDays)} / ${summary.standardWorkDays} ngày"
         canvas1.drawText(actualDaysVal, 440f, currentY, paintValBold)
 
         // Row 3

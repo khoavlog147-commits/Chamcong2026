@@ -714,14 +714,21 @@ fun PayslipScreen(
                         PayslipProfileRow(label = "Mã nhân viên (UID):", value = employeeCode, isMono = true)
                         PayslipProfileRow(label = "Mức lương cơ bản:", value = "${fmt.format(c.luongCoBan)}đ")
                         
-                        val totalActualWorkDays = s.workingDays
+                        val totalActualWorkDays = s.actualPresenceDays
                         val lcbActualWorkDays = s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
                         val totalProjectedWorkDays = soNgayCongDuKienDouble + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
                         val lcbProjectedWorkDays = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
 
+                        // 1. Tiến độ tháng (Số ngày công chuẩn của tháng)
+                        PayslipProfileRow(
+                            label = "Tiến độ tháng (Công chuẩn):",
+                            value = "${s.standardWorkDays} ngày"
+                        )
+
+                        // 2. Ngày công làm việc (Thực tế hoặc Dự kiến)
                         if (selectedTab == 1) {
                             PayslipProfileRow(
-                                label = "Công làm việc dự kiến:", 
+                                label = "Ngày công (Dự kiến):", 
                                 value = "${df.format(totalProjectedWorkDays)} / ${standardTargetDays.toInt()} ngày"
                             )
                             if (isCurrentSelectedMonth) {
@@ -738,7 +745,7 @@ fun PayslipScreen(
                             }
                         } else {
                             PayslipProfileRow(
-                                label = "Công làm việc:", 
+                                label = "Ngày công (Thực tế):", 
                                 value = "${df.format(totalActualWorkDays)} / ${s.standardWorkDays} ngày"
                             )
                         }
@@ -1652,11 +1659,12 @@ fun savePayslipAsPngImage(
     drawRow("Họ và tên:", employeeName)
     drawRow("Mã nhân viên:", employeeCode)
     drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
+    drawRow("Tiến độ tháng:", "${summary.standardWorkDays} ngày")
     
     if (selectedTab == 1) {
-        drawRow("Công làm việc:", "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày")
+        drawRow("Ngày công (Dự kiến):", "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày")
     } else {
-        drawRow("Công làm việc:", "${df.format(summary.workingDays)} / ${if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays} ngày")
+        drawRow("Ngày công (Thực tế):", "${df.format(summary.actualPresenceDays)} / ${summary.standardWorkDays} ngày")
     }
     currentY += 30f
 
@@ -1831,6 +1839,7 @@ fun MonthlyIncomeTrendChart(
     Card(
         colors = CardDefaults.cardColors(containerColor = DarkContainer),
         shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2D3748)),
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 16.dp)
@@ -1840,20 +1849,21 @@ fun MonthlyIncomeTrendChart(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Title & Trend Info
+            // Title & Trend Info Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
                         text = "SO SÁNH THU NHẬP THỰC TẾ",
                         color = NeonBlue,
-                        fontSize = 13.sp,
+                        fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.5.sp
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Xu hướng thu nhập 6 tháng gần nhất",
                         color = LightGray,
@@ -1866,13 +1876,13 @@ fun MonthlyIncomeTrendChart(
                     modifier = Modifier
                         .background(AccentGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
                         .border(1.dp, AccentGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
                 ) {
                     Column(horizontalAlignment = Alignment.End) {
                         Text(
                             text = "Lương TB",
                             color = AccentGreen,
-                            fontSize = 8.sp,
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
@@ -1885,99 +1895,198 @@ fun MonthlyIncomeTrendChart(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Chart area
+            // Chart area calculations
             val maxIncome = remember(historyList) {
                 (historyList.maxOfOrNull { it.luongThucNhan } ?: 10000000.0).coerceAtLeast(1000000.0)
             }
 
+            // Balanced Chart Grid Container
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp)
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                    .height(160.dp)
+                    .padding(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
                 historyList.forEach { pt ->
                     val isSelected = pt.monthStr == selectedMonth
                     
-                    // Simple parser for month label format "yyyy-MM" -> "Thg M" or "MM/yy"
+                    // Format month label cleanly e.g., "2026-08" -> "T8"
                     val label = remember(pt.monthStr) {
                         try {
                             val parts = pt.monthStr.split("-")
-                            "T${parts[1]}"
+                            val mNum = parts.getOrNull(1)?.toIntOrNull()
+                            if (mNum != null) "T$mNum" else pt.monthStr
                         } catch (e: Exception) {
                             pt.monthStr
                         }
                     }
 
+                    // Format income value above bar cleanly
+                    val incomeLabel = remember(pt.luongThucNhan) {
+                        if (pt.luongThucNhan >= 1_000_000) {
+                            val millions = pt.luongThucNhan / 1_000_000.0
+                            if (millions >= 10.0) {
+                                String.format(Locale.US, "%.1fM", millions)
+                            } else {
+                                String.format(Locale.US, "%.1fM", millions)
+                            }
+                        } else if (pt.luongThucNhan > 0) {
+                            "${(pt.luongThucNhan / 1000).toInt()}k"
+                        } else {
+                            "0đ"
+                        }
+                    }
+
                     // Height factor calculation
-                    val heightFraction = (pt.luongThucNhan / maxIncome).coerceIn(0.08, 1.0).toFloat()
-                    
-                    // Smooth visual state transition for selected bar
+                    val targetFraction = if (pt.luongThucNhan <= 0) 0.05f else (pt.luongThucNhan / maxIncome).coerceIn(0.08, 1.0).toFloat()
+                    val animatedFraction by animateFloatAsState(
+                        targetValue = targetFraction,
+                        animationSpec = tween(durationMillis = 350)
+                    )
+
                     val barAlpha by animateFloatAsState(
                         targetValue = if (isSelected) 1f else 0.45f,
-                        animationSpec = tween(durationMillis = 300)
-                    )
-                    val scaleFactor by animateFloatAsState(
-                        targetValue = if (isSelected) 1.05f else 1.0f,
                         animationSpec = tween(durationMillis = 300)
                     )
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier
                             .weight(1f)
+                            .fillMaxHeight()
                             .clickable { onMonthSelected(pt.monthStr) }
                             .padding(horizontal = 2.dp)
                     ) {
-                        // Income text above bar
-                        Text(
-                            text = if (pt.luongThucNhan >= 1000000) {
-                                String.format(Locale.US, "%.1fM", pt.luongThucNhan / 1000000.0)
-                            } else {
-                                fmt.format(pt.luongThucNhan)
-                            },
-                            color = if (isSelected) NeonBlue else LightGray.copy(alpha = barAlpha),
-                            fontSize = 9.sp,
-                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-
-                        // Visual bar with premium gradients & shapes
+                        // 1. Top Value Badge
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(90.dp * heightFraction)
-                                .scale(scaleX = 1f, scaleY = scaleFactor)
-                                .background(
-                                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                                        colors = if (isSelected) {
-                                            listOf(NeonBlue, NeonBlue.copy(alpha = 0.4f))
-                                        } else {
-                                            listOf(Color.Gray.copy(alpha = barAlpha), Color.Gray.copy(alpha = 0.2f * barAlpha))
-                                        }
-                                    ),
-                                    shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                .height(22.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(NeonBlue.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        .border(0.8.dp, NeonBlue, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = incomeLabel,
+                                        color = NeonBlue,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = incomeLabel,
+                                    color = LightGray.copy(alpha = 0.7f),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
-                                .border(
-                                    width = if (isSelected) 1.5.dp else 0.dp,
-                                    color = if (isSelected) White.copy(alpha = 0.8f) else Color.Transparent,
-                                    shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
-                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 2. Bar Gauge Area with Background Track
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            // Background track for consistent visual structure
+                            Box(
+                                modifier = Modifier
+                                    .width(22.dp)
+                                    .fillMaxHeight()
+                                    .background(
+                                        color = Color.White.copy(alpha = 0.04f),
+                                        shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                    )
+                            )
+
+                            // Foreground Active Bar
+                            Box(
+                                modifier = Modifier
+                                    .width(22.dp)
+                                    .fillMaxHeight(animatedFraction)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                            colors = if (isSelected) {
+                                                listOf(NeonBlue, Color(0xFF0284C7))
+                                            } else {
+                                                listOf(Color(0xFF64748B).copy(alpha = barAlpha), Color(0xFF334155).copy(alpha = 0.3f * barAlpha))
+                                            }
+                                        ),
+                                        shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                    )
+                                    .then(
+                                        if (isSelected) {
+                                            Modifier.border(
+                                                width = 1.dp,
+                                                color = Color.White.copy(alpha = 0.6f),
+                                                shape = RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)
+                                            )
+                                        } else Modifier
+                                    )
+                            )
+                        }
+
+                        // Subtle baseline divider
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(Color(0xFF334155))
                         )
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        // Month label
-                        Text(
-                            text = label,
-                            color = if (isSelected) NeonBlue else LightGray,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                        )
+                        // 3. Month Label Badge
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(26.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(NeonBlue, RoundedCornerShape(6.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        color = Color(0xFF0F172A),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = label,
+                                    color = LightGray,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
                     }
                 }
             }

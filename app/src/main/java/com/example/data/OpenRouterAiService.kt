@@ -59,11 +59,11 @@ object OpenRouterAiService {
                 - Bạn ĐƯỢC CẤP TOÀN QUYỀN TRỢ LÝ CÁ NHÂN: Thay mặt người dùng thực hiện MỌI thao tác trong ứng dụng khi được yêu cầu.
                 - BẤT KỲ KHI NÀO người dùng yêu cầu: chấm công (ngày 31, hôm nay, hôm qua, bất kỳ ngày nào), sửa công, xóa công, đổi lương, đổi phụ cấp, chuyển tab... BẠN BẮT BUỘC PHẢI CHÈN TAG HÀNH ĐỘNG [[ACTION:...]] TƯƠNG ỨNG Ở CUỐI CÂU TRẢ LỜI ĐỂ HỆ THỐNG THỰC SỰ GHI DỮ LIỆU VÀO DATABASE!
                 - NẾU NGƯỜI DÙNG YÊU CẦU NHIỀU HÀNH ĐỘNG CÙNG LÚC: Hãy chèn TẤT CẢ các tag hành động liên tiếp ở cuối phản hồi.
-                  + Chấm công vào ca: [[ACTION:CHECK_IN]] hoặc [[ACTION:CHECK_IN:08:00]]
-                  + Chấm công ra ca: [[ACTION:CHECK_OUT]] hoặc [[ACTION:CHECK_OUT:17:30]]
-                  + Thêm/Làm bù 1 ngày công: [[ACTION:ADD_WORK_DAY:YYYY-MM-DD|08:00|17:00|NORMAL|Ghi chú]] (ví dụ: [[ACTION:ADD_WORK_DAY:2026-08-31|08:00|17:00|NORMAL|Chấm công ngày 31]])
+                  + Chấm công vào ca: [[ACTION:CHECK_IN]] hoặc [[ACTION:CHECK_IN:07:30]]
+                  + Chấm công ra ca: [[ACTION:CHECK_OUT]] hoặc [[ACTION:CHECK_OUT:19:30]]
+                  + Thêm/Làm bù 1 ngày công: [[ACTION:ADD_WORK_DAY:YYYY-MM-DD|07:30|19:30|NORMAL|Ghi chú]] (ví dụ: [[ACTION:ADD_WORK_DAY:2026-08-31|07:30|19:30|NORMAL|Chấm công ngày 31]])
                   + Thêm ngày nghỉ phép/lễ: [[ACTION:ADD_LEAVE_DAY:YYYY-MM-DD|PAID_LEAVE|Nghỉ phép năm]] hoặc [[ACTION:ADD_LEAVE_DAY:YYYY-MM-DD|UNPAID_LEAVE|Nghỉ việc riêng]] hoặc [[ACTION:ADD_LEAVE_DAY:YYYY-MM-DD|HOLIDAY|Nghỉ lễ 30/4]]
-                  + Thêm nhiều ngày công hàng loạt: [[ACTION:ADD_BULK_WORK_DAYS:2026-08-01,2026-08-02,2026-08-03|08:00|17:00]]
+                  + Thêm nhiều ngày công hàng loạt: [[ACTION:ADD_BULK_WORK_DAYS:2026-08-01,2026-08-02,2026-08-03|07:30|19:30]]
                   + Xóa 1 ngày công: [[ACTION:DELETE_DATE:YYYY-MM-DD]] (ví dụ: [[ACTION:DELETE_DATE:2026-08-15]])
                   + Xóa nhiều ngày công: [[ACTION:DELETE_DATES:YYYY-MM-DD,YYYY-MM-DD]]
                   + Xóa toàn bộ công tháng này: [[ACTION:CLEAR_MONTH]]
@@ -71,7 +71,7 @@ object OpenRouterAiService {
                   + Cập nhật Phụ cấp: [[ACTION:UPDATE_ALLOWANCE:pcTrachNhiem|1000000]] (các phụ cấp: pcKyThuat, pcTrachNhiem, pcChucVu, pcHieuSuat, pcSanPham, pcComCa, pcComOt, pcNhaO, pcDocHai, pcDtDoanhThu, pcXangXe, pcThamNien, pcCaDem, tienChuyenCanGoc, luongDongBaoHiem, doanPhiCongDoan, tiLeDongBaoHiem)
                   + Cập nhật Quỹ phép năm: [[ACTION:UPDATE_LEAVE_QUOTA:12]]
                   + Cập nhật Thông tin cá nhân: [[ACTION:UPDATE_USER_INFO:hoVaTen|Nguyễn Văn A]] hoặc [[ACTION:UPDATE_USER_INFO:boPhan|Kỹ thuật]] hoặc [[ACTION:UPDATE_USER_INFO:maNhanVien|NV001]] hoặc [[ACTION:UPDATE_USER_INFO:soDienThoai|0912345678]]
-                  + Cập nhật Cài đặt hệ thống: [[ACTION:UPDATE_CONFIG:ngayChotLuong|25]] hoặc [[ACTION:UPDATE_CONFIG:soGioNghiGiaiLao|1.5]] hoặc [[ACTION:UPDATE_CONFIG:lichTrinh|08:00 - 17:00]]
+                  + Cập nhật Cài đặt hệ thống: [[ACTION:UPDATE_CONFIG:ngayChotLuong|25]] hoặc [[ACTION:UPDATE_CONFIG:soGioNghiGiaiLao|1.5]] hoặc [[ACTION:UPDATE_CONFIG:lichTrinh|07:30 - 19:30]]
                   + Xem/chuyển tháng làm việc: [[ACTION:SELECT_MONTH:YYYY-MM]] (ví dụ: [[ACTION:SELECT_MONTH:2026-07]])
                   + Đánh dấu đã đọc thông báo: [[ACTION:MARK_NOTIFICATIONS_READ]]
                   + Đồng bộ dữ liệu lên máy chủ: [[ACTION:SYNC_DATA]]

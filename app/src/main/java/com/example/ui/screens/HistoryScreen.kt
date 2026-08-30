@@ -474,10 +474,10 @@ fun HistoryScreen(
                 }
             }
 
-            var checkInHour by remember { mutableStateOf(TextFieldValue("08")) }
-            var checkInMin by remember { mutableStateOf(TextFieldValue("00")) }
-            var checkOutHour by remember { mutableStateOf(TextFieldValue("17")) }
-            var checkOutMin by remember { mutableStateOf(TextFieldValue("00")) }
+            var checkInHour by remember { mutableStateOf(TextFieldValue("07")) }
+            var checkInMin by remember { mutableStateOf(TextFieldValue("30")) }
+            var checkOutHour by remember { mutableStateOf(TextFieldValue("19")) }
+            var checkOutMin by remember { mutableStateOf(TextFieldValue("30")) }
             
             val focusRequesters = remember { List(4) { FocusRequester() } }
             
@@ -506,8 +506,8 @@ fun HistoryScreen(
                             checkOutMin = TextFieldValue(String.format("%02d", outCal.get(Calendar.MINUTE)))
                             leaveCheckOutEmpty = false
                         } else {
-                            checkOutHour = TextFieldValue("17")
-                            checkOutMin = TextFieldValue("00")
+                            checkOutHour = TextFieldValue("19")
+                            checkOutMin = TextFieldValue("30")
                             leaveCheckOutEmpty = true
                         }
                     }
@@ -520,10 +520,10 @@ fun HistoryScreen(
                         selectedDayType = if (day.isSunday) "SUNDAY" else "NORMAL"
                     }
                     isBreakDeducted = configState?.tinhKhauTruNghi ?: true
-                    checkInHour = TextFieldValue("08")
-                    checkInMin = TextFieldValue("00")
-                    checkOutHour = TextFieldValue("17")
-                    checkOutMin = TextFieldValue("00")
+                    checkInHour = TextFieldValue("07")
+                    checkInMin = TextFieldValue("30")
+                    checkOutHour = TextFieldValue("19")
+                    checkOutMin = TextFieldValue("30")
                     leaveCheckOutEmpty = false
                 }
             }
@@ -978,10 +978,10 @@ fun HistoryScreen(
                                             noteStr = noteString.ifEmpty { "Nghỉ phép trước" }
                                         )
                                     } else {
-                                        val inHour = checkInHour.text.toIntOrNull() ?: 8
-                                        val inMin = checkInMin.text.toIntOrNull() ?: 0
-                                        val outHour = if (leaveCheckOutEmpty) null else (checkOutHour.text.toIntOrNull() ?: 17)
-                                        val outMin = if (leaveCheckOutEmpty) null else (checkOutMin.text.toIntOrNull() ?: 0)
+                                        val inHour = checkInHour.text.toIntOrNull() ?: 7
+                                        val inMin = checkInMin.text.toIntOrNull() ?: 30
+                                        val outHour = if (leaveCheckOutEmpty) null else (checkOutHour.text.toIntOrNull() ?: 19)
+                                        val outMin = if (leaveCheckOutEmpty) null else (checkOutMin.text.toIntOrNull() ?: 30)
 
                                         viewModel.addSingleEntry(
                                             dateStr = day.dateString,
@@ -1090,10 +1090,10 @@ fun HistoryScreen(
 
         // ==================== BULK SHIFT SELECT PRESET DIALOG (CHẾ ĐỘ 2) ====================
         if (showBulkDialog) {
-            var startHour by remember { mutableStateOf(TextFieldValue("08")) }
-            var startMin by remember { mutableStateOf(TextFieldValue("00")) }
-            var endHour by remember { mutableStateOf(TextFieldValue("17")) }
-            var endMin by remember { mutableStateOf(TextFieldValue("00")) }
+            var startHour by remember { mutableStateOf(TextFieldValue("07")) }
+            var startMin by remember { mutableStateOf(TextFieldValue("30")) }
+            var endHour by remember { mutableStateOf(TextFieldValue("19")) }
+            var endMin by remember { mutableStateOf(TextFieldValue("30")) }
             
             val bulkFocusRequesters = remember { List(4) { FocusRequester() } }
 
@@ -1377,10 +1377,10 @@ fun HistoryScreen(
                                     }
                                 }
                                 if (validDates.isNotEmpty()) {
-                                    val inH = startHour.text.toIntOrNull() ?: 8
-                                    val inM = startMin.text.toIntOrNull() ?: 0
-                                    val outH = endHour.text.toIntOrNull() ?: 17
-                                    val outM = endMin.text.toIntOrNull() ?: 0
+                                    val inH = startHour.text.toIntOrNull() ?: 7
+                                    val inM = startMin.text.toIntOrNull() ?: 30
+                                    val outH = endHour.text.toIntOrNull() ?: 19
+                                    val outM = endMin.text.toIntOrNull() ?: 30
                                     val startTotalMinutes = inH * 60 + inM
                                     val isNightShiftOverride = startTotalMinutes in (18 * 60)..(19 * 60 + 30)
 

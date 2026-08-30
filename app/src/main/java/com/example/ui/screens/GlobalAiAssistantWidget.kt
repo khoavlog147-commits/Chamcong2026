@@ -121,22 +121,33 @@ object AiTextFormatter {
         text = text.replace(Regex("\\bvs\\b", RegexOption.IGNORE_CASE), "so với")
         text = text.replace(Regex("\\bapprox\\b", RegexOption.IGNORE_CASE), "khoảng")
         
-        // Convert Vietnamese currency numbers (e.g. 12.000.000đ or 500.000đ) into spoken Vietnamese
-        text = text.replace(Regex("(\\d+)\\.000\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 triệu đồng")
-        text = text.replace(Regex("(\\d+)\\.([1-9])00\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 phẩy $2 triệu đồng")
-        text = text.replace(Regex("(\\d+)\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 nghìn đồng")
-        text = text.replace(Regex("(\\d+)\\s*(?:đ|vnđ|vnd)\\b", RegexOption.IGNORE_CASE), "$1 đồng")
+        // Convert Vietnamese currency numbers (e.g. 12.000.000đ, 500.000đ, 25.000đ, 25k, etc.) into natural spoken Vietnamese
+        text = text.replace(Regex("(\\d+)\\.000\\.000\\s*(?:đ|₫|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 triệu đồng")
+        text = text.replace(Regex("(\\d+)\\.([1-9])00\\.000\\s*(?:đ|₫|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 phẩy $2 triệu đồng")
+        text = text.replace(Regex("(\\d+)\\.000\\s*(?:đ|₫|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 nghìn đồng")
+        text = text.replace(Regex("(\\d+)\\s*(?:k|K)\\s*(?:đ|₫|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 nghìn đồng")
+        text = text.replace(Regex("(\\d+)\\s*(?:đ|₫|vnđ|vnd)\\b", RegexOption.IGNORE_CASE), "$1 đồng")
+        text = text.replace(Regex("(\\d+)\\s*₫"), "$1 đồng")
         
         // Replace "%" with " phần trăm"
         text = text.replace("%", " phần trăm")
-        
+
         // Replace "/" between dates (e.g. 15/08/2026 -> ngày 15 tháng 8 năm 2026)
         text = text.replace(Regex("(\\d{1,2})/(\\d{1,2})/(\\d{4})"), "ngày $1 tháng $2 năm $3")
         text = text.replace(Regex("(\\d{1,2})/(\\d{1,2})"), "ngày $1 tháng $2")
+
+        // Replace "/" in ratios/progress (e.g. "25/26" or "25 / 26" -> "25 trên 26")
+        text = text.replace(Regex("(\\d+(?:[.,]\\d+)?)\\s*/\\s*(\\d+(?:[.,]\\d+)?)"), "$1 trên $2")
+        text = text.replace("/", " trên ")
         
         // Replace ":" in time format (e.g. 08:00 -> 8 giờ, 17:30 -> 17 giờ 30)
         text = text.replace(Regex("(\\d{1,2}):00\\b"), "$1 giờ")
         text = text.replace(Regex("(\\d{1,2}):(\\d{2})\\b"), "$1 giờ $2")
+
+        // Replace "g" or "h" as hours (e.g. "12g", "12 g", "12h", "12 h" -> "12 giờ", "12g30" -> "12 giờ 30")
+        text = text.replace(Regex("(\\d{1,2})\\s*[ghGH](\\d{2})\\b"), "$1 giờ $2")
+        text = text.replace(Regex("(\\d{1,2})\\s*[ghGH]\\b"), "$1 giờ")
+        text = text.replace(Regex("(\\d+(?:[.,]\\d+)?)\\s*(?:giờ|tiếng|h|g)\\b", RegexOption.IGNORE_CASE), "$1 giờ")
         
         // Clean leftover dots or double spaces
         text = text.replace(Regex("\\s+([,.:;?!])"), "$1")

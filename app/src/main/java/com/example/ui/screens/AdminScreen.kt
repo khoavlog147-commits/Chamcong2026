@@ -2042,10 +2042,10 @@ fun EmployeeDetailView(
                     var recordType by remember { mutableStateOf("NORMAL") } // "NORMAL", "PAID_LEAVE", "UNPAID_LEAVE", "HOLIDAY_LEAVE"
                     var noteText by remember { mutableStateOf("") }
 
-                    var checkInHour by remember { mutableStateOf(TextFieldValue("08")) }
-                    var checkInMin by remember { mutableStateOf(TextFieldValue("00")) }
-                    var checkOutHour by remember { mutableStateOf(TextFieldValue("17")) }
-                    var checkOutMin by remember { mutableStateOf(TextFieldValue("00")) }
+                    var checkInHour by remember { mutableStateOf(TextFieldValue("07")) }
+                    var checkInMin by remember { mutableStateOf(TextFieldValue("30")) }
+                    var checkOutHour by remember { mutableStateOf(TextFieldValue("19")) }
+                    var checkOutMin by remember { mutableStateOf(TextFieldValue("30")) }
                     
                     val focusRequesters = remember { List(7) { FocusRequester() } }
 
@@ -2321,7 +2321,7 @@ fun EmployeeDetailView(
                                     } else if (recordType == "NORMAL" && inH.isNotBlank() && inM.isNotBlank()) {
                                         SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr $inH:$inM")?.time ?: 0L
                                     } else {
-                                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr 08:00")?.time ?: System.currentTimeMillis()
+                                        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).parse("$dbDateStr 07:30")?.time ?: System.currentTimeMillis()
                                     }
                                     
                                     var fullOut = if (isLeave) {
@@ -4269,7 +4269,7 @@ fun EmployeePayslipView(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Công làm việc:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))
-                        val totalWorkDaysShow = if (selectedTab == 1) soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0) else summary.workingDays.toDouble()
+                        val totalWorkDaysShow = if (selectedTab == 1) soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0) else summary.actualPresenceDays
                         Text("${df.format(totalWorkDaysShow)} / ${summary.standardWorkDays} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
                 }

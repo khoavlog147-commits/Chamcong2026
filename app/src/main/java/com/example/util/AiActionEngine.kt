@@ -119,15 +119,15 @@ object AiActionEngine {
                 if (actionParam.isNotBlank()) {
                     val parts = actionParam.split("|")
                     val rawDateStr = parts.getOrNull(0)?.trim() ?: ""
-                    val checkInStr = parts.getOrNull(1)?.trim()?.ifBlank { "08:00" } ?: "08:00"
-                    val checkOutStr = parts.getOrNull(2)?.trim()?.ifBlank { "17:00" } ?: "17:00"
+                    val checkInStr = parts.getOrNull(1)?.trim()?.ifBlank { "07:30" } ?: "07:30"
+                    val checkOutStr = parts.getOrNull(2)?.trim()?.ifBlank { "19:30" } ?: "19:30"
                     val dayType = parts.getOrNull(3)?.trim()?.ifBlank { "NORMAL" } ?: "NORMAL"
                     val note = parts.getOrNull(4)?.trim() ?: "AI hỗ trợ ghi nhận công"
 
                     val normDateStr = resolveDateToDmy(rawDateStr)
                     if (normDateStr.isNotBlank()) {
-                        val (inHour, inMin) = parseHourMinute(checkInStr, 8, 0)
-                        val (outHour, outMin) = parseHourMinute(checkOutStr, 17, 0)
+                        val (inHour, inMin) = parseHourMinute(checkInStr, 7, 30)
+                        val (outHour, outMin) = parseHourMinute(checkOutStr, 19, 30)
 
                         viewModel.addSingleEntry(
                             dateStr = normDateStr,
@@ -156,10 +156,10 @@ object AiActionEngine {
                     if (normDateStr.isNotBlank()) {
                         viewModel.addSingleEntry(
                             dateStr = normDateStr,
-                            checkInHour = 8,
-                            checkInMin = 0,
-                            checkOutHour = 17,
-                            checkOutMin = 0,
+                            checkInHour = 7,
+                            checkInMin = 30,
+                            checkOutHour = 19,
+                            checkOutMin = 30,
                             dayTypeOverride = dayType,
                             noteStr = note
                         )
@@ -175,13 +175,13 @@ object AiActionEngine {
                 if (actionParam.isNotBlank()) {
                     val parts = actionParam.split("|")
                     val rawDatesListStr = parts.getOrNull(0)?.trim() ?: ""
-                    val checkInStr = parts.getOrNull(1)?.trim()?.ifBlank { "08:00" } ?: "08:00"
-                    val checkOutStr = parts.getOrNull(2)?.trim()?.ifBlank { "17:00" } ?: "17:00"
+                    val checkInStr = parts.getOrNull(1)?.trim()?.ifBlank { "07:30" } ?: "07:30"
+                    val checkOutStr = parts.getOrNull(2)?.trim()?.ifBlank { "19:30" } ?: "19:30"
 
                     val dateList = rawDatesListStr.split(",").map { resolveDateToDmy(it.trim()) }.filter { it.isNotBlank() }
                     if (dateList.isNotEmpty()) {
-                        val (inHour, inMin) = parseHourMinute(checkInStr, 8, 0)
-                        val (outHour, outMin) = parseHourMinute(checkOutStr, 17, 0)
+                        val (inHour, inMin) = parseHourMinute(checkInStr, 7, 30)
+                        val (outHour, outMin) = parseHourMinute(checkOutStr, 19, 30)
 
                         viewModel.addBulkEntries(
                             selectedDates = dateList,
@@ -408,16 +408,16 @@ object AiActionEngine {
                     
                     viewModel.addSingleEntry(
                         dateStr = normDate,
-                        checkInHour = 8,
-                        checkInMin = 0,
-                        checkOutHour = 17,
-                        checkOutMin = 0,
+                        checkInHour = 7,
+                        checkInMin = 30,
+                        checkOutHour = 19,
+                        checkOutMin = 30,
                         dayTypeOverride = dayType,
                         noteStr = "AI tự động ghi nhận công"
                     )
                     processedKeys.add("ADD_WORK_DATE:$normDate")
                     val label = if (dayType == "PAID_LEAVE") "nghỉ phép" else if (dayType == "UNPAID_LEAVE") "nghỉ không lương" else "ngày công"
-                    executedMessages.add("Ghi nhận $label ngày $normDate (08:00 - 17:00)")
+                    executedMessages.add("Ghi nhận $label ngày $normDate (07:30 - 19:30)")
                 }
             }
         }

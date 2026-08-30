@@ -1917,5 +1917,6 @@ data class SalarySummary(
     val chuNhatDayHours: Double = 0.0,
     val chuNhatNightHours: Double = 0.0,
     val otLeHours: Double = 0.0,
-    val tienOtLe: Double = 0.0
+    val tienOtLe: Double = 0.0,
+    val actualPresenceDays: Double = 0.0
 )

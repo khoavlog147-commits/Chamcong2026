@@ -411,7 +411,7 @@ object SalaryCalculator {
 
         // Aggregators
         var totalWorkDays = unworkedHolidaysCount.toDouble()
-        var actualPresenceDaysCount = 0
+        var actualPresenceDaysCount = unworkedHolidaysCount.toDouble()
         var totalStandardHours = unworkedHolidaysCount * 8.0
         var totalOtDayHours = 0.0
         var totalOtNightHours = 0.0
@@ -455,6 +455,7 @@ object SalaryCalculator {
 
             if (isPaidLeaveType(e.dayType)) {
                 totalWorkDays += 1.0
+                actualPresenceDaysCount += 1.0
                 totalStandardHours += 8.0
                 continue
             }
@@ -671,7 +672,8 @@ object SalaryCalculator {
             chuNhatDayHours = totalSundayDayHours,
             chuNhatNightHours = totalSundayNightHours,
             otLeHours = totalOtLeHours,
-            tienOtLe = roundedOtLePay
+            tienOtLe = roundedOtLePay,
+            actualPresenceDays = actualPresenceDaysCount
         )
     }
 
