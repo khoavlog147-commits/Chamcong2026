@@ -52,6 +52,11 @@ import kotlinx.coroutines.delay
 import androidx.compose.ui.draw.alpha
 import java.text.DecimalFormat
 import kotlin.math.roundToInt
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -174,11 +179,18 @@ fun GlobalAiAssistantWidget(
         } ?: "Thông tin & cài đặt nhân viên chưa được thiết lập"
 
         val summaryInfo = summaryState?.let { s ->
+            val hourlyRate = if (s.standardWorkDays > 0 && s.baseBasicSalary > 0) s.baseBasicSalary / (s.standardWorkDays * 8.0) else 0.0
             """
-            * THỐNG KÊ LƯƠNG & CHẤM CÔNG THÁNG HIỆN TẠI:
+            * THỐNG KÊ CHI TIẾT LƯƠNG & CÔNG THÁNG HIỆN TẠI:
+            - Đơn giá 1 giờ công chuẩn (LCB / Công chuẩn / 8g): ${fmt.format(hourlyRate)}đ/giờ
             - Ngày công thực tế: ${s.workingDays}/${s.standardWorkDays} ngày công | Giờ làm chuẩn: ${s.standardHours}g | Số ca đêm: ${s.caDemCount} ca
-            - OT ngày thường: ${s.otDayHours}g | OT đêm: ${s.otNightHours}g | Giờ Chủ nhật: ${s.chuNhatHours}g | OT Lễ: ${s.otLeHours}g
-            - Khấu trừ BHXH: ${fmt.format(s.tienBh)}đ | Đoàn phí: ${fmt.format(s.doanPhi)}đ | Phạt/trừ nghỉ: ${fmt.format(s.tienKhauTruNghi)}đ
+            - Chi tiết các loại giờ & Tiền công tương ứng:
+              + OT ngày thường: ${s.otDayHours}g => Tiền: ${fmt.format(s.tienOtNgay)}đ
+              + OT ca đêm: ${s.otNightHours}g => Tiền: ${fmt.format(s.tienOtDem)}đ
+              + Giờ Chủ nhật (Tổng): ${s.chuNhatHours}g (Ngày: ${s.chuNhatDayHours}g, Đêm: ${s.chuNhatNightHours}g) => Tổng tiền CN: ${fmt.format(s.tienChuNhat)}đ (CN Ngày: ${fmt.format(s.tienChuNhatNgay)}đ, CN Đêm: ${fmt.format(s.tienChuNhatDem)}đ)
+              + OT Ngày lễ: ${s.otLeHours}g => Tiền: ${fmt.format(s.tienOtLe)}đ
+            - Tổng tiền cơm: ${fmt.format(s.tongTienCom)}đ | Tổng phụ cấp: ${fmt.format(s.phuCap)}đ | Thưởng: ${fmt.format(s.thuong)}đ
+            - Các khoản khấu trừ: BHXH (${fmt.format(s.tienBh)}đ), Đoàn phí (${fmt.format(s.doanPhi)}đ), Phạt/Nghỉ (${fmt.format(s.tienKhauTruNghi)}đ)
             - LƯƠNG THỰC NHẬN (NET): ${fmt.format(s.luongThucNhan)}đ
             """.trimIndent()
         } ?: "Chưa có tổng hợp công tháng này"
@@ -203,13 +215,54 @@ fun GlobalAiAssistantWidget(
         """.trimIndent()
     }
 
+    // TTS Voice Engine State
+    var ttsInstance by remember { mutableStateOf<TextToSpeech?>(null) }
+    var isTtsSpeaking by remember { mutableStateOf(false) }
+    var currentSpeakingMsgId by remember { mutableStateOf<String?>(null) }
+    var autoSpeakVoice by remember { mutableStateOf(true) }
+    var isListeningVoice by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                ttsInstance?.language = Locale("vi", "VN")
+            }
+        }
+        ttsInstance = tts
+        onDispose {
+            tts.stop()
+            tts.shutdown()
+        }
+    }
+
+    val stopSpeaking: () -> Unit = {
+        ttsInstance?.stop()
+        isTtsSpeaking = false
+        currentSpeakingMsgId = null
+    }
+
+    val speakText: (String, String) -> Unit = { id, text ->
+        if (currentSpeakingMsgId == id && isTtsSpeaking) {
+            stopSpeaking()
+        } else {
+            ttsInstance?.stop()
+            val clean = text.replace(Regex("[*_#`~]"), "")
+            val speakResult = ttsInstance?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id)
+            if (speakResult != TextToSpeech.ERROR) {
+                isTtsSpeaking = true
+                currentSpeakingMsgId = id
+            }
+        }
+    }
+
     // Function to handle sending message
-    val handleSendMessage: (String) -> Unit = { inputPrompt ->
+    val handleSendMessageInternal: (String, Boolean) -> Unit = { inputPrompt, isFromVoice ->
         val prompt = inputPrompt.trim()
         if (prompt.isNotBlank() && !isGeneratingResponse) {
             if (!AiApiKeyManager.hasApiKey(context)) {
                 showApiKeyDialog = true
             } else {
+                stopSpeaking()
                 val currentKey = AiApiKeyManager.getApiKey(context)
                 chatMessages.add(AiChatMessage(sender = "user", text = prompt))
                 userPromptText = ""
@@ -229,7 +282,11 @@ fun GlobalAiAssistantWidget(
 
                     isGeneratingResponse = false
                     result.onSuccess { responseText ->
-                        chatMessages.add(AiChatMessage(sender = "ai", text = responseText))
+                        val newAiMsg = AiChatMessage(sender = "ai", text = responseText)
+                        chatMessages.add(newAiMsg)
+                        if (isFromVoice || autoSpeakVoice) {
+                            speakText(newAiMsg.id, responseText)
+                        }
                     }.onFailure { error ->
                         val errText = error.message ?: "Có lỗi xảy ra khi gọi Gemini API."
                         chatMessages.add(AiChatMessage(sender = "ai", text = "⚠️ $errText", isError = true))
@@ -239,6 +296,41 @@ fun GlobalAiAssistantWidget(
                     }
                 }
             }
+        }
+    }
+
+    val handleSendMessage: (String) -> Unit = { prompt -> handleSendMessageInternal(prompt, false) }
+
+    // Speech-to-Text Launcher
+    val voiceSpeechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        isListeningVoice = false
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val spokenTextList = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = spokenTextList?.firstOrNull()
+            if (!spokenText.isNullOrBlank()) {
+                userPromptText = spokenText
+                handleSendMessageInternal(spokenText, true)
+            }
+        }
+    }
+
+    val startVoiceInput: () -> Unit = {
+        stopSpeaking()
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "vi-VN")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "vi-VN")
+                putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "vi-VN")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Đang lắng nghe... Hãy nói câu hỏi của bạn")
+            }
+            isListeningVoice = true
+            voiceSpeechLauncher.launch(intent)
+        } catch (e: Exception) {
+            isListeningVoice = false
+            Toast.makeText(context, "Thiết bị chưa cài dịch vụ nhận diện giọng nói Google", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -414,6 +506,23 @@ fun GlobalAiAssistantWidget(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = { 
+                                if (isTtsSpeaking) {
+                                    stopSpeaking()
+                                } else {
+                                    autoSpeakVoice = !autoSpeakVoice
+                                    Toast.makeText(context, if (autoSpeakVoice) "Đã BẬT tự động phát giọng nói phản hồi" else "Đã TẮT phát giọng nói phản hồi", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isTtsSpeaking) Icons.Default.VolumeUp else if (autoSpeakVoice) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                contentDescription = "Đọc giọng nói phản hồi",
+                                tint = if (isTtsSpeaking) NeonBlue else if (autoSpeakVoice) Color(0xFF4CC9F0) else LightGray
+                            )
+                        }
                         IconButton(
                             onClick = { showPricingCard = !showPricingCard },
                             modifier = Modifier.size(36.dp)
@@ -633,18 +742,44 @@ fun GlobalAiAssistantWidget(
                                 }
 
                                 if (!isUser && !msg.isError) {
-                                    Text(
-                                        text = "Sao chép",
-                                        color = LightGray.copy(alpha = 0.7f),
-                                        fontSize = 10.5.sp,
-                                        modifier = Modifier
-                                            .padding(top = 2.dp, start = 4.dp)
-                                            .clickable {
+                                    val isSpeaking = currentSpeakingMsgId == msg.id && isTtsSpeaking
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(top = 3.dp, start = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Sao chép",
+                                            color = LightGray.copy(alpha = 0.7f),
+                                            fontSize = 10.5.sp,
+                                            modifier = Modifier.clickable {
                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                 clipboard.setPrimaryClip(ClipData.newPlainText("AI Response", msg.text))
                                                 Toast.makeText(context, "Đã sao chép phản hồi!", Toast.LENGTH_SHORT).show()
                                             }
-                                    )
+                                        )
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                            modifier = Modifier.clickable {
+                                                speakText(msg.id, msg.text)
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isSpeaking) Icons.Default.VolumeUp else Icons.Default.VolumeMute,
+                                                contentDescription = "Đọc bằng giọng nói",
+                                                tint = if (isSpeaking) NeonBlue else LightGray.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = if (isSpeaking) "Đang phát..." else "Đọc giọng nói",
+                                                color = if (isSpeaking) NeonBlue else LightGray.copy(alpha = 0.7f),
+                                                fontSize = 10.5.sp,
+                                                fontWeight = if (isSpeaking) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -675,6 +810,35 @@ fun GlobalAiAssistantWidget(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
+                // Listening Status Banner
+                if (isListeningVoice) {
+                    Surface(
+                        color = Color(0xFFEF4444).copy(alpha = 0.2f),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Mic,
+                                contentDescription = null,
+                                tint = Color(0xFFEF4444),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "🎙️ Đang lắng nghe giọng nói của bạn...",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
                 // Bottom Input Row
                 Row(
                     modifier = Modifier
@@ -683,6 +847,23 @@ fun GlobalAiAssistantWidget(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    IconButton(
+                        onClick = { startVoiceInput() },
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isListeningVoice) Color(0xFFEF4444) else Color(0xFF334155)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isListeningVoice) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = "Nói bằng giọng nói",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     OutlinedTextField(
                         value = userPromptText,
                         onValueChange = { userPromptText = it },
