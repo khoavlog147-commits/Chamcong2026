@@ -127,6 +127,7 @@ fun GlobalAiAssistantWidget(
     val userConfig by viewModel.userConfig.collectAsStateWithLifecycle()
     val summaryState by viewModel.salarySummaryState.collectAsStateWithLifecycle()
     val timeEntries by viewModel.monthTimeEntries.collectAsStateWithLifecycle(emptyList())
+    val salaryHistory by viewModel.salaryHistoryState.collectAsStateWithLifecycle()
 
     // Scroll to bottom when new message arrives or when soft keyboard opens
     val isImeVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 0.dp
@@ -147,7 +148,7 @@ fun GlobalAiAssistantWidget(
         else -> "Màn hình ứng dụng"
     }
 
-    val contextDataStr = remember(currentTab, userConfig, summaryState, timeEntries) {
+    val contextDataStr = remember(currentTab, userConfig, summaryState, timeEntries, salaryHistory) {
         val fmt = DecimalFormat("#,###")
         val configInfo = userConfig?.let { c ->
             val totalPhuCap = c.pcKyThuat + c.pcTrachNhiem + c.pcChucVu + c.pcHieuSuat +
@@ -182,10 +183,23 @@ fun GlobalAiAssistantWidget(
             """.trimIndent()
         } ?: "Chưa có tổng hợp công tháng này"
 
+        val historyInfo = if (salaryHistory.isNotEmpty()) {
+            val historyListStr = salaryHistory.joinToString("\n") { p ->
+                "  + Tháng ${p.monthStr}: Lương NET = ${fmt.format(p.luongThucNhan)}đ, Ngày công = ${p.workingDays} ngày"
+            }
+            """
+            * DỮ LIỆU LỊCH SỬ LƯƠNG & NGÀY CÔNG (6 THÁNG GẦN NHẤT ĐỂ SO SÁNH):
+            $historyListStr
+            """.trimIndent()
+        } else {
+            "* LỊCH SỬ LƯƠNG CÁC THÁNG TRƯỚC: Chưa ghi nhận dữ liệu tháng trước."
+        }
+
         """
         - Màn hình người dùng đang mở: $tabNameVi
         $configInfo
         $summaryInfo
+        $historyInfo
         """.trimIndent()
     }
 
@@ -502,15 +516,15 @@ fun GlobalAiAssistantWidget(
                 // Quick Suggestion Chips according to current Tab
                 val quickChips = when (currentTab) {
                     "payslip" -> listOf(
+                        "💡 So sánh lương tháng này với tháng trước",
                         "💡 Giải thích tổng lương tháng này",
                         "💡 Các khoản phụ cấp của tôi gồm những gì?",
-                        "💡 Tỷ lệ trừ BHXH & Công đoàn phí",
-                        "💡 Hệ số OT ngày thường, Chủ nhật & Ca đêm?"
+                        "💡 Tỷ lệ trừ BHXH & Công đoàn phí"
                     )
                     "history" -> listOf(
+                        "💡 So sánh lương & ngày công tháng này vs tháng trước",
                         "💡 Tổng công làm việc tháng này là bao nhiêu?",
                         "💡 Tháng này tôi làm bao nhiêu ca đêm?",
-                        "💡 Kiểm tra xem tôi có đi trễ buổi nào không?",
                         "💡 Tổng số giờ OT tăng ca tháng này?"
                     )
                     "home" -> listOf(
