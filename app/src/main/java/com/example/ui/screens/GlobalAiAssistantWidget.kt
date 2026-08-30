@@ -73,11 +73,86 @@ data class AiChatMessage(
     val isError: Boolean = false
 )
 
+/**
+ * Helper to sanitize and format AI generated text for clean display and natural Vietnamese speech.
+ * Eliminates erratic whitespace, trailing punctuation spaces, raw markdown artifacts,
+ * and normalizes currency/time/abbreviations for smooth Text-to-Speech reading.
+ */
+object AiTextFormatter {
+    fun cleanForDisplay(rawText: String): String {
+        var text = rawText.replace(Regex("\\[\\[ACTION:[^\\]]+\\]\\]"), "").trim()
+        
+        // Fix weird space before punctuation (e.g. "chữ , dấu cách" -> "chữ, dấu cách", "được . " -> "được. ")
+        text = text.replace(Regex("[ \\t]+([,.:;?!])"), "$1")
+        
+        // Fix space after opening bracket and before closing bracket
+        text = text.replace(Regex("\\(\\s+"), "(").replace(Regex("\\s+\\)"), ")")
+        
+        // Clean markdown bold syntax if broken: e.g. "** từ **" -> "**từ**"
+        text = text.replace(Regex("\\*\\*\\s+"), "**").replace(Regex("\\s+\\*\\*"), "**")
+        
+        // Replace multiple consecutive spaces with a single space
+        text = text.replace(Regex("[ \\t]+"), " ")
+        
+        // Replace 3+ consecutive newlines with 2 newlines
+        text = text.replace(Regex("\\n{3,}"), "\n\n")
+        
+        return text.trim()
+    }
+
+    fun prepareForVietnameseTts(rawText: String): String {
+        var text = cleanForDisplay(rawText)
+        
+        // Remove markdown formatting
+        text = text.replace(Regex("[*_#`~]"), "")
+        text = text.replace(Regex("^[-•*]\\s+", RegexOption.MULTILINE), "")
+        
+        // Remove emojis and special symbol glyphs that cause TTS to spell out English emoji names
+        text = text.replace(Regex("[\\p{So}\\p{Cn}\\uD83C-\\uDBFF\\uDC00-\\uDFFF]+"), " ")
+        
+        // Expand common work abbreviations to natural spoken Vietnamese
+        text = text.replace(Regex("\\bOT\\b", RegexOption.IGNORE_CASE), "tăng ca")
+        text = text.replace(Regex("\\bBHXH\\b", RegexOption.IGNORE_CASE), "bảo hiểm xã hội")
+        text = text.replace(Regex("\\bBHYT\\b", RegexOption.IGNORE_CASE), "bảo hiểm y tế")
+        text = text.replace(Regex("\\bBHTN\\b", RegexOption.IGNORE_CASE), "bảo hiểm thất nghiệp")
+        text = text.replace(Regex("\\bLCB\\b", RegexOption.IGNORE_CASE), "lương cơ bản")
+        text = text.replace(Regex("\\bLBH\\b", RegexOption.IGNORE_CASE), "lương đóng bảo hiểm")
+        text = text.replace(Regex("\\bCN\\b"), "Chủ nhật")
+        text = text.replace(Regex("\\bvs\\b", RegexOption.IGNORE_CASE), "so với")
+        text = text.replace(Regex("\\bapprox\\b", RegexOption.IGNORE_CASE), "khoảng")
+        
+        // Convert Vietnamese currency numbers (e.g. 12.000.000đ or 500.000đ) into spoken Vietnamese
+        text = text.replace(Regex("(\\d+)\\.000\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 triệu đồng")
+        text = text.replace(Regex("(\\d+)\\.([1-9])00\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 phẩy $2 triệu đồng")
+        text = text.replace(Regex("(\\d+)\\.000\\s*(?:đ|vnđ|vnd|đồng)?", RegexOption.IGNORE_CASE), "$1 nghìn đồng")
+        text = text.replace(Regex("(\\d+)\\s*(?:đ|vnđ|vnd)\\b", RegexOption.IGNORE_CASE), "$1 đồng")
+        
+        // Replace "%" with " phần trăm"
+        text = text.replace("%", " phần trăm")
+        
+        // Replace "/" between dates (e.g. 15/08/2026 -> ngày 15 tháng 8 năm 2026)
+        text = text.replace(Regex("(\\d{1,2})/(\\d{1,2})/(\\d{4})"), "ngày $1 tháng $2 năm $3")
+        text = text.replace(Regex("(\\d{1,2})/(\\d{1,2})"), "ngày $1 tháng $2")
+        
+        // Replace ":" in time format (e.g. 08:00 -> 8 giờ, 17:30 -> 17 giờ 30)
+        text = text.replace(Regex("(\\d{1,2}):00\\b"), "$1 giờ")
+        text = text.replace(Regex("(\\d{1,2}):(\\d{2})\\b"), "$1 giờ $2")
+        
+        // Clean leftover dots or double spaces
+        text = text.replace(Regex("\\s+([,.:;?!])"), "$1")
+        text = text.replace(Regex("[ \\t]+"), " ")
+        text = text.replace(Regex("\\n+"), ". ")
+        
+        return text.trim()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlobalAiAssistantWidget(
     currentTab: String,
-    viewModel: TimeSnapViewModel
+    viewModel: TimeSnapViewModel,
+    onNavigateTab: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -183,6 +258,23 @@ fun GlobalAiAssistantWidget(
                 ttsRef?.language = Locale("vi", "VN")
             }
         }
+        try {
+            ttsRef.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    isTtsSpeaking = true
+                }
+                override fun onDone(utteranceId: String?) {
+                    isTtsSpeaking = false
+                    currentSpeakingMsgId = null
+                }
+                override fun onError(utteranceId: String?) {
+                    isTtsSpeaking = false
+                    currentSpeakingMsgId = null
+                }
+            })
+        } catch (e: Exception) {
+            // Ignore if engine does not support listener
+        }
         ttsInstance = ttsRef
         onDispose {
             ttsRef?.stop()
@@ -275,8 +367,8 @@ fun GlobalAiAssistantWidget(
                 // Fallback gracefully on TTS engines that don't support voice enumeration
             }
 
-            val clean = text.replace(Regex("[*_#`~]"), "")
-            val speakResult = ttsInstance?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id)
+            val speechSanitized = AiTextFormatter.prepareForVietnameseTts(text)
+            val speakResult = ttsInstance?.speak(speechSanitized, TextToSpeech.QUEUE_FLUSH, null, id)
             if (speakResult != TextToSpeech.ERROR) {
                 isTtsSpeaking = true
                 currentSpeakingMsgId = id
@@ -327,7 +419,7 @@ fun GlobalAiAssistantWidget(
                                     if (actionParam.isNotBlank()) {
                                         val dStr = actionParam.trim()
                                         viewModel.deleteEntryByDateString(dStr)
-                                        Toast.makeText(context, "⚡ AI đã thực thi xóa ngày công: $dStr", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "⚡ AI đã thực thi: Xóa ngày công $dStr", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                                 "DELETE_DATES" -> {
@@ -336,17 +428,246 @@ fun GlobalAiAssistantWidget(
                                         for (d in dateList) {
                                             viewModel.deleteEntryByDateString(d)
                                         }
-                                        Toast.makeText(context, "⚡ AI đã thực thi xóa ${dateList.size} ngày công", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "⚡ AI đã thực thi: Xóa ${dateList.size} ngày công", Toast.LENGTH_SHORT).show()
                                     }
                                 }
                                 "CLEAR_MONTH" -> {
                                     viewModel.clearAllEntriesInSelectedMonth()
-                                    Toast.makeText(context, "⚡ AI đã thực thi xóa toàn bộ công tháng này", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "⚡ AI đã thực thi: Xóa toàn bộ công tháng này", Toast.LENGTH_SHORT).show()
+                                }
+                                "ADD_WORK_DAY", "ADD_TIME_ENTRY" -> {
+                                    // Format: DATE|CHECK_IN|CHECK_OUT|DAY_TYPE|NOTE
+                                    if (actionParam.isNotBlank()) {
+                                        val parts = actionParam.split("|")
+                                        val dateStr = parts.getOrNull(0)?.trim() ?: ""
+                                        val checkInStr = parts.getOrNull(1)?.trim() ?: "08:00"
+                                        val checkOutStr = parts.getOrNull(2)?.trim() ?: "17:00"
+                                        val dayType = parts.getOrNull(3)?.trim()?.takeIf { it.isNotBlank() } ?: "NORMAL"
+                                        val note = parts.getOrNull(4)?.trim() ?: "AI hỗ trợ ghi nhận công"
+
+                                        if (dateStr.isNotBlank()) {
+                                            val inParts = checkInStr.split(":")
+                                            val inHour = inParts.getOrNull(0)?.toIntOrNull() ?: 8
+                                            val inMin = inParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+                                            val outParts = checkOutStr.split(":")
+                                            val outHour = outParts.getOrNull(0)?.toIntOrNull() ?: 17
+                                            val outMin = outParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+                                            viewModel.addSingleEntry(
+                                                dateStr = dateStr,
+                                                checkInHour = inHour,
+                                                checkInMin = inMin,
+                                                checkOutHour = outHour,
+                                                checkOutMin = outMin,
+                                                dayTypeOverride = dayType,
+                                                noteStr = note
+                                            )
+                                            Toast.makeText(context, "⚡ AI đã thực thi: Thêm ngày công $dateStr ($checkInStr - $checkOutStr)", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                "ADD_LEAVE_DAY" -> {
+                                    // Format: DATE|DAY_TYPE|NOTE
+                                    if (actionParam.isNotBlank()) {
+                                        val parts = actionParam.split("|")
+                                        val dateStr = parts.getOrNull(0)?.trim() ?: ""
+                                        val dayType = parts.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() } ?: "PAID_LEAVE"
+                                        val note = parts.getOrNull(2)?.trim() ?: "Nghỉ phép (AI đăng ký)"
+
+                                        if (dateStr.isNotBlank()) {
+                                            viewModel.addSingleEntry(
+                                                dateStr = dateStr,
+                                                checkInHour = 8,
+                                                checkInMin = 0,
+                                                checkOutHour = 17,
+                                                checkOutMin = 0,
+                                                dayTypeOverride = dayType,
+                                                noteStr = note
+                                            )
+                                            val typeLabel = if (dayType == "PAID_LEAVE") "Nghỉ phép có lương" else "Nghỉ không lương"
+                                            Toast.makeText(context, "⚡ AI đã thực thi: Thêm ngày $typeLabel $dateStr", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                "ADD_BULK_WORK_DAYS" -> {
+                                    // Format: DATE1,DATE2,DATE3|CHECK_IN|CHECK_OUT
+                                    if (actionParam.isNotBlank()) {
+                                        val parts = actionParam.split("|")
+                                        val datesListStr = parts.getOrNull(0)?.trim() ?: ""
+                                        val checkInStr = parts.getOrNull(1)?.trim() ?: "08:00"
+                                        val checkOutStr = parts.getOrNull(2)?.trim() ?: "17:00"
+
+                                        val dateList = datesListStr.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                        if (dateList.isNotEmpty()) {
+                                            val inParts = checkInStr.split(":")
+                                            val inHour = inParts.getOrNull(0)?.toIntOrNull() ?: 8
+                                            val inMin = inParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+                                            val outParts = checkOutStr.split(":")
+                                            val outHour = outParts.getOrNull(0)?.toIntOrNull() ?: 17
+                                            val outMin = outParts.getOrNull(1)?.toIntOrNull() ?: 0
+
+                                            viewModel.addBulkEntries(
+                                                selectedDates = dateList,
+                                                checkInHour = inHour,
+                                                checkInMin = inMin,
+                                                checkOutHour = outHour,
+                                                checkOutMin = outMin,
+                                                skipSunday = false,
+                                                skipHoliday = false,
+                                                autoRecognizeOt = true
+                                            )
+                                            Toast.makeText(context, "⚡ AI đã thực thi: Thêm ${dateList.size} ngày công hàng loạt", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                "CHECK_IN" -> {
+                                    val note = if (actionParam.isNotBlank()) actionParam.trim() else "AI hỗ trợ chấm công vào ca"
+                                    viewModel.toggleCheckIn(note = note)
+                                    Toast.makeText(context, "⚡ AI đã thực thi: Chấm công vào ca", Toast.LENGTH_SHORT).show()
+                                }
+                                "CHECK_OUT" -> {
+                                    val note = if (actionParam.isNotBlank()) actionParam.trim() else "AI hỗ trợ chấm công ra ca"
+                                    viewModel.toggleCheckIn(note = note)
+                                    Toast.makeText(context, "⚡ AI đã thực thi: Chấm công ra ca", Toast.LENGTH_SHORT).show()
+                                }
+                                "UPDATE_BASE_SALARY" -> {
+                                    val amount = actionParam.trim().replace(".", "").replace(",", "").toDoubleOrNull()
+                                    if (amount != null && userConfig != null) {
+                                        val updatedConfig = userConfig!!.copy(luongCoBan = amount)
+                                        viewModel.updateSalaryConfig(updatedConfig)
+                                        val fmt = java.text.DecimalFormat("#,###")
+                                        Toast.makeText(context, "⚡ AI đã cập nhật Lương cơ bản: ${fmt.format(amount)}đ", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "UPDATE_ALLOWANCE" -> {
+                                    // Format: ALLOWANCE_NAME|AMOUNT
+                                    val parts = actionParam.split("|")
+                                    val name = parts.getOrNull(0)?.trim() ?: ""
+                                    val amount = parts.getOrNull(1)?.trim()?.replace(".", "")?.replace(",", "")?.toDoubleOrNull()
+                                    if (name.isNotBlank() && amount != null && userConfig != null) {
+                                        val cur = userConfig!!
+                                        val updated = when (name.lowercase()) {
+                                            "pckythuat", "kythuat" -> cur.copy(pcKyThuat = amount)
+                                            "pctrachnhiem", "trachnhiem" -> cur.copy(pcTrachNhiem = amount)
+                                            "pcchucvu", "chucvu" -> cur.copy(pcChucVu = amount)
+                                            "pchieusuat", "hieusuat" -> cur.copy(pcHieuSuat = amount)
+                                            "pcsanpham", "sanpham" -> cur.copy(pcSanPham = amount)
+                                            "pccomca", "comca" -> cur.copy(pcComCa = amount)
+                                            "pccomot", "comot" -> cur.copy(pcComOt = amount)
+                                            "pcnhao", "nhao" -> cur.copy(pcNhaO = amount)
+                                            "pcdochai", "dochai" -> cur.copy(pcDocHai = amount)
+                                            "pcdtdoanhthu", "doanhthu" -> cur.copy(pcDtDoanhThu = amount)
+                                            "pcxangxe", "xangxe" -> cur.copy(pcXangXe = amount)
+                                            "pcthamnien", "thamnien" -> cur.copy(pcThamNien = amount)
+                                            "pccadem", "cadem" -> cur.copy(pcCaDem = amount)
+                                            "tienchuyencangoc", "chuyencan" -> cur.copy(tienChuyenCanGoc = amount)
+                                            "luongdongbaohiem", "baohiem", "lbh" -> cur.copy(luongDongBaoHiem = amount)
+                                            else -> cur
+                                        }
+                                        viewModel.updateSalaryConfig(updated)
+                                        val fmt = java.text.DecimalFormat("#,###")
+                                        Toast.makeText(context, "⚡ AI đã cập nhật phụ cấp $name: ${fmt.format(amount)}đ", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "UPDATE_LEAVE_QUOTA" -> {
+                                    val quota = actionParam.trim().toIntOrNull()
+                                    if (quota != null && userConfig != null) {
+                                        val updated = userConfig!!.copy(soNgayPhepNam = quota, phepNamConLai = quota)
+                                        viewModel.updateSalaryConfig(updated)
+                                        Toast.makeText(context, "⚡ AI đã cập nhật Quỹ phép năm: $quota ngày", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "UPDATE_NOTE" -> {
+                                    if (actionParam.isNotBlank()) {
+                                        viewModel.updateActiveEntryNote(actionParam.trim())
+                                        Toast.makeText(context, "⚡ AI đã cập nhật Ghi chú công: ${actionParam.trim()}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "UPDATE_USER_INFO" -> {
+                                    // Format: KEY|VALUE (e.g. hoVaTen|Nguyễn Văn A or boPhan|Kỹ thuật)
+                                    val parts = actionParam.split("|")
+                                    val key = parts.getOrNull(0)?.trim() ?: ""
+                                    val value = parts.getOrNull(1)?.trim() ?: ""
+                                    if (key.isNotBlank() && value.isNotBlank() && userConfig != null) {
+                                        val cur = userConfig!!
+                                        val updated = when (key.lowercase()) {
+                                            "hovaten", "ten", "name" -> cur.copy(hoVaTen = value)
+                                            "bophan", "phongban", "department" -> cur.copy(boPhan = value)
+                                            "manhanvien", "manv", "id" -> cur.copy(maNhanVien = value)
+                                            "sodienthoai", "sdt", "phone" -> cur.copy(soDienThoai = value)
+                                            "lichtrinh", "schedule" -> cur.copy(lichTrinh = value)
+                                            else -> cur
+                                        }
+                                        viewModel.updateSalaryConfig(updated)
+                                        Toast.makeText(context, "⚡ AI đã cập nhật $key: $value", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "UPDATE_CONFIG" -> {
+                                    // Format: KEY|VALUE (e.g. ngayChotLuong|25 or soGioNghiGiaiLao|1.5)
+                                    val parts = actionParam.split("|")
+                                    val key = parts.getOrNull(0)?.trim() ?: ""
+                                    val value = parts.getOrNull(1)?.trim() ?: ""
+                                    if (key.isNotBlank() && value.isNotBlank() && userConfig != null) {
+                                        val cur = userConfig!!
+                                        val updated = when (key.lowercase()) {
+                                            "ngaychotluong" -> cur.copy(ngayChotLuong = value.toIntOrNull() ?: cur.ngayChotLuong)
+                                            "sogionghigiailao", "gionghi" -> cur.copy(soGioNghiGiaiLao = value.toDoubleOrNull() ?: cur.soGioNghiGiaiLao)
+                                            "tinhkhautrunghi" -> cur.copy(tinhKhauTruNghi = value.toBooleanStrictOrNull() ?: cur.tinhKhauTruNghi)
+                                            "hesootngaythuong" -> cur.copy(heSoOtNgayThuong = value.toDoubleOrNull() ?: cur.heSoOtNgayThuong)
+                                            "hesootchunhat" -> cur.copy(heSoOtChuNhat = value.toDoubleOrNull() ?: cur.heSoOtChuNhat)
+                                            "hesootngayle" -> cur.copy(heSoOtNgayLe = value.toDoubleOrNull() ?: cur.heSoOtNgayLe)
+                                            "hesootdem" -> cur.copy(heSoOtDem = value.toDoubleOrNull() ?: cur.heSoOtDem)
+                                            "cademstart" -> cur.copy(caDemStart = value)
+                                            "cademend" -> cur.copy(caDemEnd = value)
+                                            "lichtrinh" -> cur.copy(lichTrinh = value)
+                                            else -> cur
+                                        }
+                                        viewModel.updateSalaryConfig(updated)
+                                        Toast.makeText(context, "⚡ AI đã cập nhật cài đặt $key: $value", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "SELECT_MONTH" -> {
+                                    // Format: YYYY-MM or MM/YYYY
+                                    if (actionParam.isNotBlank()) {
+                                        val rawMonth = actionParam.trim()
+                                        val normalizedMonth = if (rawMonth.contains("/")) {
+                                            val p = rawMonth.split("/")
+                                            if (p.size == 2) "${p[1]}-${p[0].padStart(2, '0')}" else rawMonth
+                                        } else rawMonth
+                                        viewModel.setSelectedMonth(normalizedMonth)
+                                        Toast.makeText(context, "⚡ AI đã chuyển sang xem tháng $normalizedMonth", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                "MARK_NOTIFICATIONS_READ" -> {
+                                    viewModel.markAllNotificationsAsRead()
+                                    Toast.makeText(context, "⚡ AI đã đánh dấu đọc tất cả thông báo", Toast.LENGTH_SHORT).show()
+                                }
+                                "SYNC_DATA" -> {
+                                    viewModel.triggerSync()
+                                    Toast.makeText(context, "⚡ AI đã đồng bộ dữ liệu lên máy chủ", Toast.LENGTH_SHORT).show()
+                                }
+                                "NAVIGATE_TAB" -> {
+                                    if (actionParam.isNotBlank()) {
+                                        val tabTarget = actionParam.trim().lowercase()
+                                        val mappedTab = when (tabTarget) {
+                                            "home", "trang chủ", "trangchu" -> "home"
+                                            "history", "lịch sử", "lichsu" -> "history"
+                                            "payslip", "phiếu lương", "phieuluong", "bảng lương", "bangluong" -> "payslip"
+                                            "settings", "cài đặt", "caidat" -> "settings"
+                                            "admin", "quản trị", "quantri" -> "admin"
+                                            "notifications", "thông báo", "thongbao" -> "notifications"
+                                            else -> tabTarget
+                                        }
+                                        onNavigateTab(mappedTab)
+                                        Toast.makeText(context, "⚡ AI đã chuyển sang màn hình $mappedTab", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
                         }
 
-                        cleanText = responseText.replace(actionRegex, "").trim()
+                        cleanText = AiTextFormatter.cleanForDisplay(responseText)
 
                         val newAiMsg = AiChatMessage(sender = "ai", text = cleanText)
                         chatMessages.add(newAiMsg)
@@ -689,7 +1010,7 @@ fun GlobalAiAssistantWidget(
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Tôi đã tự động nắm thông tin $tabNameVi của bạn. Hãy chọn gợi ý bên dưới hoặc tự nhập câu hỏi nhé!",
+                                text = "Tôi đã được cấp FULL QUYỀN TRỢ LÝ: Đọc bảng lương thực tế/dự kiến, tự động thêm/xóa ngày công, chấm công vào/ra ca, đổi lương/phụ cấp và chuyển màn hình theo lệnh của bạn!",
                                 color = LightGray,
                                 fontSize = 12.5.sp,
                                 lineHeight = 17.sp
@@ -701,37 +1022,37 @@ fun GlobalAiAssistantWidget(
                 // Quick Suggestion Chips according to current Tab
                 val quickChips = when (currentTab) {
                     "payslip" -> listOf(
-                        "💡 Thuật toán tính lương của hệ thống",
-                        "💡 Phân biệt Lương Thực tế vs Dự kiến",
-                        "💡 So sánh lương tháng này với tháng trước",
-                        "💡 Công thức tính tiền OT ca đêm & Chủ nhật",
-                        "💡 Tỷ lệ trừ BHXH & 12 khoản phụ cấp"
+                        "⚡ Phân biệt Lương Thực tế vs Dự kiến",
+                        "⚡ So sánh lương tháng này với tháng trước",
+                        "⚡ Công thức tính tiền OT ca đêm & Chủ nhật",
+                        "⚡ Tỷ lệ trừ BHXH & 12 khoản phụ cấp",
+                        "⚡ Thuật toán tính lương của hệ thống"
                     )
                     "history" -> listOf(
-                        "💡 Thuật toán tính công & OT hệ thống",
-                        "💡 So sánh lương & ngày công tháng này vs tháng trước",
-                        "💡 Tổng công làm việc tháng này là bao nhiêu?",
-                        "💡 Tháng này tôi làm bao nhiêu ca đêm?",
-                        "💡 Tổng số giờ OT tăng ca tháng này?"
+                        "⚡ Xóa công ngày hôm qua",
+                        "⚡ Thêm công làm bù từ 08:00 đến 17:00",
+                        "⚡ Tổng công làm việc tháng này là bao nhiêu?",
+                        "⚡ Tháng này tôi làm bao nhiêu ca đêm?",
+                        "⚡ Tổng số giờ OT tăng ca tháng này?"
                     )
                     "home" -> listOf(
-                        "💡 Thuật toán tính lương của hệ thống",
-                        "💡 Giờ quy định vào ca ngày & ca đêm",
-                        "💡 Quy định ngày chốt lương & giờ nghỉ giải lao",
-                        "💡 Ngày công chuẩn tháng này là bao nhiêu?",
-                        "💡 Các khoản phụ cấp của tôi"
+                        "⚡ Chấm công vào ca cho tôi",
+                        "⚡ Chấm công ra ca cho tôi",
+                        "⚡ Thêm ngày nghỉ phép năm cho tôi",
+                        "⚡ Ngày công chuẩn tháng này là bao nhiêu?",
+                        "⚡ Thuật toán tính lương của hệ thống"
                     )
                     "settings" -> listOf(
-                        "💡 Giải thích thuật toán tính lương TimeSnap Pro",
-                        "💡 Kiểm tra toàn bộ cài đặt lương của tôi",
-                        "💡 Hướng dẫn tạo Gemini API Key miễn phí",
-                        "💡 Hướng dẫn xuất file phiếu lương PDF/PNG"
+                        "⚡ Đổi lương cơ bản thành 12 triệu",
+                        "⚡ Kiểm tra toàn bộ cài đặt lương của tôi",
+                        "⚡ Hướng dẫn tạo Gemini API Key miễn phí",
+                        "⚡ Hướng dẫn xuất file phiếu lương PDF/PNG"
                     )
                     else -> listOf(
-                        "💡 Thuật toán tính lương của hệ thống",
-                        "💡 Phân biệt Lương Thực tế vs Dự kiến",
-                        "💡 Chi tiết cài đặt lương của tôi",
-                        "💡 Tỷ lệ trừ BHXH & các phụ cấp"
+                        "⚡ Thuật toán tính lương của hệ thống",
+                        "⚡ Phân biệt Lương Thực tế vs Dự kiến",
+                        "⚡ Chi tiết cài đặt lương của tôi",
+                        "⚡ Tỷ lệ trừ BHXH & các phụ cấp"
                     )
                 }
 
@@ -741,7 +1062,7 @@ fun GlobalAiAssistantWidget(
                 ) {
                     items(quickChips) { chipText ->
                         Surface(
-                            onClick = { handleSendMessage(chipText.replace("💡 ", "")) },
+                            onClick = { handleSendMessage(chipText.replace("⚡ ", "").replace("💡 ", "").trim()) },
                             shape = RoundedCornerShape(16.dp),
                             color = Color(0xFF222C3E),
                             border = BorderStroke(1.dp, Color(0xFF35445E))

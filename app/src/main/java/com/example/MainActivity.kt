@@ -581,7 +581,17 @@ fun MainTabScreenContainer(viewModel: TimeSnapViewModel) {
         // Global Floating AI Assistant Widget
         GlobalAiAssistantWidget(
             currentTab = currentTab,
-            viewModel = viewModel
+            viewModel = viewModel,
+            onNavigateTab = { targetTab ->
+                currentTab = targetTab
+                tabNavController.navigate(targetTab) {
+                    popUpTo(tabNavController.graph.startDestinationId) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
         )
     }
 }

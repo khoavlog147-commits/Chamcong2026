@@ -60,9 +60,9 @@ fun LoginScreen(
     val appVersionName = remember {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-            packageInfo.versionName ?: "2.2"
+            packageInfo.versionName ?: "1.4"
         } catch (e: Exception) {
-            "2.2"
+            "1.4"
         }
     }
 

@@ -1850,6 +1850,12 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setSelectedMonth(monthStr: String) {
+        if (monthStr.isNotBlank()) {
+            _currentSelectedMonth.value = monthStr
+            _triggerRefresh.value += 1
+        }
+    }
 }
 
 // Monthly Salary Point for comparison chart
