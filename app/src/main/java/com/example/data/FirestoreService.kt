@@ -394,6 +394,7 @@ object FirestoreService {
             "allowanceCalcTypes" to company.allowanceCalcTypes,
             "soGioNghiGiaiLao" to company.soGioNghiGiaiLao,
             "tinhKhauTruNghi" to company.tinhKhauTruNghi,
+            "lichTrinh" to company.lichTrinh,
             "rolesData" to company.rolesData,
             "createdAt" to company.createdAt,
             "updatedAt" to System.currentTimeMillis()
@@ -1265,6 +1266,7 @@ object FirestoreService {
             "allowanceCalcTypes" to config.allowanceCalcTypes,
             "soGioNghiGiaiLao" to config.soGioNghiGiaiLao,
             "tinhKhauTruNghi" to config.tinhKhauTruNghi,
+            "lichTrinh" to config.lichTrinh,
             "hoVaTen" to config.hoVaTen,
             "maNhanVien" to config.maNhanVien,
             "emailDangKy" to config.emailDangKy,
@@ -1403,6 +1405,7 @@ fun DocumentSnapshot.toUserSalaryConfig(userId: String): com.example.data.model.
         allowanceCalcTypes = getString("allowanceCalcTypes") ?: "",
         soGioNghiGiaiLao = getDouble("soGioNghiGiaiLao") ?: 1.5,
         tinhKhauTruNghi = getBoolean("tinhKhauTruNghi") ?: false,
+        lichTrinh = getString("lichTrinh") ?: "07:30 - 19:30",
         hoVaTen = getString("hoVaTen") ?: getString("fullName") ?: "User Demo",
         maNhanVien = getString("maNhanVien") ?: getString("maNhanVien") ?: "demo_${userId.takeLast(6)}",
         emailDangKy = getString("emailDangKy") ?: "",
@@ -1468,6 +1471,7 @@ fun DocumentSnapshot.toCompanyConfig(): CompanyConfig {
         allowanceCalcTypes = getString("allowanceCalcTypes") ?: "",
         soGioNghiGiaiLao = getDouble("soGioNghiGiaiLao") ?: 1.5,
         tinhKhauTruNghi = getBoolean("tinhKhauTruNghi") ?: false,
+        lichTrinh = getString("lichTrinh") ?: "07:30 - 19:30",
         rolesData = getString("rolesData") ?: "",
         createdAt = getLong("createdAt") ?: System.currentTimeMillis(),
         updatedAt = getLong("updatedAt") ?: System.currentTimeMillis()

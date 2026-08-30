@@ -47,7 +47,7 @@ data class UserConfig(
     val emailDangKy: String = "",
     val soDienThoai: String = "",
     val boPhan: String = "",
-    val lichTrinh: String = "08:00 - 17:00",
+    val lichTrinh: String = "07:30 - 19:30",
     val ngayVaoLam: String = "", // Ngày vào làm/bắt đầu tính công (yyyy-MM-dd)
     
     // Multi-tenancy / Company configuration

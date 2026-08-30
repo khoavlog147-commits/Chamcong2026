@@ -42,7 +42,7 @@ data class CompanyConfig(
     val allowanceCalcTypes: String = "",
     val soGioNghiGiaiLao: Double = 1.5,
     val tinhKhauTruNghi: Boolean = false,
-    val lichTrinh: String = "08:00 - 17:00",
+    val lichTrinh: String = "07:30 - 19:30",
     val rolesData: String = "",
     
     val createdAt: Long = System.currentTimeMillis(),

@@ -461,6 +461,8 @@ fun HomeScreen(
                     val realSalary = summaryState?.luongThucNhan ?: 0.0
                     val formattedSalary = DecimalFormat("#,###").format(realSalary) + " đ"
                     val workingDays = summaryState?.workingDays ?: 0.0
+                    val standardWorkDays = summaryState?.standardWorkDays ?: 26
+                    val actualPresenceDays = summaryState?.actualPresenceDays ?: 0.0
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -497,14 +499,14 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "${DecimalFormat("#.#").format(workingDays)} / 26 ngày",
+                                text = "${DecimalFormat("#.#").format(workingDays)} / $standardWorkDays ngày",
                                 color = TextPrimary,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             LinearProgressIndicator(
-                                progress = { (workingDays / 26.0).toFloat().coerceIn(0f, 1f) },
+                                progress = { (workingDays / standardWorkDays.toDouble()).toFloat().coerceIn(0f, 1f) },
                                 modifier = Modifier
                                     .width(90.dp)
                                     .height(6.dp)
@@ -547,7 +549,7 @@ fun HomeScreen(
                     ) {
                         SalaryMetricColumn(
                             label = "Ngày công",
-                            value = "${DecimalFormat("#.#").format(workingDays)}/26",
+                            value = "${DecimalFormat("#.#").format(actualPresenceDays)}/$standardWorkDays",
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = Alignment.Start
                         )

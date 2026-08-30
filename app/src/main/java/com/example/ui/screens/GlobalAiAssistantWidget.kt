@@ -172,6 +172,7 @@ fun GlobalAiAssistantWidget(
     var isChatOpen by remember { mutableStateOf(false) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showPricingCard by remember { mutableStateOf(false) }
+    var showActivityLogsDialog by remember { mutableStateOf(false) }
 
     var apiKey by remember { mutableStateOf(AiApiKeyManager.getApiKey(context)) }
     val hasApiKey = apiKey.isNotBlank()
@@ -689,6 +690,16 @@ fun GlobalAiAssistantWidget(
                             )
                         }
                         IconButton(
+                            onClick = { showActivityLogsDialog = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = "Lịch sử hoạt động AI",
+                                tint = LightGray
+                            )
+                        }
+                        IconButton(
                             onClick = { showApiKeyDialog = true },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -788,7 +799,7 @@ fun GlobalAiAssistantWidget(
                     )
                     "history" -> listOf(
                         "⚡ Xóa công ngày hôm qua",
-                        "⚡ Thêm công làm bù từ 08:00 đến 17:00",
+                        "⚡ Thêm công làm bù từ 07:30 đến 19:30",
                         "⚡ Tổng công làm việc tháng này là bao nhiêu?",
                         "⚡ Tháng này tôi làm bao nhiêu ca đêm?",
                         "⚡ Tổng số giờ OT tăng ca tháng này?"
@@ -877,7 +888,7 @@ fun GlobalAiAssistantWidget(
 
                             Column(
                                 horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-                                modifier = Modifier.widthIn(max = 280.dp)
+                                modifier = Modifier.widthIn(max = 320.dp).fillMaxWidth(0.82f)
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(
@@ -1593,6 +1604,158 @@ fun GlobalAiAssistantWidget(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Đóng & Áp dụng", fontWeight = FontWeight.Bold, color = Color.Black)
+                }
+            },
+            containerColor = Color(0xFF1E2638),
+            tonalElevation = 6.dp
+        )
+    }
+
+    if (showActivityLogsDialog) {
+        val logs = remember(showActivityLogsDialog) { com.example.util.AiActivityLogManager.getLogs(context) }
+        var logsList by remember { mutableStateOf(logs) }
+
+        AlertDialog(
+            onDismissRequest = { showActivityLogsDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        tint = NeonBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "Lịch sử hoạt động AI",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (logsList.isNotEmpty()) {
+                        IconButton(
+                            onClick = {
+                                com.example.util.AiActivityLogManager.clearLogs(context)
+                                logsList = emptyList()
+                                Toast.makeText(context, "Đã xóa lịch sử hoạt động!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Xóa tất cả",
+                                tint = Color(0xFFEF476F)
+                            )
+                        }
+                    }
+                }
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                ) {
+                    if (logsList.isEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = LightGray.copy(alpha = 0.4f),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text(
+                                text = "Chưa có hoạt động nào được ghi nhận",
+                                color = LightGray,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Khi bạn yêu cầu Trợ lý thực hiện các tác vụ (như chấm công, đổi lương, ghi nhận ngày công...), lịch sử hoạt động của AI sẽ hiển thị tại đây.",
+                                color = LightGray.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(logsList) { log ->
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF242F41)),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // Action icon
+                                        val (icon, tint) = when (log.actionType) {
+                                            "ATTENDANCE" -> Pair(Icons.Default.CheckCircle, AccentGreen)
+                                            "SALARY_CONFIG" -> Pair(Icons.Default.MonetizationOn, Color(0xFFFFD166))
+                                            "TIMESHEET" -> Pair(Icons.Default.CalendarMonth, NeonBlue)
+                                            else -> Pair(Icons.Default.Bolt, Color(0xFF4CC9F0))
+                                        }
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = tint,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                                        ) {
+                                            Text(
+                                                text = "AI đã: " + log.description,
+                                                color = Color.White,
+                                                fontSize = 13.5.sp,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                            if (log.userPrompt.isNotBlank()) {
+                                                Text(
+                                                    text = "Yêu cầu: \"${log.userPrompt}\"",
+                                                    color = LightGray,
+                                                    fontSize = 11.5.sp,
+                                                    style = androidx.compose.ui.text.TextStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                                )
+                                            }
+                                            val timeStr = java.text.SimpleDateFormat("HH:mm - dd/MM/yyyy", java.util.Locale.getDefault())
+                                                .format(java.util.Date(log.timestamp))
+                                            Text(
+                                                text = timeStr,
+                                                color = LightGray.copy(alpha = 0.5f),
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showActivityLogsDialog = false }) {
+                    Text("Đóng", color = NeonBlue, fontWeight = FontWeight.Bold)
                 }
             },
             containerColor = Color(0xFF1E2638),

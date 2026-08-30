@@ -38,6 +38,7 @@ import com.example.data.model.getRoles
 import com.example.data.model.updateRoles
 import com.example.ui.theme.*
 import com.example.viewmodel.AdminViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,31 @@ fun CompanyManagementDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    val updateLocalUserSessionConfig = { updatedCompany: CompanyConfig ->
+        coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val sharedPrefs = context.getSharedPreferences("timesnap_auth", android.content.Context.MODE_PRIVATE)
+                val currentUid = sharedPrefs.getString("last_logged_in_uid", "local_user") ?: "local_user"
+                val db = com.example.data.db.AppDatabase.getInstance(context)
+                val userConfigDao = db.userConfigDao()
+                val localUserConfig = userConfigDao.getConfigForUser(currentUid)
+                if (localUserConfig != null) {
+                    if (localUserConfig.companyId == updatedCompany.companyId || 
+                        (updatedCompany.companyId == "default_company" && (localUserConfig.companyId.isBlank() || localUserConfig.companyId == "default_company"))
+                    ) {
+                        val updatedUserConfig = updatedCompany.applyToUserConfig(localUserConfig, overwriteCustomBaseSalary = false)
+                        userConfigDao.saveConfig(updatedUserConfig)
+                        android.util.Log.d("CompanyManagementDialog", "Successfully updated local UserConfig in Room for $currentUid to match updated CompanyConfig.")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CompanyManagementDialog", "Error updating local user session config", e)
+            }
+        }
+    }
+
     var selectedCompanyId by remember { mutableStateOf(initialCompanyId) }
     val currentCompany = companies.find { it.companyId == selectedCompanyId } 
         ?: companies.firstOrNull() 
@@ -329,7 +355,7 @@ fun CompanyManagementDialog(
                                         OutlinedTextField(
                                             value = schedule,
                                             onValueChange = { schedule = it },
-                                            label = { Text("Lịch chuẩn (08:00 - 17:00)") },
+                                            label = { Text("Lịch chuẩn (07:30 - 19:30)") },
                                             singleLine = true,
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedTextColor = White,
@@ -940,7 +966,7 @@ fun CompanyManagementDialog(
                                 companyCode = companyCode.ifBlank { localCompanyConfig.companyCode },
                                 description = description,
                                 address = address,
-                                lichTrinh = schedule.ifBlank { "08:00 - 17:00" },
+                                lichTrinh = schedule.ifBlank { "07:30 - 19:30" },
                                 luongCoBan = luongCoBan.toDoubleOrNull() ?: localCompanyConfig.luongCoBan,
                                 luongDongBaoHiem = luongDongBaoHiem.toDoubleOrNull() ?: localCompanyConfig.luongDongBaoHiem,
                                 tiLeDongBaoHiem = tiLeDongBaoHiem.toDoubleOrNull() ?: localCompanyConfig.tiLeDongBaoHiem,
@@ -969,6 +995,7 @@ fun CompanyManagementDialog(
                             )
                             adminViewModel.saveCompany(updated) { success ->
                                 if (success) {
+                                    updateLocalUserSessionConfig(updated)
                                     android.widget.Toast.makeText(context, "Đã lưu cấu hình công ty thành công!", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }
@@ -987,6 +1014,9 @@ fun CompanyManagementDialog(
                             val updated = localCompanyConfig.copy(
                                 companyName = companyName.ifBlank { localCompanyConfig.companyName },
                                 companyCode = companyCode.ifBlank { localCompanyConfig.companyCode },
+                                description = description,
+                                address = address,
+                                lichTrinh = schedule.ifBlank { "07:30 - 19:30" },
                                 luongCoBan = luongCoBan.toDoubleOrNull() ?: localCompanyConfig.luongCoBan,
                                 luongDongBaoHiem = luongDongBaoHiem.toDoubleOrNull() ?: localCompanyConfig.luongDongBaoHiem,
                                 tiLeDongBaoHiem = tiLeDongBaoHiem.toDoubleOrNull() ?: localCompanyConfig.tiLeDongBaoHiem,
@@ -1013,6 +1043,7 @@ fun CompanyManagementDialog(
                                 tienChuyenCanGoc = tienChuyenCanGoc.toDoubleOrNull() ?: 0.0
                             )
                             adminViewModel.syncCompanyConfigToEmployees(updated) { count ->
+                                updateLocalUserSessionConfig(updated)
                                 android.widget.Toast.makeText(context, "Đã đồng bộ phụ cấp cho $count nhân viên!", android.widget.Toast.LENGTH_LONG).show()
                             }
                         },

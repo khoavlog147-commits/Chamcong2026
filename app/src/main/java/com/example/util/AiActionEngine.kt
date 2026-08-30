@@ -79,6 +79,22 @@ object AiActionEngine {
                 "⚡ AI đã thực thi ${executedMessages.size} tác vụ:\n" + executedMessages.joinToString("\n") { "• $it" }
             }
             Toast.makeText(context, summaryToast, Toast.LENGTH_LONG).show()
+
+            // Log AI Activity
+            for (msg in executedMessages) {
+                val logType = when {
+                    msg.contains("Chấm công", ignoreCase = true) || msg.contains("ca làm", ignoreCase = true) -> "ATTENDANCE"
+                    msg.contains("Lương", ignoreCase = true) || msg.contains("phụ cấp", ignoreCase = true) || msg.contains("cấu hình", ignoreCase = true) -> "SALARY_CONFIG"
+                    msg.contains("Xóa", ignoreCase = true) || msg.contains("ngày", ignoreCase = true) || msg.contains("công", ignoreCase = true) || msg.contains("phép", ignoreCase = true) -> "TIMESHEET"
+                    else -> "ACTION"
+                }
+                AiActivityLogManager.addLog(
+                    context = context,
+                    actionType = logType,
+                    description = msg,
+                    userPrompt = userPrompt
+                )
+            }
         }
 
         return ExecutionResult(
@@ -106,13 +122,13 @@ object AiActionEngine {
                 val note = actionParam.ifBlank { "AI hỗ trợ chấm công vào ca" }
                 viewModel.toggleCheckIn(note = note)
                 processedKeys.add(key)
-                executedMessages.add("Chấm công vào ca thành công")
+                executedMessages.add("Chấm công vào ca")
             }
             "CHECK_OUT" -> {
                 val note = actionParam.ifBlank { "AI hỗ trợ chấm công ra ca" }
                 viewModel.toggleCheckIn(note = note)
                 processedKeys.add(key)
-                executedMessages.add("Chấm công ra ca thành công")
+                executedMessages.add("Chấm công ra ca")
             }
             "ADD_WORK_DAY", "ADD_TIME_ENTRY" -> {
                 // Format: DATE|CHECK_IN|CHECK_OUT|DAY_TYPE|NOTE
@@ -140,7 +156,7 @@ object AiActionEngine {
                         )
                         processedKeys.add(key)
                         processedKeys.add("ADD_WORK_DATE:$normDateStr")
-                        executedMessages.add("Ghi nhận công ngày $normDateStr ($checkInStr - $checkOutStr)")
+                        executedMessages.add("Ghi công ngày $normDateStr")
                     }
                 }
             }
@@ -165,8 +181,8 @@ object AiActionEngine {
                         )
                         processedKeys.add(key)
                         processedKeys.add("ADD_WORK_DATE:$normDateStr")
-                        val typeLabel = if (dayType == "PAID_LEAVE") "Nghỉ phép năm" else "Nghỉ không lương"
-                        executedMessages.add("Đăng ký $typeLabel ngày $normDateStr")
+                        val typeLabel = if (dayType == "PAID_LEAVE") "Phép năm" else "Không lương"
+                        executedMessages.add("Đăng ký $typeLabel $normDateStr")
                     }
                 }
             }
@@ -195,7 +211,7 @@ object AiActionEngine {
                         )
                         processedKeys.add(key)
                         dateList.forEach { processedKeys.add("ADD_WORK_DATE:$it") }
-                        executedMessages.add("Thêm ${dateList.size} ngày công hàng loạt")
+                        executedMessages.add("Thêm ${dateList.size} ngày công")
                     }
                 }
             }
@@ -205,7 +221,7 @@ object AiActionEngine {
                     viewModel.deleteEntryByDateString(normDateStr)
                     processedKeys.add(key)
                     processedKeys.add("DELETE_DATE:$normDateStr")
-                    executedMessages.add("Xóa ngày công $normDateStr")
+                    executedMessages.add("Xóa công ngày $normDateStr")
                 }
             }
             "DELETE_DATES" -> {
@@ -222,7 +238,7 @@ object AiActionEngine {
             "CLEAR_MONTH" -> {
                 viewModel.clearAllEntriesInSelectedMonth()
                 processedKeys.add(key)
-                executedMessages.add("Xóa toàn bộ dữ liệu công tháng hiện tại")
+                executedMessages.add("Xóa toàn bộ công tháng này")
             }
             "UPDATE_BASE_SALARY" -> {
                 val amount = parseMoneyValue(actionParam)
@@ -231,7 +247,7 @@ object AiActionEngine {
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add(key)
                     val fmt = DecimalFormat("#,###")
-                    executedMessages.add("Cập nhật Lương cơ bản: ${fmt.format(amount)}đ")
+                    executedMessages.add("Đổi lương cơ bản: ${fmt.format(amount)}đ")
                 }
             }
             "UPDATE_ALLOWANCE" -> {
@@ -262,7 +278,7 @@ object AiActionEngine {
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add(key)
                     val fmt = DecimalFormat("#,###")
-                    executedMessages.add("Cập nhật phụ cấp $name: ${fmt.format(amount)}đ")
+                    executedMessages.add("Đổi phụ cấp $name: ${fmt.format(amount)}đ")
                 }
             }
             "UPDATE_LEAVE_QUOTA" -> {
@@ -271,7 +287,7 @@ object AiActionEngine {
                     val updated = userConfig.copy(soNgayPhepNam = quota, phepNamConLai = quota)
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add(key)
-                    executedMessages.add("Cập nhật Quỹ phép năm: $quota ngày")
+                    executedMessages.add("Sửa phép năm: $quota ngày")
                 }
             }
             "UPDATE_USER_INFO" -> {
@@ -291,7 +307,7 @@ object AiActionEngine {
                     }
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add(key)
-                    executedMessages.add("Cập nhật thông tin $uKey: $uVal")
+                    executedMessages.add("Sửa thông tin $uKey")
                 }
             }
             "UPDATE_CONFIG" -> {
@@ -315,7 +331,7 @@ object AiActionEngine {
                     }
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add(key)
-                    executedMessages.add("Cập nhật cài đặt $cKey: $cVal")
+                    executedMessages.add("Sửa cài đặt $cKey")
                 }
             }
             "SELECT_MONTH" -> {
@@ -327,24 +343,24 @@ object AiActionEngine {
                     } else rawMonth
                     viewModel.setSelectedMonth(normalizedMonth)
                     processedKeys.add(key)
-                    executedMessages.add("Chuyển sang xem tháng $normalizedMonth")
+                    executedMessages.add("Xem tháng $normalizedMonth")
                 }
             }
             "MARK_NOTIFICATIONS_READ" -> {
                 viewModel.markAllNotificationsAsRead()
                 processedKeys.add(key)
-                executedMessages.add("Đánh dấu đọc tất cả thông báo")
+                executedMessages.add("Đọc hết thông báo")
             }
             "SYNC_DATA" -> {
                 viewModel.triggerSync()
                 processedKeys.add(key)
-                executedMessages.add("Đồng bộ dữ liệu lên máy chủ")
+                executedMessages.add("Đồng bộ đám mây")
             }
             "UPDATE_NOTE" -> {
                 if (actionParam.isNotBlank()) {
                     viewModel.updateActiveEntryNote(actionParam.trim())
                     processedKeys.add(key)
-                    executedMessages.add("Cập nhật ghi chú: ${actionParam.trim()}")
+                    executedMessages.add("Sửa ghi chú")
                 }
             }
             "NAVIGATE_TAB" -> {
@@ -361,7 +377,7 @@ object AiActionEngine {
                     }
                     onNavigateTab(mappedTab)
                     processedKeys.add(key)
-                    executedMessages.add("Chuyển sang màn hình $mappedTab")
+                    executedMessages.add("Mở màn hình $mappedTab")
                 }
             }
         }
@@ -388,11 +404,11 @@ object AiActionEngine {
         if ((p.contains("chấm công vào") || p.contains("vào ca") || p.contains("bấm công vào")) && !processedKeys.contains("CHECK_IN:")) {
             viewModel.toggleCheckIn(note = "AI nhận diện vào ca")
             processedKeys.add("CHECK_IN:")
-            executedMessages.add("Chấm công vào ca thành công")
+            executedMessages.add("Chấm công vào ca")
         } else if ((p.contains("chấm công ra") || p.contains("ra ca") || p.contains("bấm công ra") || p.contains("tan ca")) && !processedKeys.contains("CHECK_OUT:")) {
             viewModel.toggleCheckIn(note = "AI nhận diện ra ca")
             processedKeys.add("CHECK_OUT:")
-            executedMessages.add("Chấm công ra ca thành công")
+            executedMessages.add("Chấm công ra ca")
         }
 
         // 2. INTENT: CHẤM CÔNG / THÊM NGÀY CÔNG CỤ THỂ (e.g. "chấm công ngày 31", "thêm công ngày 28, 29, 30, 31")
@@ -416,8 +432,8 @@ object AiActionEngine {
                         noteStr = "AI tự động ghi nhận công"
                     )
                     processedKeys.add("ADD_WORK_DATE:$normDate")
-                    val label = if (dayType == "PAID_LEAVE") "nghỉ phép" else if (dayType == "UNPAID_LEAVE") "nghỉ không lương" else "ngày công"
-                    executedMessages.add("Ghi nhận $label ngày $normDate (07:30 - 19:30)")
+                    val label = if (dayType == "PAID_LEAVE") "nghỉ phép" else if (dayType == "UNPAID_LEAVE") "không lương" else "ngày công"
+                    executedMessages.add("Ghi công $label ngày $normDate")
                 }
             }
         }
@@ -430,7 +446,7 @@ object AiActionEngine {
                 if (normDate.isNotBlank() && !processedKeys.contains("DELETE_DATE:$normDate")) {
                     viewModel.deleteEntryByDateString(normDate)
                     processedKeys.add("DELETE_DATE:$normDate")
-                    executedMessages.add("Xóa ngày công $normDate")
+                    executedMessages.add("Xóa công ngày $normDate")
                 }
             }
         }
@@ -443,7 +459,7 @@ object AiActionEngine {
                 viewModel.updateSalaryConfig(updated)
                 processedKeys.add("UPDATE_BASE_SALARY:$money")
                 val fmt = DecimalFormat("#,###")
-                executedMessages.add("Cập nhật Lương cơ bản: ${fmt.format(money)}đ")
+                executedMessages.add("Đổi lương cơ bản: ${fmt.format(money)}đ")
             }
         }
 
@@ -488,7 +504,7 @@ object AiActionEngine {
                     viewModel.updateSalaryConfig(updated)
                     processedKeys.add("IMPLICIT_ALLOWANCE:$money")
                     val fmt = DecimalFormat("#,###")
-                    executedMessages.add("Cập nhật phụ cấp: ${fmt.format(money)}đ")
+                    executedMessages.add("Đổi phụ cấp: ${fmt.format(money)}đ")
                 }
             }
         }
@@ -498,25 +514,25 @@ object AiActionEngine {
             if (!processedKeys.contains("NAVIGATE:payslip")) {
                 onNavigateTab("payslip")
                 processedKeys.add("NAVIGATE:payslip")
-                executedMessages.add("Chuyển sang màn hình Phiếu lương")
+                executedMessages.add("Mở Phiếu lương")
             }
         } else if (p.contains("lịch sử") || p.contains("nhật ký công")) {
             if (!processedKeys.contains("NAVIGATE:history")) {
                 onNavigateTab("history")
                 processedKeys.add("NAVIGATE:history")
-                executedMessages.add("Chuyển sang màn hình Lịch sử")
+                executedMessages.add("Mở Lịch sử")
             }
         } else if (p.contains("cài đặt") || p.contains("thiết lập")) {
             if (!processedKeys.contains("NAVIGATE:settings")) {
                 onNavigateTab("settings")
                 processedKeys.add("NAVIGATE:settings")
-                executedMessages.add("Chuyển sang màn hình Cài đặt")
+                executedMessages.add("Mở Cài đặt")
             }
         } else if (p.contains("trang chủ") || p.contains("màn hình chính")) {
             if (!processedKeys.contains("NAVIGATE:home")) {
                 onNavigateTab("home")
                 processedKeys.add("NAVIGATE:home")
-                executedMessages.add("Chuyển về Trang chủ")
+                executedMessages.add("Về Trang chủ")
             }
         }
 
@@ -525,7 +541,7 @@ object AiActionEngine {
             if (!processedKeys.contains("SYNC")) {
                 viewModel.triggerSync()
                 processedKeys.add("SYNC")
-                executedMessages.add("Đồng bộ dữ liệu lên máy chủ")
+                executedMessages.add("Đồng bộ đám mây")
             }
         }
     }
