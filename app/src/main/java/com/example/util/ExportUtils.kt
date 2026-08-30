@@ -142,10 +142,8 @@ object ExportUtils {
             val dateStrYmd = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
             val dateStrDmy = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
             if (isHolidayDate(dateStrYmd) || isHolidayDate(dateStrDmy)) {
-                if (!isCurrentSelectedMonth || dateStrYmd <= todayStr) {
-                    holidayDatesInMonth.add(dateStrYmd)
-                    holidayDatesInMonth.add(dateStrDmy)
-                }
+                holidayDatesInMonth.add(dateStrYmd)
+                holidayDatesInMonth.add(dateStrDmy)
             }
         }
 

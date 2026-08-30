@@ -3876,9 +3876,7 @@ fun EmployeePayslipView(
     for (day in 1..maxDaysInMo) {
         val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
         if (com.example.data.SalaryCalculator.isHoliday(dateStr)) {
-            if (!isCurrentSelectedMonth || dateStr <= todayStr) {
-                holidayDatesInMonth.add(dateStr)
-            }
+            holidayDatesInMonth.add(dateStr)
         }
     }
 

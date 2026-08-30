@@ -390,7 +390,8 @@ object SalaryCalculator {
         selectedMonth: String,
         todayStr: String,
         isCurrentSelectedMonth: Boolean,
-        holidayDatesInMonth: Set<String>
+        holidayDatesInMonth: Set<String>,
+        includeFuturePaidLeave: Boolean = false
     ): SalarySummary {
         val luongBasic = config.luongCoBan
         val stdMonthDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
@@ -433,9 +434,17 @@ object SalaryCalculator {
 
         for (e in processedEntries) {
             val normEntryDate = normalizeToYmd(e.date)
-            // Do not calculate future days/leaves as they have not happened yet if they are unworked
+            // Do not calculate future days in current month if unworked (for Actual Salary)
             if (isCurrentSelectedMonth && normEntryDate > normTodayStr && e.rawCheckIn == null) {
-                continue
+                if (includeFuturePaidLeave) {
+                    val isPaidLeave = isPaidLeaveType(e.dayType)
+                    val isHoliday = holidayDatesInMonth.contains(e.date) || holidayDatesInMonth.contains(normEntryDate) || holidayDatesInMonth.contains(normalizeDateToDmy(e.date))
+                    if (!isPaidLeave && !isHoliday) {
+                        continue
+                    }
+                } else {
+                    continue
+                }
             }
 
             val isHolidayDateVal = holidayDatesInMonth.contains(e.date) || holidayDatesInMonth.contains(normEntryDate) || holidayDatesInMonth.contains(normalizeDateToDmy(e.date))

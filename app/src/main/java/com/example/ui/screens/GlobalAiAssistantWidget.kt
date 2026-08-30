@@ -215,7 +215,12 @@ fun GlobalAiAssistantWidget(
         """.trimIndent()
     }
 
-    // TTS Voice Engine State
+    // TTS Voice Engine State & SharedPreferences Preferences
+    val prefs = remember { context.getSharedPreferences("ai_voice_prefs", Context.MODE_PRIVATE) }
+    var voiceGender by remember { mutableStateOf(prefs.getString("gender", "female") ?: "female") }
+    var voiceSpeed by remember { mutableStateOf(prefs.getFloat("speed", 1.0f)) }
+    var showVoiceSettingsDialog by remember { mutableStateOf(false) }
+
     var ttsInstance by remember { mutableStateOf<TextToSpeech?>(null) }
     var isTtsSpeaking by remember { mutableStateOf(false) }
     var currentSpeakingMsgId by remember { mutableStateOf<String?>(null) }
@@ -246,6 +251,34 @@ fun GlobalAiAssistantWidget(
             stopSpeaking()
         } else {
             ttsInstance?.stop()
+            
+            // Adjust Pitch & Speed according to user's selected gender & speed
+            val pitch = if (voiceGender == "male") 0.78f else 1.18f
+            ttsInstance?.setPitch(pitch)
+            ttsInstance?.setSpeechRate(voiceSpeed)
+
+            // Select matching system voice engine if available
+            try {
+                val voices = ttsInstance?.voices
+                if (!voices.isNullOrEmpty()) {
+                    val viVoices = voices.filter { it.locale.language == "vi" || it.locale == Locale("vi", "VN") }
+                    val targetVoice = viVoices.find { v ->
+                        val vName = v.name.lowercase()
+                        if (voiceGender == "male") {
+                            vName.contains("male") || vName.contains("man") || vName.contains("vic") || vName.contains("vib")
+                        } else {
+                            vName.contains("female") || vName.contains("woman") || vName.contains("via") || vName.contains("vid") || vName.contains("vif")
+                        }
+                    } ?: viVoices.firstOrNull()
+
+                    if (targetVoice != null) {
+                        ttsInstance?.voice = targetVoice
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallback gracefully on TTS engines that don't support voice enumeration
+            }
+
             val clean = text.replace(Regex("[*_#`~]"), "")
             val speakResult = ttsInstance?.speak(clean, TextToSpeech.QUEUE_FLUSH, null, id)
             if (speakResult != TextToSpeech.ERROR) {
@@ -524,6 +557,16 @@ fun GlobalAiAssistantWidget(
                             )
                         }
                         IconButton(
+                            onClick = { showVoiceSettingsDialog = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SettingsVoice,
+                                contentDescription = "Cài đặt Giọng nói AI",
+                                tint = if (voiceGender == "male") NeonBlue else Color(0xFFFF4081)
+                            )
+                        }
+                        IconButton(
                             onClick = { showPricingCard = !showPricingCard },
                             modifier = Modifier.size(36.dp)
                         ) {
@@ -625,33 +668,37 @@ fun GlobalAiAssistantWidget(
                 // Quick Suggestion Chips according to current Tab
                 val quickChips = when (currentTab) {
                     "payslip" -> listOf(
+                        "💡 Thuật toán tính lương của hệ thống",
+                        "💡 Phân biệt Lương Thực tế vs Dự kiến",
                         "💡 So sánh lương tháng này với tháng trước",
-                        "💡 Giải thích tổng lương tháng này",
-                        "💡 Các khoản phụ cấp của tôi gồm những gì?",
-                        "💡 Tỷ lệ trừ BHXH & Công đoàn phí"
+                        "💡 Công thức tính tiền OT ca đêm & Chủ nhật",
+                        "💡 Tỷ lệ trừ BHXH & 12 khoản phụ cấp"
                     )
                     "history" -> listOf(
+                        "💡 Thuật toán tính công & OT hệ thống",
                         "💡 So sánh lương & ngày công tháng này vs tháng trước",
                         "💡 Tổng công làm việc tháng này là bao nhiêu?",
                         "💡 Tháng này tôi làm bao nhiêu ca đêm?",
                         "💡 Tổng số giờ OT tăng ca tháng này?"
                     )
                     "home" -> listOf(
+                        "💡 Thuật toán tính lương của hệ thống",
                         "💡 Giờ quy định vào ca ngày & ca đêm",
                         "💡 Quy định ngày chốt lương & giờ nghỉ giải lao",
                         "💡 Ngày công chuẩn tháng này là bao nhiêu?",
                         "💡 Các khoản phụ cấp của tôi"
                     )
                     "settings" -> listOf(
+                        "💡 Giải thích thuật toán tính lương TimeSnap Pro",
                         "💡 Kiểm tra toàn bộ cài đặt lương của tôi",
                         "💡 Hướng dẫn tạo Gemini API Key miễn phí",
-                        "💡 Hướng dẫn xuất file phiếu lương PDF/PNG",
-                        "💡 Đổi mật khẩu & Bảo mật tài khoản"
+                        "💡 Hướng dẫn xuất file phiếu lương PDF/PNG"
                     )
                     else -> listOf(
+                        "💡 Thuật toán tính lương của hệ thống",
+                        "💡 Phân biệt Lương Thực tế vs Dự kiến",
                         "💡 Chi tiết cài đặt lương của tôi",
-                        "💡 Tỷ lệ trừ BHXH & các phụ cấp",
-                        "💡 Hướng dẫn sử dụng ứng dụng"
+                        "💡 Tỷ lệ trừ BHXH & các phụ cấp"
                     )
                 }
 
@@ -1058,6 +1105,203 @@ fun GlobalAiAssistantWidget(
             dismissButton = {
                 TextButton(onClick = { showApiKeyDialog = false }) {
                     Text("Đóng", color = LightGray)
+                }
+            },
+            containerColor = Color(0xFF1E2638),
+            tonalElevation = 6.dp
+        )
+    }
+
+    // DIALOG CÀI ĐẶT GIỌNG NÓI (MALE / FEMALE & SPEED)
+    if (showVoiceSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showVoiceSettingsDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SettingsVoice,
+                        contentDescription = null,
+                        tint = NeonBlue,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "Cài đặt Giọng nói AI",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Tùy chỉnh giọng đọc phản hồi của Trợ lý AI:",
+                        color = LightGray,
+                        fontSize = 13.sp
+                    )
+
+                    // Gender Selection
+                    Text(
+                        text = "Chọn Giọng đọc:",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Surface(
+                            onClick = {
+                                voiceGender = "female"
+                                prefs.edit().putString("gender", "female").apply()
+                                Toast.makeText(context, "Đã chọn Giọng Nữ (Thanh thoát)", Toast.LENGTH_SHORT).show()
+                            },
+                            color = if (voiceGender == "female") Color(0xFFE91E63).copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (voiceGender == "female") Color(0xFFFF4081) else Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = "👧 Giọng Nữ",
+                                    color = if (voiceGender == "female") Color(0xFFFF4081) else LightGray,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+
+                        Surface(
+                            onClick = {
+                                voiceGender = "male"
+                                prefs.edit().putString("gender", "male").apply()
+                                Toast.makeText(context, "Đã chọn Giọng Nam (Trầm ấm)", Toast.LENGTH_SHORT).show()
+                            },
+                            color = if (voiceGender == "male") NeonBlue.copy(alpha = 0.25f) else Color(0xFF2C384E),
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (voiceGender == "male") NeonBlue else Color.Transparent
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = "👦 Giọng Nam",
+                                    color = if (voiceGender == "male") NeonBlue else LightGray,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // Speed Selection
+                    Text(
+                        text = "Tốc độ nói:",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        listOf(
+                            Triple(0.85f, "Chậm", "🐢"),
+                            Triple(1.0f, "Bình thường", "🚶"),
+                            Triple(1.25f, "Nhanh", "🐇")
+                        ).forEach { (speedVal, speedLabel, emoji) ->
+                            val isSelected = (voiceSpeed == speedVal)
+                            Surface(
+                                onClick = {
+                                    voiceSpeed = speedVal
+                                    prefs.edit().putFloat("speed", speedVal).apply()
+                                },
+                                color = if (isSelected) AccentGreen.copy(alpha = 0.25f) else Color(0xFF2C384E),
+                                border = BorderStroke(
+                                    1.5.dp,
+                                    if (isSelected) AccentGreen else Color.Transparent
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(vertical = 10.dp)
+                                ) {
+                                    Text(text = emoji, fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = speedLabel,
+                                        color = if (isSelected) AccentGreen else LightGray,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Test Voice button
+                    Button(
+                        onClick = {
+                            val sampleText = if (voiceGender == "female") {
+                                "Xin chào! Em là Trợ lý AI TimeSnap Pro giọng Nữ, luôn sẵn sàng hỗ trợ anh tính lương."
+                            } else {
+                                "Xin chào! Tôi là Trợ lý AI TimeSnap Pro giọng Nam, sẵn sàng đồng hành cùng bạn."
+                            }
+                            speakText("sample_voice_test", sampleText)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VolumeUp,
+                                contentDescription = null,
+                                tint = NeonBlue,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(text = "🔊 Nghe thử giọng đã chọn", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        stopSpeaking()
+                        showVoiceSettingsDialog = false 
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonBlue),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Đóng & Áp dụng", fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             },
             containerColor = Color(0xFF1E2638),
