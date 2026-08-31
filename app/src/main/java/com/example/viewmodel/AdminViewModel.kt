@@ -495,6 +495,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     // 3. Generate and save PNG
                     val saved = ExportUtils.savePayslipAsPngImage(
                         context = context,
+                        entries = monthEntries,
                         summary = summary,
                         config = employee,
                         userSession = null,
@@ -535,6 +536,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 val summary = ExportUtils.calculateSalarySummary(monthEntries, employee, finalMonthStr)
                 val saved = ExportUtils.savePayslipAsPngImage(
                     context = context,
+                    entries = monthEntries,
                     summary = summary,
                     config = employee,
                     userSession = null,

@@ -73,7 +73,8 @@ data class SalarySummary(
     val chuNhatNightHours: Double = 0.0,
     val otLeHours: Double = 0.0,
     val tienOtLe: Double = 0.0,
-    val actualPresenceDays: Double = 0.0
+    val actualPresenceDays: Double = 0.0,
+    val actualStandardWorkingDays: Double = 0.0
 )
 
 object ExportUtils {
@@ -293,12 +294,14 @@ object ExportUtils {
             chuNhatNightHours = vmSummary.chuNhatNightHours,
             otLeHours = vmSummary.otLeHours,
             tienOtLe = vmSummary.tienOtLe,
-            actualPresenceDays = vmSummary.actualPresenceDays
+            actualPresenceDays = vmSummary.actualPresenceDays,
+            actualStandardWorkingDays = vmSummary.actualStandardWorkingDays
         )
     }
 
     fun savePayslipAsPngImage(
         context: Context,
+        entries: List<com.example.data.model.TimeEntry>,
         summary: SalarySummary,
         config: UserConfig,
         userSession: UserSession?,
@@ -456,7 +459,19 @@ object ExportUtils {
             drawRow("Email:", config.emailDangKy)
         }
         drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
-        drawRow("Tiến độ tháng:", "${summary.standardWorkDays} ngày")
+        
+        val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
+        drawRow("Tiến độ tháng (Công chuẩn):", progressText)
+
+        val paidLeavesCount = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+        val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+        val leaveDaysVal = when {
+            paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount}n, Không lương: ${unpaidLeavesCount}n"
+            paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
+            unpaidLeavesCount > 0 -> "Không lương: ${unpaidLeavesCount} ngày"
+            else -> "0 ngày"
+        }
+        drawRow("Ngày nghỉ:", leaveDaysVal)
         
         val totalProjectedWorkDaysPNG = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
         val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
@@ -722,7 +737,7 @@ object ExportUtils {
         canvas1.drawText("Họ và tên:", 45f, currentY, paintLabel)
         canvas1.drawText(empName, 150f, currentY, paintValBold)
         canvas1.drawText("Công chuẩn:", 320f, currentY, paintLabel)
-        val standardDaysVal = if (selectedTab == 1) "${summary.standardWorkDays} ngày" else "${if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays} ngày"
+        val standardDaysVal = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
         canvas1.drawText(standardDaysVal, 440f, currentY, paintValBold)
 
         // Row 2
@@ -738,7 +753,14 @@ object ExportUtils {
         canvas1.drawText("Bộ phận:", 45f, currentY, paintLabel)
         canvas1.drawText(config.boPhan.ifBlank { "N/A" }, 150f, currentY, paintValNormal)
         canvas1.drawText("Ngày nghỉ phép:", 320f, currentY, paintLabel)
-        val leaveDaysVal = "${entries.count { it.dayType.equals("LEAVE", ignoreCase = true) }} ngày"
+        val paidLeavesCount = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+        val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+        val leaveDaysVal = when {
+            paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount}n, Không lương: ${unpaidLeavesCount}n"
+            paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
+            unpaidLeavesCount > 0 -> "Không lương: ${unpaidLeavesCount} ngày"
+            else -> "Nghỉ: 0 ngày"
+        }
         canvas1.drawText(leaveDaysVal, 440f, currentY, paintValNormal)
 
         // Row 4

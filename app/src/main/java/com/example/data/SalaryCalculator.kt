@@ -411,7 +411,8 @@ object SalaryCalculator {
 
         // Aggregators
         var totalWorkDays = unworkedHolidaysCount.toDouble()
-        var actualPresenceDaysCount = unworkedHolidaysCount.toDouble()
+        var actualPresenceDaysCount = 0.0 // Do not include unworked holidays in physical presence
+        var actualStandardWorkingDaysCount = 0.0 // Standard weekdays physically worked (not Sundays, not holidays, not leaves)
         var totalStandardHours = unworkedHolidaysCount * 8.0
         var totalOtDayHours = 0.0
         var totalOtNightHours = 0.0
@@ -455,7 +456,7 @@ object SalaryCalculator {
 
             if (isPaidLeaveType(e.dayType)) {
                 totalWorkDays += 1.0
-                actualPresenceDaysCount += 1.0
+                // Paid leaves are not physical presence days, so we do not increment actualPresenceDaysCount or actualStandardWorkingDaysCount
                 totalStandardHours += 8.0
                 continue
             }
@@ -490,6 +491,9 @@ object SalaryCalculator {
                 } else {
                     totalWorkDays += e.workDay
                     actualPresenceDaysCount++
+                    if (!isHolidayDateVal) {
+                        actualStandardWorkingDaysCount += e.workDay
+                    }
                     totalStandardHours += 8.0
                 }
                 continue
@@ -516,6 +520,9 @@ object SalaryCalculator {
             } else {
                 totalWorkDays += e.workDay
                 actualPresenceDaysCount++
+                if (!isHolidayDateVal) {
+                    actualStandardWorkingDaysCount += e.workDay
+                }
                 
                 val workedHrs = (e.normalizedCheckOut!! - e.normalizedCheckIn!!) / 3600000.0
                 val actualHours = (workedHrs - eBreakHours).coerceAtLeast(0.0)
@@ -673,7 +680,8 @@ object SalaryCalculator {
             chuNhatNightHours = totalSundayNightHours,
             otLeHours = totalOtLeHours,
             tienOtLe = roundedOtLePay,
-            actualPresenceDays = actualPresenceDaysCount
+            actualPresenceDays = actualPresenceDaysCount,
+            actualStandardWorkingDays = actualStandardWorkingDaysCount
         )
     }
 

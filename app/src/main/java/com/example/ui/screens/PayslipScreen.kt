@@ -720,9 +720,24 @@ fun PayslipScreen(
                         val lcbProjectedWorkDays = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
 
                         // 1. Tiến độ tháng (Số ngày công chuẩn của tháng)
+                        val displayStandardDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.actualStandardWorkingDays
                         PayslipProfileRow(
                             label = "Tiến độ tháng (Công chuẩn):",
-                            value = "${s.standardWorkDays} ngày"
+                            value = "${df.format(displayStandardDays)} / ${s.standardWorkDays} ngày"
+                        )
+
+                        // 1b. Ngày nghỉ phép / nghỉ thường (Dynamic)
+                        val paidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+                        val unpaidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+                        val leaveDaysVal = when {
+                            paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày, Không lương: ${unpaidLeavesCount} ngày"
+                            paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
+                            unpaidLeavesCount > 0 -> "Nghỉ không lương: ${unpaidLeavesCount} ngày"
+                            else -> "0 ngày"
+                        }
+                        PayslipProfileRow(
+                            label = "Ngày nghỉ:",
+                            value = leaveDaysVal
                         )
 
                         // 2. Ngày công làm việc (Thực tế hoặc Dự kiến)
@@ -1279,6 +1294,7 @@ fun PayslipScreen(
                     onClick = {
                         val isSaved = savePayslipAsPngImage(
                             context = context,
+                            entries = fullEntriesForExport,
                             summary = s,
                             config = c,
                             userSession = userSession,
@@ -1444,6 +1460,7 @@ fun PayslipMoneyRow(
 // -------------------------------------------------------------
 fun savePayslipAsPngImage(
     context: Context,
+    entries: List<com.example.data.model.TimeEntry>,
     summary: SalarySummary,
     config: com.example.data.model.UserConfig,
     userSession: UserSession?,
@@ -1659,7 +1676,19 @@ fun savePayslipAsPngImage(
     drawRow("Họ và tên:", employeeName)
     drawRow("Mã nhân viên:", employeeCode)
     drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
-    drawRow("Tiến độ tháng:", "${summary.standardWorkDays} ngày")
+    
+    val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
+    drawRow("Tiến độ tháng (Công chuẩn):", progressText)
+
+    val paidLeavesCount = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+    val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+    val leaveDaysVal = when {
+        paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount}n, Không lương: ${unpaidLeavesCount}n"
+        paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
+        unpaidLeavesCount > 0 -> "Không lương: ${unpaidLeavesCount} ngày"
+        else -> "0 ngày"
+    }
+    drawRow("Ngày nghỉ:", leaveDaysVal)
     
     if (selectedTab == 1) {
         drawRow("Ngày công (Dự kiến):", "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày")

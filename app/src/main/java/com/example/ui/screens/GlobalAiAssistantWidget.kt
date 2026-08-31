@@ -173,6 +173,7 @@ fun GlobalAiAssistantWidget(
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var showPricingCard by remember { mutableStateOf(false) }
     var showActivityLogsDialog by remember { mutableStateOf(false) }
+    var logsTrigger by remember { mutableStateOf(0) }
 
     var apiKey by remember { mutableStateOf(AiApiKeyManager.getApiKey(context)) }
     val hasApiKey = apiKey.isNotBlank()
@@ -193,6 +194,9 @@ fun GlobalAiAssistantWidget(
     val chatMessages = remember { mutableStateListOf<AiChatMessage>() }
     var userPromptText by remember { mutableStateOf("") }
     var isGeneratingResponse by remember { mutableStateOf(false) }
+    val inlineLogs = remember(chatMessages.size, isGeneratingResponse, showActivityLogsDialog, logsTrigger) {
+        com.example.util.AiActivityLogManager.getLogs(context).take(3)
+    }
     val listState = rememberLazyListState()
 
     // Auto-dimming logic when AI floating bubble is idle / unused
@@ -425,6 +429,7 @@ fun GlobalAiAssistantWidget(
                             userConfig = userConfig,
                             onNavigateTab = onNavigateTab
                         )
+                        logsTrigger++
 
                         val cleanText = AiTextFormatter.cleanForDisplay(responseText)
 
@@ -979,6 +984,110 @@ fun GlobalAiAssistantWidget(
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
+
+                // Inline AI Activity Logs
+                if (inlineLogs.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF334155))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.History,
+                                        contentDescription = null,
+                                        tint = NeonBlue,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "AI vừa tự động chỉnh sửa:",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Xóa lịch sử",
+                                        color = Color(0xFFEF476F),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.clickable {
+                                            com.example.util.AiActivityLogManager.clearLogs(context)
+                                            logsTrigger++
+                                            Toast.makeText(context, "Đã xóa lịch sử hoạt động!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    )
+                                    Text(
+                                        text = "Xem tất cả",
+                                        color = NeonBlue,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.clickable { showActivityLogsDialog = true }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                inlineLogs.forEach { log ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFF0F172A), RoundedCornerShape(6.dp))
+                                            .padding(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        val (icon, tint) = when (log.actionType) {
+                                            "ATTENDANCE" -> Pair(Icons.Default.CheckCircle, AccentGreen)
+                                            "SALARY_CONFIG" -> Pair(Icons.Default.MonetizationOn, Color(0xFFFFD166))
+                                            "TIMESHEET" -> Pair(Icons.Default.CalendarMonth, NeonBlue)
+                                            else -> Pair(Icons.Default.Bolt, Color(0xFF4CC9F0))
+                                        }
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = null,
+                                            tint = tint,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = log.description,
+                                                color = Color.White,
+                                                fontSize = 11.5.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (log.userPrompt.isNotBlank()) {
+                                                Text(
+                                                    text = "Yêu cầu: \"${log.userPrompt}\"",
+                                                    color = LightGray.copy(alpha = 0.7f),
+                                                    fontSize = 9.5.sp,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Listening Status Banner
                 if (isListeningVoice) {
