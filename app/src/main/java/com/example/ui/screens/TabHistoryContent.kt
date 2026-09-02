@@ -190,17 +190,20 @@ fun TabHistoryContent(
                 Spacer(modifier = Modifier.width(8.dp))
                 if (monthHolidays.isNotEmpty()) {
                     val simpleHolidays = monthHolidays.map { d ->
+                        val fullName = com.example.data.SalaryCalculator.getHolidayName(d) ?: "Lễ"
+                        val name = if (fullName.contains("(")) fullName.substringBefore("(").trim() else fullName
                         val parts = d.split("/")
-                        if (parts.size >= 2) {
+                        val dateFormatted = if (parts.size >= 2) {
                             val day = parts[0].toIntOrNull() ?: 0
                             val month = parts[1].toIntOrNull() ?: 0
                             "$day/$month"
                         } else {
                             d
                         }
+                        "$name $dateFormatted"
                     }.distinct()
                     Text(
-                        text = "Tháng này có ngày lễ ${simpleHolidays.joinToString(", ")}",
+                        text = "Tháng này lễ ${simpleHolidays.joinToString(", ")}",
                         color = Color(0xFFFFD700),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,

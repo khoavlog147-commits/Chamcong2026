@@ -170,9 +170,10 @@ object SalaryCalculator {
     fun isAnnualLeaveType(dayType: String?): Boolean {
         if (dayType.isNullOrBlank()) return false
         val upper = dayType.uppercase(Locale.ROOT)
+        if (isHolidayLeaveType(dayType)) return false
         if (upper.contains("UNPAID") || upper.contains("UNAUTHORIZED") || upper.contains("KP") || 
             upper.contains("KHONG") || upper.contains("KHÔNG") || upper.contains("THƯỜNG") || 
-            upper.contains("THUONG") || upper.contains("NORMAL_LEAVE") || upper.contains("HOLIDAY") || upper.contains("LỄ") || upper.contains("LE")) {
+            upper.contains("THUONG") || upper.contains("NORMAL_LEAVE")) {
             return false
         }
         return upper == "PAID_LEAVE" || upper == "PAIDLEAVE" || upper == "NP" || 
@@ -218,8 +219,7 @@ object SalaryCalculator {
      */
     fun calculateSingleEntry(entry: TimeEntry, config: UserConfig? = null): TimeEntry {
         if (isLeaveType(entry.dayType)) {
-            val upper = entry.dayType.uppercase(Locale.ROOT)
-            val workD = if (upper.contains("PAID") || upper == "NP" || upper.contains("PHEP") || upper.contains("PHÉP") || upper.contains("HOLIDAY") || upper.contains("LỄ") || upper.contains("LE")) 1.0 else 0.0
+            val workD = if (isPaidLeaveType(entry.dayType)) 1.0 else 0.0
             return entry.copy(
                 workDay = workD,
                 otHours = 0.0,
@@ -412,8 +412,9 @@ object SalaryCalculator {
 
         // Identify which holiday dates have been worked (have check-in logged)
         val workedHolidayDates = processedEntries.filter { e ->
-            holidayDatesInMonth.contains(e.date) && e.rawCheckIn != null
-        }.map { it.date }.toSet()
+            val normD = normalizeToYmd(e.date)
+            (holidayDatesInMonth.contains(e.date) || holidayDatesInMonth.contains(normD)) && e.rawCheckIn != null
+        }.map { normalizeToYmd(it.date) }.toSet()
 
         // Unworked holidays automatically merit full 1-day standard salary as a Holiday Leave
         val unworkedHolidaysCount = (holidayDatesInMonth - workedHolidayDates).size
