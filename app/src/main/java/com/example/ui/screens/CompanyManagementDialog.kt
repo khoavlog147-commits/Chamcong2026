@@ -123,7 +123,6 @@ fun CompanyManagementDialog(
     val tabs = listOf(
         "🏢 Chung" to Icons.Default.Business,
         "💼 Chức vụ" to Icons.Default.Badge,
-        "🎁 Phụ cấp" to Icons.Default.LocalActivity,
         "👥 Nhân viên" to Icons.Default.People
     )
 
@@ -336,38 +335,21 @@ fun CompanyManagementDialog(
                                             unfocusedLabelColor = LightGray
                                         )
                                     )
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedTextField(
-                                            value = companyCode,
-                                            onValueChange = { companyCode = it.uppercase() },
-                                            label = { Text("Mã Cty (CTY_A...)") },
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        OutlinedTextField(
-                                            value = schedule,
-                                            onValueChange = { schedule = it },
-                                            label = { Text("Lịch chuẩn (07:30 - 19:30)") },
-                                            singleLine = true,
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
+                                    OutlinedTextField(
+                                        value = companyCode,
+                                        onValueChange = { companyCode = it.uppercase() },
+                                        label = { Text("Mã Cty (CTY_A...)") },
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            focusedBorderColor = NeonBlue,
+                                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                            focusedLabelColor = NeonBlue,
+                                            unfocusedLabelColor = LightGray
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                     OutlinedTextField(
                                         value = address,
                                         onValueChange = { address = it },
@@ -385,74 +367,7 @@ fun CompanyManagementDialog(
                                     )
                                 }
 
-                                CompanyCardSection(title = "Mức lương & Bảo hiểm chuẩn", icon = Icons.Default.AccountBalanceWallet) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedTextField(
-                                            value = luongCoBan,
-                                            onValueChange = { luongCoBan = it.filter { c -> c.isDigit() } },
-                                            label = { Text("Lương CB mặc định") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        OutlinedTextField(
-                                            value = luongDongBaoHiem,
-                                            onValueChange = { luongDongBaoHiem = it.filter { c -> c.isDigit() } },
-                                            label = { Text("Lương đóng BH") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        OutlinedTextField(
-                                            value = tiLeDongBaoHiem,
-                                            onValueChange = { tiLeDongBaoHiem = it },
-                                            label = { Text("Tỉ lệ BH (%)") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        OutlinedTextField(
-                                            value = doanPhiCongDoan,
-                                            onValueChange = { doanPhiCongDoan = it.filter { c -> c.isDigit() } },
-                                            label = { Text("Đoàn phí CĐ (đ)") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                }
-
-                                CompanyCardSection(title = "Hệ số tăng ca & Nghỉ giải lao", icon = Icons.Default.TrendingUp) {
+                                CompanyCardSection(title = "Hệ số tăng ca", icon = Icons.Default.TrendingUp) {
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         OutlinedTextField(
                                             value = hsOtThuong,
@@ -516,32 +431,6 @@ fun CompanyManagementDialog(
                                             ),
                                             modifier = Modifier.weight(1f)
                                         )
-                                    }
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                        OutlinedTextField(
-                                            value = soGioNghiGiaiLao,
-                                            onValueChange = { soGioNghiGiaiLao = it },
-                                            label = { Text("Giờ nghỉ giải lao") },
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = White,
-                                                unfocusedTextColor = White,
-                                                focusedBorderColor = NeonBlue,
-                                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
-                                                focusedLabelColor = NeonBlue,
-                                                unfocusedLabelColor = LightGray
-                                            ),
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                            Checkbox(
-                                                checked = tinhKhauTruNghi,
-                                                onCheckedChange = { tinhKhauTruNghi = it },
-                                                colors = CheckboxDefaults.colors(checkedColor = NeonBlue)
-                                            )
-                                            Text("Khấu trừ vào OT", color = White, fontSize = 12.sp)
-                                        }
                                     }
                                 }
                             }
@@ -622,8 +511,8 @@ fun CompanyManagementDialog(
                             }
                         }
 
-                        // TAB 3: DANH MỤC 15 PHỤ CẤP CÔNG TY
-                        2 -> {
+                        // TAB 3: DANH MỤC 15 PHỤ CẤP CÔNG TY (ĐÃ XÓA)
+                        99 -> {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -828,8 +717,8 @@ fun CompanyManagementDialog(
                             }
                         }
 
-                        // TAB 4: DANH SÁCH NHÂN VIÊN THUỘC CTY
-                        3 -> {
+                        // TAB 3: DANH SÁCH NHÂN VIÊN THUỘC CTY
+                        2 -> {
                             val filteredCompanyEmps = remember(companyEmployees, empSearchQuery) {
                                 if (empSearchQuery.isBlank()) companyEmployees
                                 else companyEmployees.filter { 

@@ -128,7 +128,8 @@ data class CompanyConfig(
                 pcCaDem = if (role.pcCaDem > 0.0) role.pcCaDem else baseConfig.pcCaDem,
                 tienChuyenCanGoc = if (role.tienChuyenCanGoc > 0.0) role.tienChuyenCanGoc else baseConfig.tienChuyenCanGoc,
                 tinhKhauTruNghi = role.tinhKhauTruNghi,
-                soGioNghiGiaiLao = role.soGioNghiGiaiLao
+                soGioNghiGiaiLao = role.soGioNghiGiaiLao,
+                lichTrinh = role.lichTrinh
             )
         } else {
             baseConfig
@@ -178,7 +179,8 @@ data class RoleConfig(
     val tienChuyenCanGoc: Double = 0.0,
     val allowanceCalcTypes: String = "",
     val tinhKhauTruNghi: Boolean = false,
-    val soGioNghiGiaiLao: Double = 1.5
+    val soGioNghiGiaiLao: Double = 1.5,
+    val lichTrinh: String = "07:30 - 19:30"
 ) {
     fun getCalcTypeFor(field: String): String {
         if (allowanceCalcTypes.isBlank()) {
@@ -202,7 +204,7 @@ data class RoleConfig(
     }
 
     fun toCsv(): String {
-        return listOf(roleId, roleName, luongCoBan, pcKyThuat, pcTrachNhiem, pcChucVu, pcHieuSuat, pcSanPham, pcComCa, pcComOt, pcNhaO, pcDocHai, pcDtDoanhThu, pcXangXe, pcThamNien, pcKhac1, pcCaDem, tienChuyenCanGoc, allowanceCalcTypes, tinhKhauTruNghi, soGioNghiGiaiLao).joinToString("||")
+        return listOf(roleId, roleName, luongCoBan, pcKyThuat, pcTrachNhiem, pcChucVu, pcHieuSuat, pcSanPham, pcComCa, pcComOt, pcNhaO, pcDocHai, pcDtDoanhThu, pcXangXe, pcThamNien, pcKhac1, pcCaDem, tienChuyenCanGoc, allowanceCalcTypes, tinhKhauTruNghi, soGioNghiGiaiLao, lichTrinh).joinToString("||")
     }
     companion object {
         fun fromCsv(csv: String): RoleConfig? {
@@ -230,7 +232,8 @@ data class RoleConfig(
                     tienChuyenCanGoc = parts[17].toDoubleOrNull() ?: 0.0,
                     allowanceCalcTypes = if (parts.size > 18) parts[18] else "",
                     tinhKhauTruNghi = if (parts.size > 19) parts[19].toBooleanStrictOrNull() ?: false else false,
-                    soGioNghiGiaiLao = if (parts.size > 20) parts[20].toDoubleOrNull() ?: 1.5 else 1.5
+                    soGioNghiGiaiLao = if (parts.size > 20) parts[20].toDoubleOrNull() ?: 1.5 else 1.5,
+                    lichTrinh = if (parts.size > 21) parts[21] else "07:30 - 19:30"
                 )
             } catch (e: Exception) { null }
         }

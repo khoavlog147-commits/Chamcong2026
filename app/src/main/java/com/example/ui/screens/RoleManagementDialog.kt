@@ -176,6 +176,7 @@ fun RoleEditDialog(
     var lcb by remember { mutableStateOf(if (localRole.luongCoBan == 0.0) "" else localRole.luongCoBan.toLong().toString()) }
     var tinhKhauTruNghi by remember { mutableStateOf(localRole.tinhKhauTruNghi) }
     var soGioNghiGiaiLao by remember { mutableStateOf(if (localRole.soGioNghiGiaiLao == 0.0) "1.5" else localRole.soGioNghiGiaiLao.toString()) }
+    var lichTrinh by remember { mutableStateOf(localRole.lichTrinh.ifBlank { "07:30 - 19:30" }) }
     
     // Professional Allowances
     var pcChucVu by remember { mutableStateOf(if (localRole.pcChucVu == 0.0) "" else localRole.pcChucVu.toLong().toString()) }
@@ -265,6 +266,14 @@ fun RoleEditDialog(
                             onValueChange = { lcb = it.filter { c -> c.isDigit() } },
                             label = { Text("Lương cơ bản mặc định (VNĐ)") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = NeonBlue),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = lichTrinh,
+                            onValueChange = { lichTrinh = it },
+                            label = { Text("Lịch làm việc của chức vụ (VD: 07:30 - 19:30)") },
                             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = NeonBlue),
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
@@ -541,7 +550,8 @@ fun RoleEditDialog(
                                 pcKhac1 = pcKhac.toDoubleOrNull() ?: 0.0,
                                 tienChuyenCanGoc = chuyenCan.toDoubleOrNull() ?: 0.0,
                                 tinhKhauTruNghi = tinhKhauTruNghi,
-                                soGioNghiGiaiLao = soGioNghiGiaiLao.toDoubleOrNull() ?: 1.5
+                                soGioNghiGiaiLao = soGioNghiGiaiLao.toDoubleOrNull() ?: 1.5,
+                                lichTrinh = lichTrinh.ifBlank { "07:30 - 19:30" }
                             )
                             onSave(updated)
                         },
