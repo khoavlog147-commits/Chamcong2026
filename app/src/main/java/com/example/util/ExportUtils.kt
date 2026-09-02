@@ -509,17 +509,21 @@ object ExportUtils {
         if (pcComCaShowPNG > 0.0) drawRow("Phụ cấp cơm ca", "+${fmt.format(pcComCaShowPNG)}đ", paintGreen)
         if (pcComOtShowPNG > 0.0) drawRow("Phụ cấp cơm OT", "+${fmt.format(pcComOtShowPNG)}đ", paintGreen)
         
-        val projOtDayHoursPNG = if (selectedTab == 1) customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val shiftDurationPNG = com.example.data.SalaryCalculator.parseShiftDuration(config.lichTrinh)
+        val dailyOtHoursMaxPNG = (shiftDurationPNG - 8.0 - breakHours).coerceAtLeast(0.0)
+        val sundayHoursPerShiftPNG = (shiftDurationPNG - breakHours).coerceAtLeast(0.0)
+
+        val projOtDayHoursPNG = if (selectedTab == 1) customOt15DaysCountDay * dailyOtHoursMaxPNG else 0.0
         val totalOtDayHoursPNG = summary.otDayHours + projOtDayHoursPNG
         val totalOtDayPayPNG = summary.tienOtNgay + (if (selectedTab == 1) customOt15PayDay else 0.0)
         if (totalOtDayHoursPNG > 0.0) drawRow("OT ngày ${df.format(config.heSoOtNgayThuong)} (${df.format(totalOtDayHoursPNG)}h)", "+${fmt.format(totalOtDayPayPNG)}đ", paintGreen)
 
-        val projSunDayHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * (12.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projSunDayHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPNG else 0.0
         val totalSunDayHoursPNG = summary.chuNhatDayHours + projSunDayHoursPNG
         val totalSunDayPayPNG = summary.tienChuNhatNgay + (if (selectedTab == 1 && includeSundayInProjection) projSunDayHoursPNG * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
         if (totalSunDayHoursPNG > 0.0) drawRow("OT CN - Ca ngày ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunDayHoursPNG)}h)", "+${fmt.format(totalSunDayPayPNG)}đ", paintGreen)
 
-        val projSunNightHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * (12.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projSunNightHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPNG else 0.0
         val totalSunNightHoursPNG = summary.chuNhatNightHours + projSunNightHoursPNG
         val totalSunNightPayPNG = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPNG * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
         if (totalSunNightHoursPNG > 0.0) drawRow("OT CN - Ca đêm ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunNightHoursPNG)}h)", "+${fmt.format(totalSunNightPayPNG)}đ", paintGreen)
@@ -529,7 +533,7 @@ object ExportUtils {
         }
         if (summary.tienOtLe > 0.0) drawRow("OT lễ ${df.format(config.heSoOtNgayLe)} (${df.format(summary.otLeHours)}h)", "+${fmt.format(summary.tienOtLe)}đ", paintGreen)
 
-        val projOtNightHoursPNG = if (selectedTab == 1) customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projOtNightHoursPNG = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMaxPNG else 0.0
         val totalOtNightHoursPNG = summary.otNightHours + projOtNightHoursPNG
         val totalOtNightPayPNG = summary.tienOtDem + (if (selectedTab == 1) customOt15PayNight else 0.0)
         if (totalOtNightHoursPNG > 0.0) drawRow("OT đêm ${df.format(config.heSoOtDem)} (${df.format(totalOtNightHoursPNG)}h)", "+${fmt.format(totalOtNightPayPNG)}đ", paintGreen)
@@ -874,20 +878,24 @@ object ExportUtils {
         drawPdfRow(baseSalaryLabelText, baseSalaryValue, 0.0)
 
         // OT Lương
-        val projOtDayHoursPDF = if (selectedTab == 1) customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val shiftDurationPDF = com.example.data.SalaryCalculator.parseShiftDuration(config.lichTrinh)
+        val dailyOtHoursMaxPDF = (shiftDurationPDF - 8.0 - breakHours).coerceAtLeast(0.0)
+        val sundayHoursPerShiftPDF = (shiftDurationPDF - breakHours).coerceAtLeast(0.0)
+
+        val projOtDayHoursPDF = if (selectedTab == 1) customOt15DaysCountDay * dailyOtHoursMaxPDF else 0.0
         val totalOtDayHoursPDF = summary.otDayHours + projOtDayHoursPDF
         val totalOtDayPayPDF = summary.tienOtNgay + (if (selectedTab == 1) customOt15PayDay else 0.0)
 
-        val projOtNightHoursPDF = if (selectedTab == 1) customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projOtNightHoursPDF = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMaxPDF else 0.0
         val totalOtNightHoursPDF = summary.otNightHours + projOtNightHoursPDF
         val totalOtNightPayPDF = summary.tienOtDem + (if (selectedTab == 1) customOt15PayNight else 0.0)
 
         val otNormalPay = totalOtDayPayPDF
-        val projSunDayHoursPDF = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * (12.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projSunDayHoursPDF = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPDF else 0.0
         val totalSunDayHoursPDF = summary.chuNhatDayHours + projSunDayHoursPDF
         val otSundayDayPay = summary.tienChuNhatNgay + (if (selectedTab == 1 && includeSundayInProjection) projSunDayHoursPDF * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
 
-        val projSunNightHoursPDF = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * (12.0 - breakHours).coerceAtLeast(0.0) else 0.0
+        val projSunNightHoursPDF = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPDF else 0.0
         val totalSunNightHoursPDF = summary.chuNhatNightHours + projSunNightHoursPDF
         val otSundayNightPay = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPDF * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
 

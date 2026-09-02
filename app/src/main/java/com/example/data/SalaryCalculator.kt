@@ -138,6 +138,31 @@ object SalaryCalculator {
         return s.replace("-", "/")
     }
 
+    fun parseShiftDuration(lichTrinh: String): Double {
+        try {
+            val parts = lichTrinh.split("-")
+            if (parts.size == 2) {
+                val startParts = parts[0].trim().split(":")
+                val endParts = parts[1].trim().split(":")
+                if (startParts.size == 2 && endParts.size == 2) {
+                    val startHour = startParts[0].trim().toDoubleOrNull() ?: 7.5
+                    val startMin = startParts[1].trim().toDoubleOrNull() ?: 0.0
+                    val endHour = endParts[0].trim().toDoubleOrNull() ?: 19.5
+                    val endMin = endParts[1].trim().toDoubleOrNull() ?: 0.0
+                    
+                    var diff = (endHour + endMin / 60.0) - (startHour + startMin / 60.0)
+                    if (diff < 0) {
+                        diff += 24.0 // Xử lý nếu là ca đêm qua ngày hôm sau
+                    }
+                    return diff
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return 12.0 // Ca mặc định 12 tiếng nếu parse lỗi hoặc không có định dạng hợp lệ
+    }
+
     fun normalizeToYmd(dateStr: String): String {
         val s = dateStr.trim()
         if (s.contains("/")) {

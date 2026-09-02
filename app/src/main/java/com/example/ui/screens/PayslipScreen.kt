@@ -358,7 +358,9 @@ fun PayslipScreen(
                 val hourlySalary = dailySalary / 8.0
 
                 val breakHours = if (c.tinhKhauTruNghi) c.soGioNghiGiaiLao else 0.0
-                val sundayHoursPerShift = (12.0 - breakHours).coerceAtLeast(0.0)
+                val shiftDuration = com.example.data.SalaryCalculator.parseShiftDuration(c.lichTrinh)
+                val sundayHoursPerShift = (shiftDuration - breakHours).coerceAtLeast(0.0)
+                val dailyOtHoursMax = (shiftDuration - 8.0 - breakHours).coerceAtLeast(0.0)
 
                 val additionalSundaysDayHours = remainingSundaysDay * sundayHoursPerShift
                 val additionalSundaysNightHours = remainingSundaysNight * sundayHoursPerShift
@@ -555,8 +557,8 @@ fun PayslipScreen(
                 val allowanceAdjustment = fullProjectedAllowancesSum - currentProratedAllowancesSum
 
                 val baseSalaryAdjustment = if (isCurrentSelectedMonth) (luongDuKienBaseSalary - s.baseBasicSalary) else 0.0
-                val totalOtDayHours = customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0)
-                val totalOtNightHours = customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0)
+                val totalOtDayHours = customOt15DaysCountDay * dailyOtHoursMax
+                val totalOtNightHours = customOt15DaysCountNight * dailyOtHoursMax
                 val customOt15PayDayVal = totalOtDayHours * hourlySalary * c.heSoOtNgayThuong
                 val customOt15PayNightVal = totalOtNightHours * hourlySalary * c.heSoOtDem
                 val customOt15Pay = customOt15PayDayVal + customOt15PayNightVal
@@ -1208,7 +1210,7 @@ fun PayslipScreen(
                         }
 
                         // 13. OT Ngày (Merged)
-                        val projectedOtDayHours = if (selectedTab == 1) customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+                        val projectedOtDayHours = if (selectedTab == 1) customOt15DaysCountDay * dailyOtHoursMax else 0.0
                         val totalOtDayHours = s.otDayHours + projectedOtDayHours
                         val totalOtDayPay = s.tienOtNgay + (if (selectedTab == 1) customOt15PayDayVal else 0.0)
                         
@@ -1241,7 +1243,7 @@ fun PayslipScreen(
                         }
 
                         // 15.1 OT đêm (Merged)
-                        val projectedOtNightHours = if (selectedTab == 1) customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+                        val projectedOtNightHours = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMax else 0.0
                         val totalOtNightHours = s.otNightHours + projectedOtNightHours
                         val totalOtNightPay = s.tienOtDem + (if (selectedTab == 1) customOt15PayNightVal else 0.0)
 
@@ -1898,12 +1900,14 @@ fun savePayslipAsPngImageOld(
     if (pcComOtShowPNG > 0.0) drawRow("Phụ cấp cơm OT", "+${fmt.format(pcComOtShowPNG)}đ", paintGreen)
 
     // OT Ngày Merged
-    val projOtDayPNG = if (selectedTab == 1 && selectedOt15Shift == "Ngày") customOt15DaysCount * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+    val shiftDurationPNG = com.example.data.SalaryCalculator.parseShiftDuration(config.lichTrinh)
+    val dailyOtHoursMaxPNG = (shiftDurationPNG - 8.0 - breakHours).coerceAtLeast(0.0)
+    val projOtDayPNG = if (selectedTab == 1 && selectedOt15Shift == "Ngày") customOt15DaysCount * dailyOtHoursMaxPNG else 0.0
     val totalOtDayPNG = summary.otDayHours + projOtDayPNG
     val totalPayDayPNG = summary.tienOtNgay + (if (selectedTab == 1 && selectedOt15Shift == "Ngày") customOt15Pay else 0.0)
     if (totalOtDayPNG > 0.0) drawRow("OT ngày ${df.format(config.heSoOtNgayThuong)} (${df.format(totalOtDayPNG)}h)", "+${fmt.format(totalPayDayPNG)}đ", paintGreen)
 
-    val sundayHoursPerShiftPNG = (12.0 - breakHours).coerceAtLeast(0.0)
+    val sundayHoursPerShiftPNG = (shiftDurationPNG - breakHours).coerceAtLeast(0.0)
     val hourlySalaryPNG = dailySalary / 8.0
     val totalSunDayHoursPNG = summary.chuNhatDayHours + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPNG else 0.0)
     val totalSunDayPayPNG = summary.tienChuNhatNgay + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPNG * hourlySalaryPNG * config.heSoOtChuNhat else 0.0)
@@ -1922,7 +1926,7 @@ fun savePayslipAsPngImageOld(
     if (summary.tienOtLe > 0.0) drawRow("OT lễ ${df.format(config.heSoOtNgayLe)} (${df.format(summary.otLeHours)}h)", "+${fmt.format(summary.tienOtLe)}đ", paintGreen)
 
     // OTĐ Merged
-    val projOtNightPNG = if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+    val projOtNightPNG = if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount * dailyOtHoursMaxPNG else 0.0
     val totalOtNightPNG = summary.otNightHours + projOtNightPNG
     val totalPayNightPNG = summary.tienOtDem + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15Pay else 0.0)
     if (totalOtNightPNG > 0.0) drawRow("OT đêm ${df.format(config.heSoOtDem)} (${df.format(totalOtNightPNG)}h)", "+${fmt.format(totalPayNightPNG)}đ", paintGreen)
