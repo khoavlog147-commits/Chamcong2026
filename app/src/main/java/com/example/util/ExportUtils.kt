@@ -367,7 +367,7 @@ object ExportUtils {
 
         val pcComCaShowPNG = if (selectedTab == 1) {
             if (isCurrentSelectedMonth) {
-                soNgayCongDuKienDouble * config.pcComCa
+                calcPrPNG("pcComCa", config.pcComCa)
             } else {
                 summary.pcComCaVal
             }
@@ -678,7 +678,7 @@ object ExportUtils {
 
         val pcComCaShow = if (selectedTab == 1) {
             if (isCurrentSelectedMonth) {
-                soNgayCongDuKienDouble * config.pcComCa
+                calcPrPDF("pcComCa", config.pcComCa)
             } else {
                 summary.pcComCaVal
             }

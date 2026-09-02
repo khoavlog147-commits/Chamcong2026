@@ -490,14 +490,16 @@ fun PayslipScreen(
                     }
                 }
 
+                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
+
                 fun calcPr(fieldName: String, valRaw: Double): Double {
                     return com.example.data.SalaryCalculator.calculateAllowanceValue(
                         fieldName = fieldName,
                         allowanceValue = valRaw,
                         calcType = c.getCalcTypeFor(fieldName),
                         totalWorkDays = soNgayCongDuKienDouble,
-                        comCaCount = soNgayCongDuKienDouble.toInt(),
-                        comOtCount = 0,
+                        comCaCount = (soNgayCongDuKienDouble + projectedSundays).toInt(),
+                        comOtCount = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight).toInt() + projectedSundaysOtMeals) else 0,
                         nightShiftsCount = s.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0),
                         scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
                         totalScheduledDaysInMonth = standardTargetDays.toInt()
@@ -512,7 +514,7 @@ fun PayslipScreen(
 
                 val pcComCaShow = if (selectedTab == 1) {
                     if (isCurrentSelectedMonth) {
-                        (soNgayCongDuKienDouble + projectedSundays) * c.pcComCa
+                        calcPr("pcComCa", c.pcComCa)
                     } else {
                         s.pcComCaVal
                     }
@@ -520,7 +522,6 @@ fun PayslipScreen(
                     s.pcComCaVal
                 }
 
-                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
                 val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * c.pcComOt else 0.0
                 val pcComOtShow = if (selectedTab == 1) s.pcComOtVal + otMealAllowance else s.pcComOtVal
 
@@ -1678,7 +1679,17 @@ fun savePayslipAsPngImageOld(
 
     val pcComCaShowPNG = if (selectedTab == 1) {
         if (isCurrentSelectedMonth) {
-            summary.pcComCaVal + (remainingWeekdays * config.pcComCa) + (if (includeSundayInProjection) remainingSundays * config.pcComCa else 0.0)
+            com.example.data.SalaryCalculator.calculateAllowanceValue(
+                fieldName = "pcComCa",
+                allowanceValue = config.pcComCa,
+                calcType = config.getCalcTypeFor("pcComCa"),
+                totalWorkDays = soNgayCongDuKien,
+                comCaCount = (soNgayCongDuKien + (if (includeSundayInProjection) remainingSundays else 0)).toInt(),
+                comOtCount = 0,
+                nightShiftsCount = summary.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0),
+                scheduledDaysSoFar = soNgayCongDuKien.toInt(),
+                totalScheduledDaysInMonth = summary.standardWorkDays
+            )
         } else {
             summary.pcComCaVal
         }
