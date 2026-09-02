@@ -167,19 +167,28 @@ object SalaryCalculator {
         return s
     }
 
-    fun isPaidLeaveType(dayType: String?): Boolean {
+    fun isAnnualLeaveType(dayType: String?): Boolean {
         if (dayType.isNullOrBlank()) return false
         val upper = dayType.uppercase(Locale.ROOT)
         if (upper.contains("UNPAID") || upper.contains("UNAUTHORIZED") || upper.contains("KP") || 
             upper.contains("KHONG") || upper.contains("KHÔNG") || upper.contains("THƯỜNG") || 
-            upper.contains("THUONG") || upper.contains("NORMAL_LEAVE")) {
+            upper.contains("THUONG") || upper.contains("NORMAL_LEAVE") || upper.contains("HOLIDAY") || upper.contains("LỄ") || upper.contains("LE")) {
             return false
         }
         return upper == "PAID_LEAVE" || upper == "PAIDLEAVE" || upper == "NP" || 
                upper == "PHEP_NAM" || upper == "PHÉP NĂM" || upper == "PHEP NAM" || upper == "ANNUAL_LEAVE" ||
-               upper == "HOLIDAY_LEAVE" || upper == "HOLIDAYLEAVE" || upper == "LỄ" || upper == "LE" ||
-               upper.contains("PAID") || upper.contains("PHÉP NĂM") || upper.contains("PHEP NAM") ||
+               upper.contains("PAID") || upper.contains("PHÉP NĂM") || upper.contains("PHEP NAM")
+    }
+
+    fun isHolidayLeaveType(dayType: String?): Boolean {
+        if (dayType.isNullOrBlank()) return false
+        val upper = dayType.uppercase(Locale.ROOT)
+        return upper == "HOLIDAY_LEAVE" || upper == "HOLIDAYLEAVE" || upper == "LỄ" || upper == "LE" || upper == "HOLIDAY" ||
                upper.contains("LỄ") || upper.contains("HOLIDAY")
+    }
+
+    fun isPaidLeaveType(dayType: String?): Boolean {
+        return isAnnualLeaveType(dayType) || isHolidayLeaveType(dayType)
     }
 
     fun isUnpaidLeaveType(dayType: String?): Boolean {

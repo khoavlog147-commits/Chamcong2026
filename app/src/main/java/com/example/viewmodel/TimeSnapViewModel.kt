@@ -1191,6 +1191,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                         }
                     } else {
                         // Valid leave, consume 1
+                        phepNamDelta -= 1
                     }
                 }
                 if (phepNamDelta != 0) {
@@ -1576,8 +1577,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             val cal = Calendar.getInstance()
             cal.set(targetYear, targetMonth - 1, day)
             val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-            val isHoliday = isHolidayDate(dateStr)
-            if (!isSunday && !isHoliday) {
+            if (!isSunday) {
                 totalWorkDaysInMonth++
             }
         }
@@ -1591,8 +1591,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 val cal = Calendar.getInstance()
                 cal.set(currentYear, currentMonth - 1, day)
                 val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-                val isHoliday = isHolidayDate(dateStr)
-                if (!isSunday && !isHoliday) {
+                if (!isSunday) {
                     expectedWorkDaysSoFar++
                 }
             }
@@ -1606,8 +1605,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     val cal = Calendar.getInstance()
                     cal.set(targetYear, targetMonth - 1, day)
                     val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
-                    val isHoliday = isHolidayDate(dateStr)
-                    if (!isSunday && !isHoliday) {
+                    if (!isSunday) {
                         expectedWorkDaysSoFar++
                     }
                 }

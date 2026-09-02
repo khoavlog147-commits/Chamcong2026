@@ -89,11 +89,11 @@ fun PayslipScreen(
     val entries by viewModel.monthTimeEntries.collectAsStateWithLifecycle(emptyList())
     val salaryHistoryList by viewModel.salaryHistoryState.collectAsStateWithLifecycle()
 
-    var customOt15DaysCount by remember { mutableStateOf(0.0) }
-    var selectedOt15Shift by remember { mutableStateOf("Ngày") }
+    var customOt15DaysCountDay by remember { mutableStateOf(0.0) }
+    var customOt15DaysCountNight by remember { mutableStateOf(0.0) }
     LaunchedEffect(selectedMonth) {
-        customOt15DaysCount = 0.0
-        selectedOt15Shift = "Ngày"
+        customOt15DaysCountDay = 0.0
+        customOt15DaysCountNight = 0.0
     }
 
     val fmt = DecimalFormat("#,###")
@@ -403,7 +403,7 @@ fun PayslipScreen(
                 val fullEntriesForExport = remember(
                     entries, selectedTab, isCurrentSelectedMonth, remainingWeekdays,
                     remainingSundays, includeSundayInProjection, remainingSundaysDay,
-                    remainingSundaysNight, customOt15DaysCount, selectedOt15Shift
+                    remainingSundaysNight, customOt15DaysCountDay, customOt15DaysCountNight
                 ) {
                     if (selectedTab != 1 || !isCurrentSelectedMonth) {
                         entries
@@ -419,7 +419,8 @@ fun PayslipScreen(
 
                         var sunDayLeft = if (includeSundayInProjection) remainingSundaysDay else 0
                         var sunNightLeft = if (includeSundayInProjection) remainingSundaysNight else 0
-                        var ot15Left = customOt15DaysCount.toInt()
+                        var ot15DayLeft = customOt15DaysCountDay.toInt()
+                        var ot15NightLeft = customOt15DaysCountNight.toInt()
 
                         for (day in (todayDay + 1)..daysInMonth) {
                             val dCal = Calendar.getInstance().apply { set(currentYear, currentMonth, day) }
@@ -460,10 +461,13 @@ fun PayslipScreen(
                             } else {
                                 val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
                                 if (!isHoliday) {
-                                    val hasOt15 = ot15Left > 0
-                                    if (hasOt15) ot15Left--
-                                    val shiftT = if (hasOt15 && selectedOt15Shift == "Đêm") "NIGHT" else "DAY"
-                                    val noteStr = if (hasOt15) "Dự kiến (OT 1.5)" else "Dự kiến (Thường)"
+                                    val isOtDay = ot15DayLeft > 0
+                                    val isOtNight = !isOtDay && ot15NightLeft > 0
+                                    if (isOtDay) ot15DayLeft--
+                                    else if (isOtNight) ot15NightLeft--
+                                    
+                                    val shiftT = if (isOtNight) "NIGHT" else "DAY"
+                                    val noteStr = if (isOtDay || isOtNight) "Dự kiến (OT 1.5)" else "Dự kiến (Thường)"
                                     
                                     list.add(
                                         TimeEntry(
@@ -492,7 +496,7 @@ fun PayslipScreen(
                         totalWorkDays = soNgayCongDuKienDouble,
                         comCaCount = soNgayCongDuKienDouble.toInt(),
                         comOtCount = 0,
-                        nightShiftsCount = s.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0),
+                        nightShiftsCount = s.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0),
                         scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
                         totalScheduledDaysInMonth = standardTargetDays.toInt()
                     )
@@ -515,7 +519,7 @@ fun PayslipScreen(
                 }
 
                 val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
-                val otMealAllowance = if (selectedTab == 1) (customOt15DaysCount + projectedSundaysOtMeals) * c.pcComOt else 0.0
+                val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * c.pcComOt else 0.0
                 val pcComOtShow = if (selectedTab == 1) s.pcComOtVal + otMealAllowance else s.pcComOtVal
 
                 val pcNhaOShow = if (selectedTab == 1) calcPr("pcNhaO", c.pcNhaO) else s.pcNhaOVal
@@ -539,20 +543,23 @@ fun PayslipScreen(
                         s.pcDtDoanhThuVal + s.pcXangXeVal + s.pcKhac1Val + s.pcThamNienVal + s.phuCapChuyenCan +
                         s.pcCaDemVal
 
+                val customNightAllowance = if (selectedTab == 1) {
+                    customOt15DaysCountNight * c.pcCaDem
+                } else 0.0
+
                 val fullProjectedAllowancesSum = pcKyThuatShow + pcTrachNhiemShow + pcChucVuShow + pcHieuSuatShow +
                         pcSanPhamShow + pcComCaShow + pcComOtShow + pcNhaOShow + pcDocHaiShow + 
                         pcDtDoanhThuShow + pcXangXeShow + pcKhac1Show + pcThamNienShow + pcChuyenCanShow +
-                        (s.pcCaDemVal + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount * c.pcCaDem else 0.0) + additionalSundaysNightAllowance)
+                        (s.pcCaDemVal + customNightAllowance + additionalSundaysNightAllowance)
 
                 val allowanceAdjustment = fullProjectedAllowancesSum - currentProratedAllowancesSum
 
                 val baseSalaryAdjustment = if (isCurrentSelectedMonth) (luongDuKienBaseSalary - s.baseBasicSalary) else 0.0
-                val totalOtHours = customOt15DaysCount * (4.0 - breakHours).coerceAtLeast(0.0)
-                val customOtCoeff = if (selectedOt15Shift == "Đêm") c.heSoOtDem else c.heSoOtNgayThuong
-                val customOt15Pay = totalOtHours * hourlySalary * customOtCoeff
-                val customNightAllowance = if (selectedOt15Shift == "Đêm") {
-                    customOt15DaysCount * c.pcCaDem
-                } else 0.0
+                val totalOtDayHours = customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0)
+                val totalOtNightHours = customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0)
+                val customOt15PayDayVal = totalOtDayHours * hourlySalary * c.heSoOtNgayThuong
+                val customOt15PayNightVal = totalOtNightHours * hourlySalary * c.heSoOtDem
+                val customOt15Pay = customOt15PayDayVal + customOt15PayNightVal
                 val luongDuKienVal = s.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + additionalSundaysNightAllowance + allowanceAdjustment + customOt15Pay + customNightAllowance
 
                 Row(
@@ -727,14 +734,14 @@ fun PayslipScreen(
                         )
 
                         // 1b. Ngày nghỉ phép / nghỉ thường (Dynamic)
-                        val paidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+                        val annualLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
+                        val holidayLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
                         val unpaidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
-                        val leaveDaysVal = when {
-                            paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày, Không lương: ${unpaidLeavesCount} ngày"
-                            paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
-                            unpaidLeavesCount > 0 -> "Nghỉ không lương: ${unpaidLeavesCount} ngày"
-                            else -> "0 ngày"
-                        }
+                        val leaveParts = mutableListOf<String>()
+                        if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount} ngày")
+                        if (holidayLeavesCount > 0) leaveParts.add("Nghỉ lễ: ${holidayLeavesCount} ngày")
+                        if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount} ngày")
+                        val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
                         PayslipProfileRow(
                             label = "Ngày nghỉ:",
                             value = leaveDaysVal
@@ -968,12 +975,10 @@ fun PayslipScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("Dự kiến OT (${if (selectedOt15Shift == "Đêm") df.format(c.heSoOtDem) else df.format(c.heSoOtNgayThuong)}):", color = LightGray, fontSize = 13.sp)
-                                    }
-                                    if (customOt15DaysCount > 0.0) {
+                                    Text("Tăng ca OT 1.5:", color = LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    if (customOt15DaysCountDay > 0 || customOt15DaysCountNight > 0) {
                                         Text(
-                                            text = "+${fmt.format(customOt15Pay)}đ dự kiến",
+                                            text = "+${fmt.format(customOt15Pay)}đ",
                                             color = AccentGreen,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold
@@ -981,84 +986,146 @@ fun PayslipScreen(
                                     }
                                 }
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        RadioButton(
-                                            selected = selectedOt15Shift == "Ngày",
-                                            onClick = { selectedOt15Shift = "Ngày" },
-                                            colors = RadioButtonDefaults.colors(selectedColor = NeonBlue, unselectedColor = LightGray)
-                                        )
-                                        Text("Ngày", color = White, fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        RadioButton(
-                                            selected = selectedOt15Shift == "Đêm",
-                                            onClick = { selectedOt15Shift = "Đêm" },
-                                            colors = RadioButtonDefaults.colors(selectedColor = NeonBlue, unselectedColor = LightGray)
-                                        )
-                                        Text("Đêm", color = White, fontSize = 13.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("☀️ OT 1.5 ca ngày:", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(x${df.format(c.heSoOtNgayThuong)})", color = NeonBlue, fontSize = 11.sp)
                                     }
 
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        var textFieldValue by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(if (customOt15DaysCount == 0.0) "" else df.format(customOt15DaysCount))) }
-                                        LaunchedEffect(remainingWeekdays) {
-                                            if (customOt15DaysCount > remainingWeekdays) {
-                                                customOt15DaysCount = remainingWeekdays.toDouble()
-                                            }
-                                        }
-                                        LaunchedEffect(customOt15DaysCount) {
-                                            val str = if (customOt15DaysCount == 0.0) "" else df.format(customOt15DaysCount)
-                                            if (textFieldValue.text != str && textFieldValue.text.toDoubleOrNull() != customOt15DaysCount) {
-                                                textFieldValue = textFieldValue.copy(text = str)
-                                            }
-                                        }
-                                        val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                                        val isFocused by interactionSource.collectIsFocusedAsState()
-                                        LaunchedEffect(isFocused) {
-                                            if (isFocused) {
-                                                kotlinx.coroutines.delay(50)
-                                                textFieldValue = textFieldValue.copy(selection = androidx.compose.ui.text.TextRange(0, textFieldValue.text.length))
-                                            }
-                                        }
-                                        TextField(
-                                            value = textFieldValue,
-                                            onValueChange = {
-                                                textFieldValue = it
-                                                val raw = it.text.toDoubleOrNull() ?: 0.0
-                                                val maxPossible = remainingWeekdays.toDouble()
-                                                if (raw > maxPossible) {
-                                                    customOt15DaysCount = maxPossible
-                                                    val cappedStr = df.format(maxPossible)
-                                                    textFieldValue = textFieldValue.copy(
-                                                        text = cappedStr,
-                                                        selection = androidx.compose.ui.text.TextRange(cappedStr.length)
-                                                    )
-                                                } else {
-                                                    customOt15DaysCount = raw
-                                                }
-                                            },
-                                            modifier = Modifier.width(60.dp),
-                                            textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center, color = White),
-                                            singleLine = true,
-                                            interactionSource = interactionSource,
-                                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                                            colors = androidx.compose.material3.TextFieldDefaults.colors(
-                                                unfocusedContainerColor = Color.Transparent,
-                                                focusedContainerColor = Color.Transparent,
-                                                focusedIndicatorColor = NeonBlue,
-                                                unfocusedIndicatorColor = Color.Transparent
+                                    var otDayInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(customOt15DaysCountDay.toInt().toString())) }
+                                    LaunchedEffect(customOt15DaysCountDay) {
+                                        if (otDayInputText.text != customOt15DaysCountDay.toInt().toString()) {
+                                            otDayInputText = otDayInputText.copy(
+                                                text = customOt15DaysCountDay.toInt().toString(),
+                                                selection = androidx.compose.ui.text.TextRange(customOt15DaysCountDay.toInt().toString().length)
                                             )
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("ngày", color = LightGray, fontSize = 13.sp)
+                                        }
                                     }
+
+                                    OutlinedTextField(
+                                        value = otDayInputText,
+                                        onValueChange = { newValue ->
+                                            val cleanText = newValue.text.filter { it.isDigit() }
+                                            if (cleanText.isEmpty()) {
+                                                otDayInputText = newValue.copy(text = "")
+                                                customOt15DaysCountDay = 0.0
+                                            } else {
+                                                cleanText.toIntOrNull()?.let { parsed ->
+                                                    val maxAllowed = (remainingWeekdays - customOt15DaysCountNight.toInt()).coerceAtLeast(0)
+                                                    if (parsed <= maxAllowed) {
+                                                        otDayInputText = newValue.copy(text = cleanText)
+                                                        customOt15DaysCountDay = parsed.toDouble()
+                                                    } else {
+                                                        val cappedStr = maxAllowed.toString()
+                                                        otDayInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                            text = cappedStr,
+                                                            selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                        )
+                                                        customOt15DaysCountDay = maxAllowed.toDouble()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.width(68.dp).height(46.dp).testTag("ot_15_day_count_input"),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            textAlign = TextAlign.Center, 
+                                            color = White, 
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        ),
+                                        singleLine = true,
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                        ),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = NeonBlue,
+                                            unfocusedBorderColor = Color(0xFF3C3C3C),
+                                            focusedContainerColor = Color(0xFF252525),
+                                            unfocusedContainerColor = Color(0xFF181818),
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            cursorColor = NeonBlue
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🌙 OT 1.5 ca đêm:", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(x${df.format(c.heSoOtDem)})", color = NeonBlue, fontSize = 11.sp)
+                                    }
+
+                                    var otNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(customOt15DaysCountNight.toInt().toString())) }
+                                    LaunchedEffect(customOt15DaysCountNight) {
+                                        if (otNightInputText.text != customOt15DaysCountNight.toInt().toString()) {
+                                            otNightInputText = otNightInputText.copy(
+                                                text = customOt15DaysCountNight.toInt().toString(),
+                                                selection = androidx.compose.ui.text.TextRange(customOt15DaysCountNight.toInt().toString().length)
+                                            )
+                                        }
+                                    }
+
+                                    OutlinedTextField(
+                                        value = otNightInputText,
+                                        onValueChange = { newValue ->
+                                            val cleanText = newValue.text.filter { it.isDigit() }
+                                            if (cleanText.isEmpty()) {
+                                                otNightInputText = newValue.copy(text = "")
+                                                customOt15DaysCountNight = 0.0
+                                            } else {
+                                                cleanText.toIntOrNull()?.let { parsed ->
+                                                    val maxAllowed = (remainingWeekdays - customOt15DaysCountDay.toInt()).coerceAtLeast(0)
+                                                    if (parsed <= maxAllowed) {
+                                                        otNightInputText = newValue.copy(text = cleanText)
+                                                        customOt15DaysCountNight = parsed.toDouble()
+                                                    } else {
+                                                        val cappedStr = maxAllowed.toString()
+                                                        otNightInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                            text = cappedStr,
+                                                            selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                        )
+                                                        customOt15DaysCountNight = maxAllowed.toDouble()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.width(68.dp).height(46.dp).testTag("ot_15_night_count_input"),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            textAlign = TextAlign.Center, 
+                                            color = White, 
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        ),
+                                        singleLine = true,
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                        ),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = NeonBlue,
+                                            unfocusedBorderColor = Color(0xFF3C3C3C),
+                                            focusedContainerColor = Color(0xFF252525),
+                                            unfocusedContainerColor = Color(0xFF181818),
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            cursorColor = NeonBlue
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
                                 }
                             }
                         }
@@ -1141,9 +1208,9 @@ fun PayslipScreen(
                         }
 
                         // 13. OT Ngày (Merged)
-                        val projectedOtDayHours = if (selectedTab == 1 && selectedOt15Shift == "Ngày") customOt15DaysCount * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+                        val projectedOtDayHours = if (selectedTab == 1) customOt15DaysCountDay * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
                         val totalOtDayHours = s.otDayHours + projectedOtDayHours
-                        val totalOtDayPay = s.tienOtNgay + (if (selectedTab == 1 && selectedOt15Shift == "Ngày") customOt15Pay else 0.0)
+                        val totalOtDayPay = s.tienOtNgay + (if (selectedTab == 1) customOt15PayDayVal else 0.0)
                         
                         if (totalOtDayHours > 0.0) {
                             PayslipMoneyRow(label = "OT ngày ${df.format(c.heSoOtNgayThuong)} (${df.format(totalOtDayHours)}h)", value = totalOtDayPay, isAddition = true, isAccent = true)
@@ -1174,16 +1241,16 @@ fun PayslipScreen(
                         }
 
                         // 15.1 OT đêm (Merged)
-                        val projectedOtNightHours = if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
+                        val projectedOtNightHours = if (selectedTab == 1) customOt15DaysCountNight * (4.0 - breakHours).coerceAtLeast(0.0) else 0.0
                         val totalOtNightHours = s.otNightHours + projectedOtNightHours
-                        val totalOtNightPay = s.tienOtDem + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15Pay else 0.0)
+                        val totalOtNightPay = s.tienOtDem + (if (selectedTab == 1) customOt15PayNightVal else 0.0)
 
                         if (totalOtNightHours > 0.0) {
                             PayslipMoneyRow(label = "OT đêm ${df.format(c.heSoOtDem)} (${df.format(totalOtNightHours)}h)", value = totalOtNightPay, isAddition = true, isAccent = true)
                         }
 
                         // 16. Phụ cấp đêm
-                        val finalPcCaDemCount = s.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0)
+                        val finalPcCaDemCount = s.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0)
                         val finalPcCaDem = if (selectedTab == 1) (s.pcCaDemVal + customNightAllowance + additionalSundaysNightAllowance) else s.pcCaDemVal
                         if (finalPcCaDem > 0.0) {
                             PayslipMoneyRow(label = "Phụ cấp ca đêm ($finalPcCaDemCount)", value = finalPcCaDem, isAddition = true)
@@ -1304,12 +1371,15 @@ fun PayslipScreen(
                             includeSundayInProjection = includeSundayInProjection,
                             remainingWeekdays = remainingWeekdays,
                             remainingSundays = remainingSundays,
+                            remainingSundaysDay = remainingSundaysDay,
+                            remainingSundaysNight = remainingSundaysNight,
                             dailySalary = dailySalary,
                             luongDuKienVal = luongDuKienVal,
                             soNgayCongDuKien = soNgayCongDuKien,
-                            customOt15DaysCount = customOt15DaysCount,
-                            customOt15Pay = customOt15Pay,
-                            selectedOt15Shift = selectedOt15Shift,
+                            customOt15DaysCountDay = customOt15DaysCountDay,
+                            customOt15DaysCountNight = customOt15DaysCountNight,
+                            customOt15PayDay = customOt15PayDayVal,
+                            customOt15PayNight = customOt15PayNightVal,
                             customNightAllowance = customNightAllowance,
                             hasLoggedUnpaidOrAbsent = hasLoggedUnpaidOrAbsent,
                             breakHours = breakHours
@@ -1354,14 +1424,18 @@ fun PayslipScreen(
                             includeSundayInProjection = includeSundayInProjection,
                             remainingWeekdays = remainingWeekdays,
                             remainingSundays = remainingSundays,
+                            remainingSundaysDay = remainingSundaysDay,
+                            remainingSundaysNight = remainingSundaysNight,
                             dailySalary = dailySalary,
                             luongDuKienVal = luongDuKienVal,
                             soNgayCongDuKien = soNgayCongDuKien,
-                            customOt15DaysCount = customOt15DaysCount,
-                            customOt15Pay = customOt15Pay,
-                            selectedOt15Shift = selectedOt15Shift,
+                            customOt15DaysCountDay = customOt15DaysCountDay,
+                            customOt15DaysCountNight = customOt15DaysCountNight,
+                            customOt15PayDay = customOt15PayDayVal,
+                            customOt15PayNight = customOt15PayNightVal,
                             customNightAllowance = customNightAllowance,
-                            hasLoggedUnpaidOrAbsent = hasLoggedUnpaidOrAbsent
+                            hasLoggedUnpaidOrAbsent = hasLoggedUnpaidOrAbsent,
+                            breakHours = breakHours
                         )
                     },
                     modifier = Modifier
@@ -1455,10 +1529,114 @@ fun PayslipMoneyRow(
     }
 }
 
+fun com.example.viewmodel.SalarySummary.toExportSummary(): com.example.util.SalarySummary {
+    return com.example.util.SalarySummary(
+        workingDays = this.workingDays,
+        standardHours = this.standardHours,
+        otDayHours = this.otDayHours,
+        otNightHours = this.otNightHours,
+        tienOtNgay = this.tienOtNgay,
+        tienOtDem = this.tienOtDem,
+        tongTienCom = this.tongTienCom,
+        phuCap = this.phuCap,
+        phuCapXangXe = this.phuCapXangXe,
+        phuCapDienThoai = this.phuCapDienThoai,
+        phuCapNhaO = this.phuCapNhaO,
+        phuCapChuyenCan = this.phuCapChuyenCan,
+        thuong = this.thuong,
+        tienBh = this.tienBh,
+        doanPhi = this.doanPhi,
+        tienKhauTruNghi = this.tienKhauTruNghi,
+        luongThucNhan = this.luongThucNhan,
+        baseBasicSalary = this.baseBasicSalary,
+        expectedWorkDays = this.expectedWorkDays,
+        standardWorkDays = this.standardWorkDays,
+        isCurrentMonth = this.isCurrentMonth,
+        pcKyThuatVal = this.pcKyThuatVal,
+        pcTrachNhiemVal = this.pcTrachNhiemVal,
+        pcChucVuVal = this.pcChucVuVal,
+        pcHieuSuatVal = this.pcHieuSuatVal,
+        pcSanPhamVal = this.pcSanPhamVal,
+        pcComCaVal = this.pcComCaVal,
+        pcComOtVal = this.pcComOtVal,
+        pcNhaOVal = this.pcNhaOVal,
+        pcDocHaiVal = this.pcDocHaiVal,
+        pcDtDoanhThuVal = this.pcDtDoanhThuVal,
+        pcXangXeVal = this.pcXangXeVal,
+        pcThamNienVal = this.pcThamNienVal,
+        pcKhac1Val = this.pcKhac1Val,
+        pcKhacVal = this.pcKhacVal,
+        pcCaDemVal = this.pcCaDemVal,
+        caDemCount = this.caDemCount,
+        tienChuNhat = this.tienChuNhat,
+        tienChuNhatNgay = this.tienChuNhatNgay,
+        tienChuNhatDem = this.tienChuNhatDem,
+        chuNhatHours = this.chuNhatHours,
+        chuNhatDayHours = this.chuNhatDayHours,
+        chuNhatNightHours = this.chuNhatNightHours,
+        otLeHours = this.otLeHours,
+        tienOtLe = this.tienOtLe,
+        actualPresenceDays = this.actualPresenceDays,
+        actualStandardWorkingDays = this.actualStandardWorkingDays
+    )
+}
+
 // -------------------------------------------------------------
 // HIGH QUALITY PRISTINE VECTOR PNG BITMAP GENERATION ENGINE
 // -------------------------------------------------------------
 fun savePayslipAsPngImage(
+    context: Context,
+    entries: List<com.example.data.model.TimeEntry>,
+    summary: SalarySummary,
+    config: com.example.data.model.UserConfig,
+    userSession: UserSession?,
+    monthLabel: String,
+    selectedMonth: String,
+    selectedTab: Int = 0,
+    includeSundayInProjection: Boolean = false,
+    remainingWeekdays: Int = 0,
+    remainingSundays: Int = 0,
+    remainingSundaysDay: Int = 0,
+    remainingSundaysNight: Int = 0,
+    dailySalary: Double = 0.0,
+    luongDuKienVal: Double = 0.0,
+    soNgayCongDuKien: Double = 0.0,
+    customOt15DaysCountDay: Double = 0.0,
+    customOt15DaysCountNight: Double = 0.0,
+    customOt15PayDay: Double = 0.0,
+    customOt15PayNight: Double = 0.0,
+    customNightAllowance: Double = 0.0,
+    hasLoggedUnpaidOrAbsent: Boolean = false,
+    breakHours: Double = 0.0
+): Boolean {
+    return com.example.util.ExportUtils.savePayslipAsPngImage(
+        context = context,
+        entries = entries,
+        summary = summary.toExportSummary(),
+        config = config,
+        userSession = userSession,
+        monthLabel = monthLabel,
+        selectedMonth = selectedMonth,
+        selectedTab = selectedTab,
+        includeSundayInProjection = includeSundayInProjection,
+        remainingWeekdays = remainingWeekdays,
+        remainingSundays = remainingSundays,
+        remainingSundaysDay = remainingSundaysDay,
+        remainingSundaysNight = remainingSundaysNight,
+        dailySalary = dailySalary,
+        luongDuKienVal = luongDuKienVal,
+        soNgayCongDuKien = soNgayCongDuKien,
+        customOt15DaysCountDay = customOt15DaysCountDay,
+        customOt15DaysCountNight = customOt15DaysCountNight,
+        customOt15PayDay = customOt15PayDay,
+        customOt15PayNight = customOt15PayNight,
+        customNightAllowance = customNightAllowance,
+        hasLoggedUnpaidOrAbsent = hasLoggedUnpaidOrAbsent,
+        breakHours = breakHours
+    )
+}
+
+fun savePayslipAsPngImageOld(
     context: Context,
     entries: List<com.example.data.model.TimeEntry>,
     summary: SalarySummary,
@@ -1680,14 +1858,14 @@ fun savePayslipAsPngImage(
     val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
     drawRow("Tiến độ tháng (Công chuẩn):", progressText)
 
-    val paidLeavesCount = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }
+    val annualLeavesCount = entries.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
+    val holidayLeavesCount = entries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
     val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
-    val leaveDaysVal = when {
-        paidLeavesCount > 0 && unpaidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount}n, Không lương: ${unpaidLeavesCount}n"
-        paidLeavesCount > 0 -> "Phép năm: ${paidLeavesCount} ngày"
-        unpaidLeavesCount > 0 -> "Không lương: ${unpaidLeavesCount} ngày"
-        else -> "0 ngày"
-    }
+    val leaveParts = mutableListOf<String>()
+    if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}n")
+    if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}n")
+    if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount}n")
+    val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
     drawRow("Ngày nghỉ:", leaveDaysVal)
     
     if (selectedTab == 1) {
