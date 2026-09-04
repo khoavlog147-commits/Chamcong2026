@@ -4069,7 +4069,18 @@ fun EmployeePayslipView(
 
     val pcComCaShow = if (selectedTab == 1) {
         if (isCurrentSelectedMonth) {
-            soNgayCongDuKienDouble * employee.pcComCa
+            val calcType = employee.getCalcTypeFor("pcComCa")
+            when (calcType) {
+                "PER_WORK_DAY" -> {
+                    summary.actualPresenceDays * employee.pcComCa
+                }
+                "FIXED_FULL" -> employee.pcComCa
+                "MONTHLY_PRO_RATED" -> {
+                    val ratio = (soNgayCongDuKienDouble / standardTargetDays).coerceAtMost(1.0)
+                    employee.pcComCa * ratio
+                }
+                else -> summary.actualPresenceDays * employee.pcComCa
+            }
         } else {
             summary.pcComCaVal
         }

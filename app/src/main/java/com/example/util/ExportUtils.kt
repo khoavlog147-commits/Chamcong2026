@@ -334,12 +334,13 @@ object ExportUtils {
 
         // UI Pre-calculations
         val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val totalOtDays = (customOt15DaysCountDay + customOt15DaysCountNight)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
-            if (isCurrentSelectedMonth) {
-                val rawProjected = summary.workingDays + remainingWeekdays.toDouble()
-                standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
+            if (isCurrentSelectedMonth && selectedTab == 1) {
+                val rawProjected = summary.workingDays + totalOtDays
+                rawProjected.coerceAtMost(standardTargetDays)
             } else {
                 summary.workingDays.coerceAtMost(standardTargetDays)
             }
@@ -367,7 +368,24 @@ object ExportUtils {
 
         val pcComCaShowPNG = if (selectedTab == 1) {
             if (isCurrentSelectedMonth) {
-                calcPrPNG("pcComCa", config.pcComCa)
+                val calcType = config.getCalcTypeFor("pcComCa")
+                when (calcType) {
+                    "PER_WORK_DAY" -> {
+                        val addedDays = (soNgayCongDuKienDouble - summary.workingDays).coerceAtLeast(0.0)
+                        val sundayDays = if (includeSundayInProjection) remainingSundays.toDouble() else 0.0
+                        (summary.actualPresenceDays + addedDays + sundayDays) * config.pcComCa
+                    }
+                    "FIXED_FULL" -> config.pcComCa
+                    "MONTHLY_PRO_RATED" -> {
+                        val ratio = (soNgayCongDuKienDouble / standardTargetDays).coerceAtMost(1.0)
+                        config.pcComCa * ratio
+                    }
+                    else -> {
+                        val addedDays = (soNgayCongDuKienDouble - summary.workingDays).coerceAtLeast(0.0)
+                        val sundayDays = if (includeSundayInProjection) remainingSundays.toDouble() else 0.0
+                        (summary.actualPresenceDays + addedDays + sundayDays) * config.pcComCa
+                    }
+                }
             } else {
                 summary.pcComCaVal
             }
@@ -642,12 +660,13 @@ object ExportUtils {
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
         val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val totalOtDaysPDF = (customOt15DaysCountDay + customOt15DaysCountNight)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
-            if (isCurrentSelectedMonth) {
-                val rawProjected = summary.workingDays + remainingWeekdays.toDouble()
-                standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
+            if (isCurrentSelectedMonth && selectedTab == 1) {
+                val rawProjected = summary.workingDays + totalOtDaysPDF
+                rawProjected.coerceAtMost(standardTargetDays)
             } else {
                 summary.workingDays.coerceAtMost(standardTargetDays)
             }
@@ -678,7 +697,24 @@ object ExportUtils {
 
         val pcComCaShow = if (selectedTab == 1) {
             if (isCurrentSelectedMonth) {
-                calcPrPDF("pcComCa", config.pcComCa)
+                val calcType = config.getCalcTypeFor("pcComCa")
+                when (calcType) {
+                    "PER_WORK_DAY" -> {
+                        val addedDays = (soNgayCongDuKienDouble - summary.workingDays).coerceAtLeast(0.0)
+                        val sundayDays = if (includeSundayInProjection) remainingSundays.toDouble() else 0.0
+                        (summary.actualPresenceDays + addedDays + sundayDays) * config.pcComCa
+                    }
+                    "FIXED_FULL" -> config.pcComCa
+                    "MONTHLY_PRO_RATED" -> {
+                        val ratio = (soNgayCongDuKienDouble / standardTargetDays).coerceAtMost(1.0)
+                        config.pcComCa * ratio
+                    }
+                    else -> {
+                        val addedDays = (soNgayCongDuKienDouble - summary.workingDays).coerceAtLeast(0.0)
+                        val sundayDays = if (includeSundayInProjection) remainingSundays.toDouble() else 0.0
+                        (summary.actualPresenceDays + addedDays + sundayDays) * config.pcComCa
+                    }
+                }
             } else {
                 summary.pcComCaVal
             }

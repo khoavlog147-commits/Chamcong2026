@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalAtm
@@ -390,13 +391,12 @@ fun PayslipScreen(
 
                 val projectedRemainingWorkdays = remainingWeekdays.toDouble()
 
+                val totalProjectedOtDays = customOt15DaysCountDay + customOt15DaysCountNight
+
                 val soNgayCongDuKien = if (isCurrentSelectedMonth) {
-                    val rawProjected = s.workingDays + projectedRemainingWorkdays
-                    if (unpaidDaysCount > 0) {
-                        (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0).coerceAtMost(standardTargetDays)
-                    } else {
-                        standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
-                    }
+                    val rawProjected = s.workingDays + totalProjectedOtDays
+                    val maxReachableDays = if (unpaidDaysCount > 0) (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0) else standardTargetDays
+                    rawProjected.coerceAtMost(maxReachableDays).coerceAtLeast(0.0)
                 } else {
                     s.workingDays.coerceAtMost(standardTargetDays)
                 }
@@ -468,21 +468,23 @@ fun PayslipScreen(
                                     if (isOtDay) ot15DayLeft--
                                     else if (isOtNight) ot15NightLeft--
                                     
-                                    val shiftT = if (isOtNight) "NIGHT" else "DAY"
-                                    val noteStr = if (isOtDay || isOtNight) "Dự kiến (OT 1.5)" else "Dự kiến (Thường)"
-                                    
-                                    list.add(
-                                        TimeEntry(
-                                            id = 0,
-                                            userId = c.maNhanVien,
-                                            date = dateStr,
-                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0) }.timeInMillis,
-                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 17, 30, 0) }.timeInMillis,
-                                            shiftType = shiftT,
-                                            dayType = "NORMAL",
-                                            note = noteStr
+                                    if (isOtDay || isOtNight) {
+                                        val shiftT = if (isOtNight) "NIGHT" else "DAY"
+                                        val noteStr = if (isOtDay) "Dự kiến (OT 1.5 Ca ngày)" else "Dự kiến (OT 1.5 Ca đêm)"
+                                        
+                                        list.add(
+                                            TimeEntry(
+                                                id = 0,
+                                                userId = c.maNhanVien,
+                                                date = dateStr,
+                                                checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 19 else 7, 30, 0) }.timeInMillis,
+                                                checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 7 else 19, 30, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                                shiftType = shiftT,
+                                                dayType = "NORMAL",
+                                                note = noteStr
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -490,7 +492,7 @@ fun PayslipScreen(
                     }
                 }
 
-                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
+                val projectedPresenceDays = s.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
 
                 fun calcPr(fieldName: String, valRaw: Double): Double {
                     return com.example.data.SalaryCalculator.calculateAllowanceValue(
@@ -498,8 +500,8 @@ fun PayslipScreen(
                         allowanceValue = valRaw,
                         calcType = c.getCalcTypeFor(fieldName),
                         totalWorkDays = soNgayCongDuKienDouble,
-                        comCaCount = (soNgayCongDuKienDouble + projectedSundays).toInt(),
-                        comOtCount = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight).toInt() + projectedSundaysOtMeals) else 0,
+                        comCaCount = projectedPresenceDays.toInt(),
+                        comOtCount = 0,
                         nightShiftsCount = s.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0),
                         scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
                         totalScheduledDaysInMonth = standardTargetDays.toInt()
@@ -514,7 +516,20 @@ fun PayslipScreen(
 
                 val pcComCaShow = if (selectedTab == 1) {
                     if (isCurrentSelectedMonth) {
-                        calcPr("pcComCa", c.pcComCa)
+                        val calcType = c.getCalcTypeFor("pcComCa")
+                        when (calcType) {
+                            "PER_WORK_DAY" -> {
+                                projectedPresenceDays * c.pcComCa
+                            }
+                            "FIXED_FULL" -> c.pcComCa
+                            "MONTHLY_PRO_RATED" -> {
+                                val ratio = (soNgayCongDuKienDouble / standardTargetDays).coerceAtMost(1.0)
+                                c.pcComCa * ratio
+                            }
+                            else -> {
+                                projectedPresenceDays * c.pcComCa
+                            }
+                        }
                     } else {
                         s.pcComCaVal
                     }
@@ -522,6 +537,7 @@ fun PayslipScreen(
                     s.pcComCaVal
                 }
 
+                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
                 val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * c.pcComOt else 0.0
                 val pcComOtShow = if (selectedTab == 1) s.pcComOtVal + otMealAllowance else s.pcComOtVal
 
@@ -763,9 +779,14 @@ fun PayslipScreen(
                                         if (remainingSundaysNight > 0) append(" + $remainingSundaysNight CN đêm")
                                     }
                                 }
+                                val workAdditionStr = if (totalProjectedOtDays > 0.0 || sundayDetails.isNotBlank()) {
+                                    "${df.format(totalProjectedOtDays)} ngày OT 1.5$sundayDetails"
+                                } else {
+                                    "Chưa nhập ngày tăng ca OT"
+                                }
                                 PayslipProfileRow(
                                     label = "Trong đó làm thêm:", 
-                                    value = "$remainingWeekdays ngày thường$sundayDetails"
+                                    value = workAdditionStr
                                 )
                             }
                         } else {
@@ -782,6 +803,7 @@ fun PayslipScreen(
                                 thickness = 0.5.dp,
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
+
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier
@@ -1129,6 +1151,37 @@ fun PayslipScreen(
                                         ),
                                         shape = RoundedCornerShape(8.dp)
                                     )
+                                }
+
+                                val totalOtInputDays = customOt15DaysCountDay + customOt15DaysCountNight
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Surface(
+                                    color = if (totalOtInputDays > 0) NeonBlue.copy(alpha = 0.12f) else Color(0xFF232323),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (totalOtInputDays > 0) Icons.Default.CheckCircle else Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = if (totalOtInputDays > 0) NeonBlue else LightGray,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (totalOtInputDays > 0) {
+                                                "Đã cộng ${df.format(totalOtInputDays)} ngày vào LCB & tiền cơm ca (+${fmt.format(totalOtInputDays * c.pcComCa)}đ)"
+                                            } else {
+                                                "Nhập số ngày OT 1.5 để cộng vào LCB và tiền cơm ca"
+                                            },
+                                            color = if (totalOtInputDays > 0) NeonBlue else LightGray,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (totalOtInputDays > 0) FontWeight.Medium else FontWeight.Normal
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1679,17 +1732,7 @@ fun savePayslipAsPngImageOld(
 
     val pcComCaShowPNG = if (selectedTab == 1) {
         if (isCurrentSelectedMonth) {
-            com.example.data.SalaryCalculator.calculateAllowanceValue(
-                fieldName = "pcComCa",
-                allowanceValue = config.pcComCa,
-                calcType = config.getCalcTypeFor("pcComCa"),
-                totalWorkDays = soNgayCongDuKien,
-                comCaCount = (soNgayCongDuKien + (if (includeSundayInProjection) remainingSundays else 0)).toInt(),
-                comOtCount = 0,
-                nightShiftsCount = summary.caDemCount + (if (selectedTab == 1 && selectedOt15Shift == "Đêm") customOt15DaysCount.toInt() else 0),
-                scheduledDaysSoFar = soNgayCongDuKien.toInt(),
-                totalScheduledDaysInMonth = summary.standardWorkDays
-            )
+            summary.pcComCaVal + (remainingWeekdays * config.pcComCa) + (if (includeSundayInProjection) remainingSundays * config.pcComCa else 0.0)
         } else {
             summary.pcComCaVal
         }
