@@ -483,12 +483,20 @@ object ExportUtils {
         }
         drawRow("Mức lương cơ bản:", "${fmt.format(config.luongCoBan)}đ")
         
-        val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
-        drawRow("Tiến độ tháng (Công chuẩn):", progressText)
-
         val annualLeavesCount = entries.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
         val holidayLeavesCount = entries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
         val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+
+        val workDaysCountPNG = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
+        val leavePartsPNG = mutableListOf<String>()
+        if (workDaysCountPNG > 0.0) leavePartsPNG.add("${df.format(workDaysCountPNG)} ngày làm việc")
+        if (annualLeavesCount > 0) leavePartsPNG.add("${annualLeavesCount} ngày phép năm")
+        if (holidayLeavesCount > 0) leavePartsPNG.add("${holidayLeavesCount} ngày lễ")
+        val breakdownStrPNG = if (leavePartsPNG.size > 1) " (${leavePartsPNG.joinToString(" + ")})" else ""
+
+        val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKienDouble)} / ${summary.standardWorkDays} ngày$breakdownStrPNG" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày$breakdownStrPNG"
+        drawRow("Tiến độ tháng (Công chuẩn):", progressText)
+
         val leaveParts = mutableListOf<String>()
         if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}n")
         if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}n")
@@ -496,13 +504,13 @@ object ExportUtils {
         val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
         drawRow("Ngày nghỉ:", leaveDaysVal)
         
-        val totalProjectedWorkDaysPNG = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val totalProjectedWorkDaysPNG = summary.actualPresenceDays + totalOtDays + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
         val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
         val lcbActualWorkDaysPNG = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
 
         val attendanceInfo = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPNG)} / ${summary.standardWorkDays} ngày" 
                              else "${df.format(summary.actualPresenceDays)} / ${summary.standardWorkDays} ngày"
-        val attendanceLabel = if (selectedTab == 1) "Ngày công (Dự kiến):" else "Ngày công (Thực tế):"
+        val attendanceLabel = if (selectedTab == 1) "Ngày làm việc (Dự kiến):" else "Ngày làm việc (Thực tế):"
         drawRow(attendanceLabel, attendanceInfo)
 
         // Section 2: Thu nhập chi tiết
@@ -672,7 +680,7 @@ object ExportUtils {
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
-        val totalProjectedWorkDaysPDF = soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val totalProjectedWorkDaysPDF = summary.actualPresenceDays + totalOtDaysPDF + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
         val lcbProjectedWorkDaysPDF = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
         val lcbActualWorkDaysPDF = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
         fun calcPrPDF(fieldName: String, valRaw: Double): Double {
@@ -681,7 +689,7 @@ object ExportUtils {
                 allowanceValue = valRaw,
                 calcType = config.getCalcTypeFor(fieldName),
                 totalWorkDays = soNgayCongDuKienDouble,
-                comCaCount = soNgayCongDuKienDouble.toInt(),
+                comCaCount = totalProjectedWorkDaysPDF.toInt(),
                 comOtCount = 0,
                 nightShiftsCount = summary.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0),
                 scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
@@ -793,11 +801,20 @@ object ExportUtils {
         val empName = config.hoVaTen.ifBlank { userSession?.displayName ?: "N/A" }
         val empCode = config.maNhanVien.ifBlank { userSession?.uid?.take(8) ?: "N/A" }
 
+        val annualLeavesCountPDF = entries.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
+        val holidayLeavesCountPDF = entries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
+        val workDaysPDF = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalOtDaysPDF).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
+        val leavePartsPDF = mutableListOf<String>()
+        if (workDaysPDF > 0.0) leavePartsPDF.add("${df.format(workDaysPDF)} ngày làm việc")
+        if (annualLeavesCountPDF > 0) leavePartsPDF.add("${annualLeavesCountPDF} ngày phép năm")
+        if (holidayLeavesCountPDF > 0) leavePartsPDF.add("${holidayLeavesCountPDF} ngày lễ")
+        val breakdownStrPDF = if (leavePartsPDF.size > 1) " (${leavePartsPDF.joinToString(" + ")})" else ""
+
         // Row 1
         canvas1.drawText("Họ và tên:", 45f, currentY, paintLabel)
         canvas1.drawText(empName, 150f, currentY, paintValBold)
         canvas1.drawText("Công chuẩn:", 320f, currentY, paintLabel)
-        val standardDaysVal = if (selectedTab == 1) "${df.format(soNgayCongDuKien)} / ${summary.standardWorkDays} ngày" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày"
+        val standardDaysVal = if (selectedTab == 1) "${df.format(soNgayCongDuKienDouble)} / ${summary.standardWorkDays} ngày$breakdownStrPDF" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày$breakdownStrPDF"
         canvas1.drawText(standardDaysVal, 440f, currentY, paintValBold)
 
         // Row 2

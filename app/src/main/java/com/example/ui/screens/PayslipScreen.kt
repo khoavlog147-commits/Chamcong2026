@@ -286,7 +286,7 @@ fun PayslipScreen(
                     count
                 }
 
-                val defaultRemainingSundays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth) {
+                val defaultRemainingSundays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, entries) {
                     if (!isCurrentSelectedMonth) 0 else {
                         val cal = Calendar.getInstance()
                         var count = 0
@@ -295,8 +295,16 @@ fun PayslipScreen(
                             cal.set(Calendar.MONTH, targetMonth - 1)
                             cal.set(Calendar.DAY_OF_MONTH, day)
                             val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
+                            val dmyStr = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
                             val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
-                            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY && !isHoliday) {
+                            val isBookedLeave = entries.any { e ->
+                                (e.date == dateStr || e.date == dmyStr) && (
+                                    com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) ||
+                                    com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) ||
+                                    e.dayType == "UNAUTHORIZED_LEAVE"
+                                )
+                            }
+                            if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY && !isHoliday && !isBookedLeave) {
                                 count++
                             }
                         }
@@ -307,7 +315,7 @@ fun PayslipScreen(
                 var remainingSundaysNight by remember { mutableStateOf(0) }
                 val remainingSundays = remainingSundaysDay + remainingSundaysNight
 
-                val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth) {
+                val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, entries) {
                     if (!isCurrentSelectedMonth) 0 else {
                         val cal = Calendar.getInstance()
                         var count = 0
@@ -316,8 +324,16 @@ fun PayslipScreen(
                             cal.set(Calendar.MONTH, targetMonth - 1)
                             cal.set(Calendar.DAY_OF_MONTH, day)
                             val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
+                            val dmyStr = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
                             val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
-                            if (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY && !isHoliday) {
+                            val isBookedLeave = entries.any { e ->
+                                (e.date == dateStr || e.date == dmyStr) && (
+                                    com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) ||
+                                    com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) ||
+                                    e.dayType == "UNAUTHORIZED_LEAVE"
+                                )
+                            }
+                            if (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY && !isHoliday && !isBookedLeave) {
                                 count++
                             }
                         }
@@ -393,8 +409,18 @@ fun PayslipScreen(
 
                 val totalProjectedOtDays = customOt15DaysCountDay + customOt15DaysCountNight
 
+                val futurePaidLeavesCount = remember(entries, isCurrentSelectedMonth, startProjectionDay, targetYear, targetMonth) {
+                    if (!isCurrentSelectedMonth) 0.0 else {
+                        val todayYmd = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, startProjectionDay)
+                        entries.count { e ->
+                            val normD = com.example.data.SalaryCalculator.normalizeToYmd(e.date)
+                            normD >= todayYmd && com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType)
+                        }.toDouble()
+                    }
+                }
+
                 val soNgayCongDuKien = if (isCurrentSelectedMonth) {
-                    val rawProjected = s.workingDays + totalProjectedOtDays
+                    val rawProjected = s.workingDays + totalProjectedOtDays + futurePaidLeavesCount
                     val maxReachableDays = if (unpaidDaysCount > 0) (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0) else standardTargetDays
                     rawProjected.coerceAtMost(maxReachableDays).coerceAtLeast(0.0)
                 } else {
@@ -742,20 +768,42 @@ fun PayslipScreen(
                         
                         val totalActualWorkDays = s.actualPresenceDays
                         val lcbActualWorkDays = s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
-                        val totalProjectedWorkDays = soNgayCongDuKienDouble + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
+                        val totalProjectedWorkDays = s.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
                         val lcbProjectedWorkDays = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
-
-                        // 1. Tiến độ tháng (Số ngày công chuẩn của tháng)
-                        val displayStandardDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.actualStandardWorkingDays
-                        PayslipProfileRow(
-                            label = "Tiến độ tháng (Công chuẩn):",
-                            value = "${df.format(displayStandardDays)} / ${s.standardWorkDays} ngày"
-                        )
 
                         // 1b. Ngày nghỉ phép / nghỉ thường (Dynamic)
                         val annualLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
                         val holidayLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
                         val unpaidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
+
+                        // 1. Tiến độ tháng (Số ngày công chuẩn của tháng để tính LCB)
+                        val totalLcbDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
+                        val workDaysCount = if (selectedTab == 1) {
+                            (s.actualStandardWorkingDays + totalProjectedOtDays).coerceAtLeast(0.0)
+                        } else {
+                            s.actualStandardWorkingDays
+                        }
+                        val leaveBreakdownStr = buildString {
+                            val parts = mutableListOf<String>()
+                            if (workDaysCount > 0.0) {
+                                parts.add("${df.format(workDaysCount)} ngày làm việc")
+                            }
+                            if (annualLeavesCount > 0) {
+                                parts.add("${annualLeavesCount} ngày phép năm")
+                            }
+                            if (holidayLeavesCount > 0) {
+                                parts.add("${holidayLeavesCount} ngày lễ")
+                            }
+                            if (parts.size > 1) {
+                                append(" (${parts.joinToString(" + ")})")
+                            }
+                        }
+
+                        PayslipProfileRow(
+                            label = "Tiến độ tháng (Công chuẩn):",
+                            value = "${df.format(totalLcbDays)} / ${s.standardWorkDays} ngày$leaveBreakdownStr"
+                        )
+
                         val leaveParts = mutableListOf<String>()
                         if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount} ngày")
                         if (holidayLeavesCount > 0) leaveParts.add("Nghỉ lễ: ${holidayLeavesCount} ngày")
@@ -766,10 +814,10 @@ fun PayslipScreen(
                             value = leaveDaysVal
                         )
 
-                        // 2. Ngày công làm việc (Thực tế hoặc Dự kiến)
+                        // 2. Ngày làm việc (Thực tế hoặc Dự kiến)
                         if (selectedTab == 1) {
                             PayslipProfileRow(
-                                label = "Ngày công (Dự kiến):", 
+                                label = "Ngày làm việc (Dự kiến):", 
                                 value = "${df.format(totalProjectedWorkDays)} / ${standardTargetDays.toInt()} ngày"
                             )
                             if (isCurrentSelectedMonth) {
@@ -791,7 +839,7 @@ fun PayslipScreen(
                             }
                         } else {
                             PayslipProfileRow(
-                                label = "Ngày công (Thực tế):", 
+                                label = "Ngày làm việc (Thực tế):", 
                                 value = "${df.format(totalActualWorkDays)} / ${s.standardWorkDays} ngày"
                             )
                         }
