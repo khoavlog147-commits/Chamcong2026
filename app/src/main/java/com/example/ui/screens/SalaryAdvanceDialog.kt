@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,8 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +54,8 @@ fun SalaryAdvanceDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     val currentMonth by viewModel.currentSelectedMonth.collectAsState()
     val advances by viewModel.monthSalaryAdvances.collectAsState()
     val salarySummary by viewModel.salarySummaryState.collectAsState()
@@ -304,7 +310,17 @@ fun SalaryAdvanceDialog(
                                         )
                                     },
                                     isError = isExceeding,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }
+                                    ),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedTextColor = TextWhite,
                                         unfocusedTextColor = TextWhite,
@@ -440,6 +456,18 @@ fun SalaryAdvanceDialog(
                                 OutlinedTextField(
                                     value = noteText,
                                     onValueChange = { noteText = it },
+                                    singleLine = true,
+                                    maxLines = 1,
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Text,
+                                        imeAction = ImeAction.Done
+                                    ),
+                                    keyboardActions = KeyboardActions(
+                                        onDone = {
+                                            keyboardController?.hide()
+                                            focusManager.clearFocus()
+                                        }
+                                    ),
                                     label = { Text("Lý do tạm ứng / Ghi chú (Tuỳ chọn)", color = TextMuted, fontSize = 12.sp) },
                                     placeholder = { Text("Ví dụ: Chi tiêu gia đình, việc cá nhân...", color = TextMuted.copy(alpha = 0.5f)) },
                                     leadingIcon = {

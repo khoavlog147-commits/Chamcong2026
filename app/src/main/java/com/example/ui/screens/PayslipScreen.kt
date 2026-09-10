@@ -797,25 +797,22 @@ fun PayslipScreen(
                         } else {
                             s.actualStandardWorkingDays
                         }
-                        val leaveBreakdownStr = buildString {
-                            val parts = mutableListOf<String>()
-                            if (workDaysCount > 0.0) {
-                                parts.add("${df.format(workDaysCount)} làm việc")
-                            }
-                            if (annualLeavesCount > 0) {
-                                parts.add("${annualLeavesCount} phép năm")
-                            }
-                            if (holidayLeavesCount > 0) {
-                                parts.add("${holidayLeavesCount} lễ")
-                            }
-                            if (parts.size > 1) {
-                                append(" (${parts.joinToString(" + ")})")
-                            }
+                        val parts = mutableListOf<String>()
+                        if (workDaysCount > 0.0) {
+                            parts.add("${df.format(workDaysCount)} làm")
                         }
+                        if (annualLeavesCount > 0) {
+                            parts.add("${annualLeavesCount} phép")
+                        }
+                        if (holidayLeavesCount > 0) {
+                            parts.add("${holidayLeavesCount} lễ")
+                        }
+                        val breakdownDetails = if (parts.size > 1) "(${parts.joinToString(" + ")})" else null
 
                         PayslipProfileRow(
-                            label = "Tiến độ tháng (Công chuẩn):",
-                            value = "${df.format(totalLcbDays)} / ${s.standardWorkDays} ngày$leaveBreakdownStr"
+                            label = "Công tính LCB:",
+                            value = "${df.format(totalLcbDays)} / ${s.standardWorkDays} ngày",
+                            subValue = breakdownDetails
                         )
 
                         val leaveParts = mutableListOf<String>()
@@ -1215,36 +1212,7 @@ fun PayslipScreen(
                                     )
                                 }
 
-                                val totalOtInputDays = customOt15DaysCountDay + customOt15DaysCountNight
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Surface(
-                                    color = if (totalOtInputDays > 0) NeonBlue.copy(alpha = 0.12f) else Color(0xFF232323),
-                                    shape = RoundedCornerShape(6.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = if (totalOtInputDays > 0) Icons.Default.CheckCircle else Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = if (totalOtInputDays > 0) NeonBlue else LightGray,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (totalOtInputDays > 0) {
-                                                "Đã cộng ${df.format(totalOtInputDays)} ngày vào LCB & tiền cơm ca (+${fmt.format(totalOtInputDays * c.pcComCa)}đ)"
-                                            } else {
-                                                "Nhập số ngày OT 1.5 để cộng vào LCB và tiền cơm ca"
-                                            },
-                                            color = if (totalOtInputDays > 0) NeonBlue else LightGray,
-                                            fontSize = 11.sp,
-                                            fontWeight = if (totalOtInputDays > 0) FontWeight.Medium else FontWeight.Normal
-                                        )
-                                    }
-                                }
+
                             }
                         }
 
@@ -1616,7 +1584,12 @@ fun PayslipScreen(
 }
 
 @Composable
-fun PayslipProfileRow(label: String, value: String, isMono: Boolean = false) {
+fun PayslipProfileRow(
+    label: String, 
+    value: String, 
+    subValue: String? = null,
+    isMono: Boolean = false
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1628,21 +1601,36 @@ fun PayslipProfileRow(label: String, value: String, isMono: Boolean = false) {
             text = label, 
             color = MediumGray, 
             fontSize = 13.sp,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f, fill = false),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = value,
-            color = White,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = if (isMono) FontFamily.Monospace else FontFamily.Default,
-            textAlign = TextAlign.End,
-            maxLines = 1,
-            softWrap = false
-        )
+        Column(
+            modifier = Modifier.weight(1.3f, fill = false),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = value,
+                color = White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = if (isMono) FontFamily.Monospace else FontFamily.Default,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (!subValue.isNullOrBlank()) {
+                Text(
+                    text = subValue,
+                    color = LightGray,
+                    fontSize = 11.5.sp,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 
