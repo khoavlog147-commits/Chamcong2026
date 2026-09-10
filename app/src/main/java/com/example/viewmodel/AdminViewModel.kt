@@ -430,9 +430,110 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun saveAttendanceRecordWithLeaveSync(
+        record: AttendanceRecord,
+        employee: UserConfig,
+        previousRecord: AttendanceRecord? = null
+    ) {
+        viewModelScope.launch {
+            var finalRecord = record
+            var phepNamDelta = 0
+
+            val prevIsPaidLeave = previousRecord?.status?.let { com.example.data.SalaryCalculator.isAnnualLeaveType(it) } == true
+            if (prevIsPaidLeave) {
+                phepNamDelta += 1
+            }
+
+            val newIsPaidLeave = com.example.data.SalaryCalculator.isAnnualLeaveType(finalRecord.status)
+            if (newIsPaidLeave) {
+                val availableQuota = employee.phepNamConLai + phepNamDelta
+                if (availableQuota <= 0) {
+                    finalRecord = finalRecord.copy(
+                        status = "UNPAID_LEAVE",
+                        notes = if (finalRecord.notes.isNullOrBlank() || finalRecord.notes == "Phép năm") "Phép thường (Hết phép năm)" else finalRecord.notes
+                    )
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        android.widget.Toast.makeText(
+                            getApplication(),
+                            "⚠️ Quỹ phép năm của nhân viên ${employee.hoVaTen} đã HẾT (0 ngày)! Đã tự động chuyển sang Phép thường (Nghỉ không lương).",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                } else {
+                    phepNamDelta -= 1
+                }
+            }
+
+            FirestoreService.saveAttendanceRecord(finalRecord)
+
+            if (phepNamDelta != 0) {
+                val updatedConfig = employee.copy(
+                    phepNamConLai = (employee.phepNamConLai + phepNamDelta).coerceAtLeast(0)
+                )
+                FirestoreService.saveUserSalaryConfigToFirestore(updatedConfig)
+                loadEmployees()
+                if (_selectedEmployee.value?.userId == employee.userId) {
+                    _selectedEmployee.value = updatedConfig
+                }
+            }
+        }
+    }
+
+    fun batchAddLeave(dateString: String, leaveType: String, notes: String = "") {
+        viewModelScope.launch {
+            val ids = _selectedEmployeeIds.value
+            val affectedEmployees = _employees.value.filter { it.userId in ids }
+            affectedEmployees.forEach { emp ->
+                try {
+                    var finalType = leaveType
+                    var phepNamDelta = 0
+                    if (com.example.data.SalaryCalculator.isAnnualLeaveType(finalType)) {
+                        if (emp.phepNamConLai <= 0) {
+                            finalType = "UNPAID_LEAVE"
+                        } else {
+                            phepNamDelta = -1
+                        }
+                    }
+                    val defaultNote = when {
+                        com.example.data.SalaryCalculator.isHolidayLeaveType(finalType) -> "Lễ"
+                        com.example.data.SalaryCalculator.isAnnualLeaveType(finalType) -> "Phép năm"
+                        finalType == "UNAUTHORIZED_LEAVE" || finalType.contains("KHONG") -> "Không phép"
+                        else -> "Phép thường"
+                    }
+                    val finalNote = if (notes.isNotBlank()) notes else defaultNote
+                    FirestoreService.saveAttendanceRecord(
+                        AttendanceRecord(
+                            uid = emp.userId,
+                            dateString = dateString,
+                            clockInTime = 0L,
+                            clockOutTime = null,
+                            status = finalType,
+                            notes = finalNote
+                        )
+                    )
+                    if (phepNamDelta != 0) {
+                        val updated = emp.copy(phepNamConLai = (emp.phepNamConLai + phepNamDelta).coerceAtLeast(0))
+                        FirestoreService.saveUserSalaryConfigToFirestore(updated)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("AdminViewModel", "Lỗi batchAddLeave: ${e.message}")
+                }
+            }
+            loadEmployees()
+            _selectedEmployeeIds.value = emptySet()
+            loadTodayAttendance()
+        }
+    }
+
     fun deleteAttendanceRecord(uid: String, dateString: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
+                val normDate = com.example.data.SalaryCalculator.normalizeDateToDmy(dateString)
+                val targetRec = _attendanceRecords.value.find {
+                    it.uid == uid && com.example.data.SalaryCalculator.normalizeDateToDmy(it.dateString) == normDate
+                }
+                val isPaidLeave = targetRec?.status?.let { com.example.data.SalaryCalculator.isAnnualLeaveType(it) } == true
+
                 FirestoreService.deleteAttendanceRecord(uid, dateString)
                 
                 val db = com.example.data.db.AppDatabase.getInstance(getApplication())
@@ -449,6 +550,18 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     add(com.example.data.SalaryCalculator.normalizeDateToDmy(dateString))
                 }
                 prefs.edit().putStringSet(setKey, updatedSet).apply()
+
+                if (isPaidLeave) {
+                    val currentEmp = _employees.value.find { it.userId == uid }
+                    if (currentEmp != null) {
+                        val updatedEmp = currentEmp.copy(phepNamConLai = currentEmp.phepNamConLai + 1)
+                        FirestoreService.saveUserSalaryConfigToFirestore(updatedEmp)
+                        loadEmployees()
+                        if (_selectedEmployee.value?.userId == uid) {
+                            _selectedEmployee.value = updatedEmp
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 android.util.Log.e("AdminViewModel", "Failed to delete attendance record: ${e.message}")
             }

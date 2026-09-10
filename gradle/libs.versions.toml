@@ -41,8 +41,10 @@ secretsGradlePlugin = "2.0.1"
 playServicesGoogleServices = "4.4.2"
 glance = "1.1.1"
 work = "2.9.1"
+coreSplashScreen = "1.0.1"
 
 [libraries]
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashScreen" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

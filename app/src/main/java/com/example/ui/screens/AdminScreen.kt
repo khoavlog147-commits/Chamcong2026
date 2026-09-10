@@ -355,7 +355,7 @@ fun AdminScreen(
     }
 
     if (showBatchEditDialog) {
-        var selectedMode by remember { mutableStateOf(0) } // 0: Vào ca / Thêm ca, 1: Ra ca hàng loạt, 2: Sửa Lương, 3: Gán Chức Vụ
+        var selectedMode by remember { mutableStateOf(0) } // 0: Vào ca / Thêm ca, 1: Ra ca hàng loạt, 2: Sửa Lương, 3: Gán Chức Vụ, 4: Nghỉ phép hàng loạt
 
         var batchLcb by remember { mutableStateOf("") }
         var batchPcXangXe by remember { mutableStateOf("") }
@@ -367,6 +367,7 @@ fun AdminScreen(
         var batchClockOut by remember { mutableStateOf("19:30") }
         var batchNote by remember { mutableStateOf("Admin chấm công hàng loạt") }
         var activeShiftPreset by remember { mutableStateOf("7:30-19:30") }
+        var batchLeaveType by remember { mutableStateOf("PAID_LEAVE") }
 
         var batchCompanyId by remember { mutableStateOf(selectedCompanyId ?: companies.firstOrNull()?.companyId ?: "default_company") }
         var batchRoleId by remember { mutableStateOf("") }
@@ -383,6 +384,7 @@ fun AdminScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = when (selectedMode) {
+                                4 -> "Nghỉ phép hàng loạt (${selectedIds.size} NV)"
                                 3 -> "Gán chức vụ hàng loạt (${selectedIds.size} NV)"
                                 2 -> "Cấu hình lương hàng loạt (${selectedIds.size} NV)"
                                 else -> "Chấm công hàng loạt (${selectedIds.size} NV)"
@@ -418,6 +420,18 @@ fun AdminScreen(
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = AccentOrange.copy(alpha = 0.3f),
                                 selectedLabelColor = AccentOrange
+                            )
+                        )
+                        FilterChip(
+                            selected = selectedMode == 4,
+                            onClick = { 
+                                selectedMode = 4
+                                batchNote = "Admin ghi nhận nghỉ phép"
+                            },
+                            label = { Text("Nghỉ phép hàng loạt", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFA855F7).copy(alpha = 0.3f),
+                                selectedLabelColor = Color(0xFFA855F7)
                             )
                         )
                         FilterChip(
@@ -754,6 +768,88 @@ fun AdminScreen(
                                 }
                             }
                         }
+                        4 -> {
+                            // MODE 4: NGHỈ PHÉP HÀNG LOẠT
+                            Surface(
+                                color = Color.White.copy(alpha = 0.04f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFA855F7).copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text("Loại ngày nghỉ:", color = Color(0xFFA855F7), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = batchLeaveType == "PAID_LEAVE",
+                                            onClick = { batchLeaveType = "PAID_LEAVE" },
+                                            label = { Text("Phép năm", fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFFF2C94C).copy(alpha = 0.3f),
+                                                selectedLabelColor = Color(0xFFF2C94C)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        FilterChip(
+                                            selected = batchLeaveType == "UNPAID_LEAVE",
+                                            onClick = { batchLeaveType = "UNPAID_LEAVE" },
+                                            label = { Text("Phép thường", fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFFFF9800).copy(alpha = 0.3f),
+                                                selectedLabelColor = Color(0xFFFF9800)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        FilterChip(
+                                            selected = batchLeaveType == "HOLIDAY_LEAVE",
+                                            onClick = { batchLeaveType = "HOLIDAY_LEAVE" },
+                                            label = { Text("Nghỉ lễ", fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFFBB86FC).copy(alpha = 0.3f),
+                                                selectedLabelColor = Color(0xFFBB86FC)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        FilterChip(
+                                            selected = batchLeaveType == "UNAUTHORIZED_LEAVE",
+                                            onClick = { batchLeaveType = "UNAUTHORIZED_LEAVE" },
+                                            label = { Text("Không phép", fontSize = 11.sp) },
+                                            colors = FilterChipDefaults.filterChipColors(
+                                                selectedContainerColor = Color(0xFFEB5757).copy(alpha = 0.3f),
+                                                selectedLabelColor = Color(0xFFEB5757)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+
+                                    AdminInputField(
+                                        label = "Ngày nghỉ (DD/MM/YYYY)",
+                                        value = batchDateInput,
+                                        onValueChange = { input ->
+                                            val clean = input.filter { it.isDigit() }.take(8)
+                                            batchDateInput = clean
+                                        },
+                                        keyboardType = KeyboardType.Number,
+                                        visualTransformation = DateVisualTransformation()
+                                    )
+
+                                    AdminInputField(
+                                        label = "Lý do / Ghi chú",
+                                        value = batchNote,
+                                        onValueChange = { batchNote = it }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -775,6 +871,9 @@ fun AdminScreen(
                             }
                             1 -> {
                                 adminViewModel.batchCheckout(formattedDateStr, batchClockOut.trim(), batchNote.trim())
+                            }
+                            4 -> {
+                                adminViewModel.batchAddLeave(formattedDateStr, batchLeaveType, batchNote.trim())
                             }
                             2 -> {
                                 if (batchLcb.isNotEmpty() || batchPcXangXe.isNotEmpty() || batchChuyenCan.isNotEmpty()) {
@@ -829,6 +928,7 @@ fun AdminScreen(
                             1 -> AccentOrange
                             2 -> Color(0xFF00E676)
                             3 -> NeonBlue
+                            4 -> Color(0xFFA855F7)
                             else -> NeonBlue
                         }
                     )
@@ -838,6 +938,7 @@ fun AdminScreen(
                             1 -> "Xác nhận Ra Ca (${selectedIds.size} NV)"
                             2 -> "Cập nhật Lương (${selectedIds.size} NV)"
                             3 -> "Gán Chức Vụ (${selectedIds.size} NV)"
+                            4 -> "Ghi nhận Nghỉ phép (${selectedIds.size} NV)"
                             else -> "Chấm Công (${selectedIds.size} NV)"
                         },
                         fontWeight = FontWeight.Bold
@@ -1655,23 +1756,25 @@ fun EmployeeDetailView(
                     if (todayRec == null || todayRec.clockInTime == 0L) {
                         val isTodayHolidayOrNear = com.example.data.SalaryCalculator.isNearHolidayWindow(todayDmy, daysRange = 3)
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Button(
                                 onClick = {
                                     val now = System.currentTimeMillis()
-                                    adminViewModel.saveAttendanceRecord(
+                                    adminViewModel.saveAttendanceRecordWithLeaveSync(
                                         AttendanceRecord(
                                             uid = employee.userId,
                                             dateString = todayDmy,
                                             clockInTime = now,
                                             status = "NORMAL"
-                                        )
+                                        ),
+                                        employee = employee,
+                                        previousRecord = todayRec
                                     )
                                 },
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
                             ) {
@@ -1681,7 +1784,7 @@ fun EmployeeDetailView(
                             if (isTodayHolidayOrNear) {
                                 Button(
                                     onClick = {
-                                        adminViewModel.saveAttendanceRecord(
+                                        adminViewModel.saveAttendanceRecordWithLeaveSync(
                                             AttendanceRecord(
                                                 uid = employee.userId,
                                                 dateString = todayDmy,
@@ -1689,11 +1792,13 @@ fun EmployeeDetailView(
                                                 clockOutTime = null,
                                                 status = "HOLIDAY_LEAVE",
                                                 notes = "Nghỉ lễ có lương"
-                                            )
+                                            ),
+                                            employee = employee,
+                                            previousRecord = todayRec
                                         )
                                     },
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                                    modifier = Modifier.weight(1f).height(32.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(32.dp),
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBB86FC))
                                 ) {
@@ -1703,31 +1808,53 @@ fun EmployeeDetailView(
 
                             Button(
                                 onClick = {
-                                    adminViewModel.saveAttendanceRecord(
+                                    adminViewModel.saveAttendanceRecordWithLeaveSync(
                                         AttendanceRecord(
                                             uid = employee.userId,
                                             dateString = todayDmy,
                                             clockInTime = 0L,
                                             clockOutTime = null,
                                             status = "PAID_LEAVE",
-                                            notes = "Nghỉ phép có lương"
-                                        )
+                                            notes = "Nghỉ phép năm"
+                                        ),
+                                        employee = employee,
+                                        previousRecord = todayRec
                                     )
-                                    if (employee.phepNamConLai > 0) {
-                                        adminViewModel.saveEmployeeConfig(employee.copy(phepNamConLai = (employee.phepNamConLai - 1).coerceAtLeast(0)))
-                                    }
                                 },
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF2C94C))
                             ) {
-                                Text("Nghỉ phép", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Phép năm", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
 
                             Button(
                                 onClick = {
-                                    adminViewModel.saveAttendanceRecord(
+                                    adminViewModel.saveAttendanceRecordWithLeaveSync(
+                                        AttendanceRecord(
+                                            uid = employee.userId,
+                                            dateString = todayDmy,
+                                            clockInTime = 0L,
+                                            clockOutTime = null,
+                                            status = "UNPAID_LEAVE",
+                                            notes = "Nghỉ phép thường (không lương)"
+                                        ),
+                                        employee = employee,
+                                        previousRecord = todayRec
+                                    )
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                            ) {
+                                Text("Phép thường", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    adminViewModel.saveAttendanceRecordWithLeaveSync(
                                         AttendanceRecord(
                                             uid = employee.userId,
                                             dateString = todayDmy,
@@ -1735,11 +1862,13 @@ fun EmployeeDetailView(
                                             clockOutTime = null,
                                             status = "UNAUTHORIZED_LEAVE",
                                             notes = "Nghỉ không phép"
-                                        )
+                                        ),
+                                        employee = employee,
+                                        previousRecord = todayRec
                                     )
                                 },
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(32.dp),
                                 shape = RoundedCornerShape(8.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEB5757))
                             ) {
@@ -2346,20 +2475,22 @@ fun EmployeeDetailView(
                                     }
                                     val finalNote = if (noteText.isNotBlank()) noteText.trim() else defaultNote
 
-                                    adminViewModel.saveAttendanceRecord(
-                                        AttendanceRecord(
+                                    val existingRecord = filteredRecords.find { 
+                                        com.example.data.SalaryCalculator.normalizeDateToDmy(it.dateString) == dbDateStr 
+                                    }
+
+                                    adminViewModel.saveAttendanceRecordWithLeaveSync(
+                                        record = AttendanceRecord(
                                             uid = employee.userId, 
                                             dateString = dbDateStr, 
                                             clockInTime = fullIn, 
                                             clockOutTime = fullOut,
                                             status = recordType,
                                             notes = finalNote
-                                        )
+                                        ),
+                                        employee = employee,
+                                        previousRecord = existingRecord
                                     )
-
-                                    if (recordType == "PAID_LEAVE" && employee.phepNamConLai > 0) {
-                                        adminViewModel.saveEmployeeConfig(employee.copy(phepNamConLai = (employee.phepNamConLai - 1).coerceAtLeast(0)))
-                                    }
                                 } catch (e: Exception) {}
                                 showAddAttendanceDialog = false
                             }) { Text("Lưu") }
@@ -2386,6 +2517,7 @@ fun AttendanceSummaryBoard(
     totalRecordCount: Int = 0,
     filteredRecords: List<AttendanceRecord> = emptyList(),
     employee: UserConfig,
+    adminViewModel: AdminViewModel = viewModel(),
     onShowCalendar: () -> Unit
 ) {
     var showLeavesDetailDialog by remember { mutableStateOf(false) }
@@ -2618,18 +2750,37 @@ fun AttendanceSummaryBoard(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Surface(
-                                        color = badgeColor.copy(alpha = 0.15f),
-                                        shape = RoundedCornerShape(6.dp),
-                                        border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.4f))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text(
-                                            text = typeLabel,
-                                            color = badgeColor,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                        )
+                                        Surface(
+                                            color = badgeColor.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(6.dp),
+                                            border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.4f))
+                                        ) {
+                                            Text(
+                                                text = typeLabel,
+                                                color = badgeColor,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                adminViewModel.deleteAttendanceRecord(employee.userId, r.dateString)
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Xóa ngày nghỉ",
+                                                tint = AccentOrange,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -3977,37 +4128,61 @@ fun EmployeePayslipView(
         day == todayDayOfMonth && (e.checkInTime != null || e.isWorking || com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) || com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "HOLIDAY_LEAVE")
     }
 
-    // Projected state calculations
     val startProjectionDay = if (!isCurrentSelectedMonth) 1 else if (hasTodayLogged) (todayDayOfMonth + 1).coerceAtMost(maxDaysInMo + 1) else todayDayOfMonth.coerceAtMost(maxDaysInMo + 1)
-    
-    val remainingWeekdays = if (!isCurrentSelectedMonth) 0 else {
-        var count = 0
-        val cal = Calendar.getInstance()
-        for (day in startProjectionDay..maxDaysInMo) {
-            cal.set(targetYear, targetMonth - 1, day)
-            val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
-            val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
-            val isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-            if (!isSunday && !isHoliday) {
-                count++
-            }
-        }
-        count
-    }
 
-    val remainingSundays = if (!isCurrentSelectedMonth) 0 else {
-        var count = 0
-        val cal = Calendar.getInstance()
-        for (day in startProjectionDay..maxDaysInMo) {
-            cal.set(targetYear, targetMonth - 1, day)
-            val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
-            val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
-            val isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-            if (isSunday && !isHoliday) {
-                count++
+    // State for interactive projections
+    var customOt15DaysCountDay by remember { mutableStateOf(0.0) }
+    var customOt15DaysCountNight by remember { mutableStateOf(0.0) }
+
+    val defaultRemainingSundays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, timeEntries) {
+        if (!isCurrentSelectedMonth) 0 else {
+            val cal = Calendar.getInstance()
+            var count = 0
+            for (day in startProjectionDay..maxDaysInMo) {
+                cal.set(targetYear, targetMonth - 1, day)
+                val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
+                val dmyStr = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
+                val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
+                val isBookedLeave = timeEntries.any { e ->
+                    (e.date == dateStr || e.date == dmyStr) && (
+                        com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) ||
+                        com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) ||
+                        e.dayType == "UNAUTHORIZED_LEAVE"
+                    )
+                }
+                if (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY && !isHoliday && !isBookedLeave) {
+                    count++
+                }
             }
+            count
         }
-        count
+    }
+    var remainingSundaysDay by remember(defaultRemainingSundays) { mutableStateOf(defaultRemainingSundays) }
+    var remainingSundaysNight by remember { mutableStateOf(0) }
+    val remainingSundays = remainingSundaysDay + remainingSundaysNight
+
+    val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, timeEntries) {
+        if (!isCurrentSelectedMonth) 0 else {
+            val cal = Calendar.getInstance()
+            var count = 0
+            for (day in startProjectionDay..maxDaysInMo) {
+                cal.set(targetYear, targetMonth - 1, day)
+                val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
+                val dmyStr = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
+                val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
+                val isBookedLeave = timeEntries.any { e ->
+                    (e.date == dateStr || e.date == dmyStr) && (
+                        com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType) ||
+                        com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) ||
+                        e.dayType == "UNAUTHORIZED_LEAVE"
+                    )
+                }
+                if (cal.get(Calendar.DAY_OF_WEEK) != Calendar.SUNDAY && !isHoliday && !isBookedLeave) {
+                    count++
+                }
+            }
+            count
+        }
     }
 
     val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
@@ -4020,32 +4195,59 @@ fun EmployeePayslipView(
 
     var includeSundayInProjection by remember(hasWorkedSunday) { mutableStateOf(hasWorkedSunday) }
 
-    val additionalWeekdaysPay = remainingWeekdays * dailySalary
-    val sundayHoursPerShift = (12.0 - (if (employee.tinhKhauTruNghi) employee.soGioNghiGiaiLao else 0.0)).coerceAtLeast(8.0)
-    val additionalSundaysPay = if (includeSundayInProjection) {
-        remainingSundays * sundayHoursPerShift * hourlySalary * employee.heSoOtChuNhat
+    val breakHours = if (employee.tinhKhauTruNghi) employee.soGioNghiGiaiLao else 0.0
+    val shiftDuration = com.example.data.SalaryCalculator.parseShiftDuration(employee.lichTrinh)
+    val sundayHoursPerShift = (shiftDuration - breakHours).coerceAtLeast(0.0)
+    val dailyOtHoursMax = (shiftDuration - 8.0 - breakHours).coerceAtLeast(0.0)
+
+    val additionalSundaysDayHours = remainingSundaysDay * sundayHoursPerShift
+    val additionalSundaysNightHours = remainingSundaysNight * sundayHoursPerShift
+
+    val additionalSundaysDayPay = if (includeSundayInProjection) {
+        additionalSundaysDayHours * hourlySalary * employee.heSoOtChuNhat
     } else {
         0.0
     }
+    val additionalSundaysNightPay = if (includeSundayInProjection) {
+        additionalSundaysNightHours * hourlySalary * employee.heSoOtChuNhat
+    } else {
+        0.0
+    }
+    val additionalSundaysNightAllowance = if (includeSundayInProjection) {
+        remainingSundaysNight * employee.pcCaDem
+    } else {
+        0.0
+    }
+    val additionalSundaysPay = additionalSundaysDayPay + additionalSundaysNightPay
+    val projectedSundays = if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight) else 0
 
     val unpaidDaysCount = remember(timeEntries) {
         timeEntries.count { e -> com.example.data.SalaryCalculator.isUnpaidLeaveType(e.dayType) || e.dayType == "UNAUTHORIZED_LEAVE" }
     }
     val hasLoggedUnpaidOrAbsent = unpaidDaysCount > 0
 
-    val projectedRemainingWorkdays = remainingWeekdays.toDouble()
+    val totalProjectedOtDays = customOt15DaysCountDay + customOt15DaysCountNight
+
+    val futurePaidLeavesCount = remember(timeEntries, isCurrentSelectedMonth, startProjectionDay, targetYear, targetMonth) {
+        if (!isCurrentSelectedMonth) 0.0 else {
+            val todayYmd = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, startProjectionDay)
+            timeEntries.count { e ->
+                val normD = com.example.data.SalaryCalculator.normalizeToYmd(e.date)
+                normD >= todayYmd && com.example.data.SalaryCalculator.isPaidLeaveType(e.dayType)
+            }.toDouble()
+        }
+    }
 
     val soNgayCongDuKien = if (isCurrentSelectedMonth) {
-        val rawProjected = summary.workingDays + projectedRemainingWorkdays
-        if (unpaidDaysCount > 0) {
-            (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0).coerceAtMost(standardTargetDays)
-        } else {
-            standardTargetDays.coerceAtLeast(rawProjected.coerceAtMost(standardTargetDays))
-        }
+        val rawProjected = summary.workingDays + totalProjectedOtDays + futurePaidLeavesCount
+        val maxReachableDays = if (unpaidDaysCount > 0) (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0) else standardTargetDays
+        rawProjected.coerceAtMost(maxReachableDays).coerceAtLeast(0.0)
     } else {
         summary.workingDays.coerceAtMost(standardTargetDays)
     }
     val soNgayCongDuKienDouble = soNgayCongDuKien
+
+    val projectedPresenceDays = summary.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
 
     fun calcPr(fieldName: String, valRaw: Double): Double {
         return com.example.data.SalaryCalculator.calculateAllowanceValue(
@@ -4053,9 +4255,9 @@ fun EmployeePayslipView(
             allowanceValue = valRaw,
             calcType = employee.getCalcTypeFor(fieldName),
             totalWorkDays = soNgayCongDuKienDouble,
-            comCaCount = soNgayCongDuKienDouble.toInt(),
+            comCaCount = projectedPresenceDays.toInt(),
             comOtCount = 0,
-            nightShiftsCount = summary.caDemCount,
+            nightShiftsCount = summary.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0) + (if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight else 0),
             scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
             totalScheduledDaysInMonth = standardTargetDays.toInt()
         )
@@ -4072,14 +4274,14 @@ fun EmployeePayslipView(
             val calcType = employee.getCalcTypeFor("pcComCa")
             when (calcType) {
                 "PER_WORK_DAY" -> {
-                    summary.actualPresenceDays * employee.pcComCa
+                    projectedPresenceDays * employee.pcComCa
                 }
                 "FIXED_FULL" -> employee.pcComCa
                 "MONTHLY_PRO_RATED" -> {
                     val ratio = (soNgayCongDuKienDouble / standardTargetDays).coerceAtMost(1.0)
                     employee.pcComCa * ratio
                 }
-                else -> summary.actualPresenceDays * employee.pcComCa
+                else -> projectedPresenceDays * employee.pcComCa
             }
         } else {
             summary.pcComCaVal
@@ -4088,7 +4290,9 @@ fun EmployeePayslipView(
         summary.pcComCaVal
     }
 
-    val pcComOtShow = summary.pcComOtVal
+    val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
+    val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * employee.pcComOt else 0.0
+    val pcComOtShow = if (selectedTab == 1) summary.pcComOtVal + otMealAllowance else summary.pcComOtVal
 
     val pcNhaOShow = if (selectedTab == 1) calcPr("pcNhaO", employee.pcNhaO) else summary.pcNhaOVal
     val pcDocHaiShow = if (selectedTab == 1) calcPr("pcDocHai", employee.pcDocHai) else summary.pcDocHaiVal
@@ -4111,16 +4315,26 @@ fun EmployeePayslipView(
             summary.pcDtDoanhThuVal + summary.pcXangXeVal + summary.pcKhac1Val + summary.pcThamNienVal + summary.phuCapChuyenCan +
             summary.pcCaDemVal
 
+    val customNightAllowance = if (selectedTab == 1) {
+        customOt15DaysCountNight * employee.pcCaDem
+    } else 0.0
+
     val fullProjectedAllowancesSum = pcKyThuatShow + pcTrachNhiemShow + pcChucVuShow + pcHieuSuatShow +
             pcSanPhamShow + pcComCaShow + pcComOtShow + pcNhaOShow + pcDocHaiShow + 
             pcDtDoanhThuShow + pcXangXeShow + pcKhac1Show + pcThamNienShow + pcChuyenCanShow +
-            summary.pcCaDemVal
+            (summary.pcCaDemVal + customNightAllowance + additionalSundaysNightAllowance)
 
     val allowanceAdjustment = fullProjectedAllowancesSum - currentProratedAllowancesSum
     val baseSalaryAdjustment = if (isCurrentSelectedMonth) (luongDuKienBaseSalary - summary.baseBasicSalary) else 0.0
 
+    val totalOtDayHours = customOt15DaysCountDay * dailyOtHoursMax
+    val totalOtNightHours = customOt15DaysCountNight * dailyOtHoursMax
+    val customOt15PayDayVal = totalOtDayHours * hourlySalary * employee.heSoOtNgayThuong
+    val customOt15PayNightVal = totalOtNightHours * hourlySalary * employee.heSoOtDem
+    val customOt15Pay = customOt15PayDayVal + customOt15PayNightVal
+
     val finalLuongHienThi = if (selectedTab == 1) {
-        summary.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + allowanceAdjustment
+        summary.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + additionalSundaysNightAllowance + allowanceAdjustment + customOt15Pay + customNightAllowance
     } else {
         summary.luongThucNhan
     }
@@ -4255,6 +4469,17 @@ fun EmployeePayslipView(
 
                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
+                val annualLeavesCount = remember(timeEntries) { timeEntries.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) } }
+                val holidayLeavesCount = remember(timeEntries) { timeEntries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) } }
+                val unpaidLeavesCount = remember(timeEntries) { timeEntries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) } }
+                val totalActualWorkDays = summary.actualPresenceDays
+                val workDaysVal = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalProjectedOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
+                val leavePartsBreakdown = mutableListOf<String>()
+                if (workDaysVal > 0.0) leavePartsBreakdown.add("${df.format(workDaysVal)} ngày làm việc")
+                if (annualLeavesCount > 0) leavePartsBreakdown.add("${annualLeavesCount} ngày phép năm")
+                if (holidayLeavesCount > 0) leavePartsBreakdown.add("${holidayLeavesCount} ngày lễ")
+                val breakdownStr = if (leavePartsBreakdown.size > 1) " (${leavePartsBreakdown.joinToString(" + ")})" else ""
+
                 // Employee Metadata
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -4268,20 +4493,399 @@ fun EmployeePayslipView(
                         Text(employee.roleName, color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Lương cơ bản (26 ngày):", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Mức lương cơ bản:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("${fmt.format(employee.luongCoBan)}đ", color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Ngày công chuẩn:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Tiến độ tháng (Công chuẩn):", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("${summary.standardWorkDays} ngày", color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                        val progressDaysShow = if (selectedTab == 1) soNgayCongDuKienDouble else summary.actualStandardWorkingDays
+                        Text("${df.format(progressDaysShow)} / ${summary.standardWorkDays} ngày$breakdownStr", color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
                     }
+
+                    val leaveParts = mutableListOf<String>()
+                    if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount} ngày")
+                    if (holidayLeavesCount > 0) leaveParts.add("Nghỉ lễ: ${holidayLeavesCount} ngày")
+                    if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount} ngày")
+                    val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Công làm việc:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Ngày nghỉ:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))
-                        val totalWorkDaysShow = if (selectedTab == 1) soNgayCongDuKienDouble + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0) else summary.actualPresenceDays
-                        Text("${df.format(totalWorkDaysShow)} / ${summary.standardWorkDays} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                        Text(leaveDaysVal, color = White, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                    }
+
+                    if (selectedTab == 1) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ngày làm việc (Dự kiến):", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("${df.format(projectedPresenceDays)} / ${standardTargetDays.toInt()} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                        }
+                        if (isCurrentSelectedMonth) {
+                            val sundayDetails = buildString {
+                                if (includeSundayInProjection && remainingSundays > 0) {
+                                    if (remainingSundaysDay > 0) append(" + $remainingSundaysDay CN ngày")
+                                    if (remainingSundaysNight > 0) append(" + $remainingSundaysNight CN đêm")
+                                }
+                            }
+                            val workAdditionStr = if (totalProjectedOtDays > 0.0 || sundayDetails.isNotBlank()) {
+                                "${df.format(totalProjectedOtDays)} ngày OT 1.5$sundayDetails"
+                            } else {
+                                "Chưa nhập ngày tăng ca OT"
+                            }
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Trong đó làm thêm:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(workAdditionStr, color = NeonBlue, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ngày làm việc (Thực tế):", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("${df.format(totalActualWorkDays)} / ${summary.standardWorkDays} ngày", color = White, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, softWrap = false)
+                        }
+                    }
+                }
+
+                // Interactive Projection Controls for Admin
+                if (selectedTab == 1 && isCurrentSelectedMonth) {
+                    HorizontalDivider(
+                        color = Color(0xFF2C2C2C),
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { includeSundayInProjection = !includeSundayInProjection },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Lịch làm việc có Chủ Nhật", color = LightGray, fontSize = 12.sp)
+                            Switch(
+                                checked = includeSundayInProjection,
+                                onCheckedChange = { includeSundayInProjection = it }
+                            )
+                        }
+
+                        if (includeSundayInProjection) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color(0xFF1E1E1E), RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Text("Phân chia ca làm Chủ Nhật:", color = LightGray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Ca Ngày
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("☀️ Ca ngày (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(x${df.format(employee.heSoOtChuNhat)})", color = AccentGreen, fontSize = 11.sp)
+                                    }
+
+                                    var sundayDayInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysDay.toString())) }
+                                    LaunchedEffect(remainingSundaysDay) {
+                                        if (sundayDayInputText.text != remainingSundaysDay.toString()) {
+                                            sundayDayInputText = sundayDayInputText.copy(
+                                                text = remainingSundaysDay.toString(),
+                                                selection = androidx.compose.ui.text.TextRange(remainingSundaysDay.toString().length)
+                                            )
+                                        }
+                                    }
+
+                                    OutlinedTextField(
+                                        value = sundayDayInputText,
+                                        onValueChange = { newValue ->
+                                            val cleanText = newValue.text.filter { it.isDigit() }
+                                            if (cleanText.isEmpty()) {
+                                                sundayDayInputText = newValue.copy(text = "")
+                                                remainingSundaysDay = 0
+                                            } else {
+                                                cleanText.toIntOrNull()?.let { parsed ->
+                                                    val maxDayAllowed = (defaultRemainingSundays - remainingSundaysNight).coerceAtLeast(0)
+                                                    if (parsed <= maxDayAllowed) {
+                                                        sundayDayInputText = newValue.copy(text = cleanText)
+                                                        remainingSundaysDay = parsed
+                                                    } else {
+                                                        val cappedStr = maxDayAllowed.toString()
+                                                        sundayDayInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                            text = cappedStr,
+                                                            selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                        )
+                                                        remainingSundaysDay = maxDayAllowed
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.width(68.dp).height(46.dp),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            textAlign = TextAlign.Center, 
+                                            color = White, 
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        ),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = AccentGreen,
+                                            unfocusedBorderColor = Color(0xFF3C3C3C),
+                                            focusedContainerColor = Color(0xFF252525),
+                                            unfocusedContainerColor = Color(0xFF181818),
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            cursorColor = AccentGreen
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Ca Đêm
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("🌙 Ca đêm (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("(x${df.format(employee.heSoOtChuNhat)} + đêm)", color = NeonBlue, fontSize = 11.sp)
+                                    }
+
+                                    var sundayNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysNight.toString())) }
+                                    LaunchedEffect(remainingSundaysNight) {
+                                        if (sundayNightInputText.text != remainingSundaysNight.toString()) {
+                                            sundayNightInputText = sundayNightInputText.copy(
+                                                text = remainingSundaysNight.toString(),
+                                                selection = androidx.compose.ui.text.TextRange(remainingSundaysNight.toString().length)
+                                            )
+                                        }
+                                    }
+
+                                    OutlinedTextField(
+                                        value = sundayNightInputText,
+                                        onValueChange = { newValue ->
+                                            val cleanText = newValue.text.filter { it.isDigit() }
+                                            if (cleanText.isEmpty()) {
+                                                sundayNightInputText = newValue.copy(text = "")
+                                                remainingSundaysNight = 0
+                                            } else {
+                                                cleanText.toIntOrNull()?.let { parsed ->
+                                                    val maxNightAllowed = (defaultRemainingSundays - remainingSundaysDay).coerceAtLeast(0)
+                                                    if (parsed <= maxNightAllowed) {
+                                                        sundayNightInputText = newValue.copy(text = cleanText)
+                                                        remainingSundaysNight = parsed
+                                                    } else {
+                                                        val cappedStr = maxNightAllowed.toString()
+                                                        sundayNightInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                            text = cappedStr,
+                                                            selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                        )
+                                                        remainingSundaysNight = maxNightAllowed
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.width(68.dp).height(46.dp),
+                                        textStyle = androidx.compose.ui.text.TextStyle(
+                                            textAlign = TextAlign.Center, 
+                                            color = White, 
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        ),
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = NeonBlue,
+                                            unfocusedBorderColor = Color(0xFF3C3C3C),
+                                            focusedContainerColor = Color(0xFF252525),
+                                            unfocusedContainerColor = Color(0xFF181818),
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            cursorColor = NeonBlue
+                                        ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(
+                        color = Color(0xFF2C2C2C),
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(vertical = 6.dp)
+                    )
+
+                    // OT 1.5 Section
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Tăng ca OT 1.5:", color = LightGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            if (customOt15DaysCountDay > 0 || customOt15DaysCountNight > 0) {
+                                Text(
+                                    text = "+${fmt.format(customOt15Pay)}đ",
+                                    color = AccentGreen,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // OT 1.5 Ngày
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("☀️ OT 1.5 ca ngày:", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("(x${df.format(employee.heSoOtNgayThuong)})", color = NeonBlue, fontSize = 11.sp)
+                            }
+
+                            var otDayInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(customOt15DaysCountDay.toInt().toString())) }
+                            LaunchedEffect(customOt15DaysCountDay) {
+                                if (otDayInputText.text != customOt15DaysCountDay.toInt().toString()) {
+                                    otDayInputText = otDayInputText.copy(
+                                        text = customOt15DaysCountDay.toInt().toString(),
+                                        selection = androidx.compose.ui.text.TextRange(customOt15DaysCountDay.toInt().toString().length)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = otDayInputText,
+                                onValueChange = { newValue ->
+                                    val cleanText = newValue.text.filter { it.isDigit() }
+                                    if (cleanText.isEmpty()) {
+                                        otDayInputText = newValue.copy(text = "")
+                                        customOt15DaysCountDay = 0.0
+                                    } else {
+                                        cleanText.toIntOrNull()?.let { parsed ->
+                                            val maxAllowed = (remainingWeekdays - customOt15DaysCountNight.toInt()).coerceAtLeast(0)
+                                            if (parsed <= maxAllowed) {
+                                                otDayInputText = newValue.copy(text = cleanText)
+                                                customOt15DaysCountDay = parsed.toDouble()
+                                            } else {
+                                                val cappedStr = maxAllowed.toString()
+                                                otDayInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                    text = cappedStr,
+                                                    selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                )
+                                                customOt15DaysCountDay = maxAllowed.toDouble()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.width(68.dp).height(46.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    textAlign = TextAlign.Center, 
+                                    color = White, 
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NeonBlue,
+                                    unfocusedBorderColor = Color(0xFF3C3C3C),
+                                    focusedContainerColor = Color(0xFF252525),
+                                    unfocusedContainerColor = Color(0xFF181818),
+                                    focusedTextColor = White,
+                                    unfocusedTextColor = White,
+                                    cursorColor = NeonBlue
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // OT 1.5 Đêm
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🌙 OT 1.5 ca đêm:", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("(x${df.format(employee.heSoOtDem)})", color = NeonBlue, fontSize = 11.sp)
+                            }
+
+                            var otNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(customOt15DaysCountNight.toInt().toString())) }
+                            LaunchedEffect(customOt15DaysCountNight) {
+                                if (otNightInputText.text != customOt15DaysCountNight.toInt().toString()) {
+                                    otNightInputText = otNightInputText.copy(
+                                        text = customOt15DaysCountNight.toInt().toString(),
+                                        selection = androidx.compose.ui.text.TextRange(customOt15DaysCountNight.toInt().toString().length)
+                                    )
+                                }
+                            }
+
+                            OutlinedTextField(
+                                value = otNightInputText,
+                                onValueChange = { newValue ->
+                                    val cleanText = newValue.text.filter { it.isDigit() }
+                                    if (cleanText.isEmpty()) {
+                                        otNightInputText = newValue.copy(text = "")
+                                        customOt15DaysCountNight = 0.0
+                                    } else {
+                                        cleanText.toIntOrNull()?.let { parsed ->
+                                            val maxAllowed = (remainingWeekdays - customOt15DaysCountDay.toInt()).coerceAtLeast(0)
+                                            if (parsed <= maxAllowed) {
+                                                otNightInputText = newValue.copy(text = cleanText)
+                                                customOt15DaysCountNight = parsed.toDouble()
+                                            } else {
+                                                val cappedStr = maxAllowed.toString()
+                                                otNightInputText = androidx.compose.ui.text.input.TextFieldValue(
+                                                    text = cappedStr,
+                                                    selection = androidx.compose.ui.text.TextRange(cappedStr.length)
+                                                )
+                                                customOt15DaysCountNight = maxAllowed.toDouble()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.width(68.dp).height(46.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    textAlign = TextAlign.Center, 
+                                    color = White, 
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                ),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NeonBlue,
+                                    unfocusedBorderColor = Color(0xFF3C3C3C),
+                                    focusedContainerColor = Color(0xFF252525),
+                                    unfocusedContainerColor = Color(0xFF181818),
+                                    focusedTextColor = White,
+                                    unfocusedTextColor = White,
+                                    cursorColor = NeonBlue
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                        }
                     }
                 }
 
@@ -4345,10 +4949,8 @@ fun EmployeePayslipView(
                 }
 
                 // 3. Overtime Pay
-                val totalOtNgayHienThi = summary.otDayHours + (if (selectedTab == 1 && isCurrentSelectedMonth) remainingWeekdays * 0.0 else 0.0)
-                val totalOtNgayTienHienThi = summary.tienOtNgay
-                if (totalOtNgayHienThi > 0.0 || totalOtNgayTienHienThi > 0.0) {
-                    LocalPayslipMoneyRow(label = "OT ngày ${df.format(employee.heSoOtNgayThuong)} (${df.format(totalOtNgayHienThi)}h)", value = totalOtNgayTienHienThi, isAddition = true, isAccent = true)
+                if (summary.tienOtNgay > 0.0) {
+                    LocalPayslipMoneyRow(label = "OT ngày ${df.format(employee.heSoOtNgayThuong)} (${df.format(summary.otDayHours)}h)", value = summary.tienOtNgay, isAddition = true, isAccent = true)
                 }
                 if (summary.tienOtDem > 0.0) {
                     LocalPayslipMoneyRow(label = "OT đêm ${df.format(employee.heSoOtDem)} (${df.format(summary.otNightHours)}h)", value = summary.tienOtDem, isAddition = true, isAccent = true)
@@ -4366,9 +4968,22 @@ fun EmployeePayslipView(
                     LocalPayslipMoneyRow(label = "OT chủ nhật ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", value = summary.tienChuNhat, isAddition = true, isAccent = true)
                 }
 
+                // Custom OT 1.5 Pay
+                if (selectedTab == 1 && customOt15PayDayVal > 0.0) {
+                    LocalPayslipMoneyRow(label = "OT 1.5 ca ngày (Dự kiến) (${df.format(totalOtDayHours)}h)", value = customOt15PayDayVal, isAddition = true, isAccent = true)
+                }
+                if (selectedTab == 1 && customOt15PayNightVal > 0.0) {
+                    LocalPayslipMoneyRow(label = "OT 1.5 ca đêm (Dự kiến) (${df.format(totalOtNightHours)}h)", value = customOt15PayNightVal, isAddition = true, isAccent = true)
+                }
+
                 // Projected Sunday Pay
                 if (selectedTab == 1 && isCurrentSelectedMonth && includeSundayInProjection && remainingSundays > 0) {
-                    LocalPayslipMoneyRow(label = "OT chủ nhật ${df.format(employee.heSoOtChuNhat)} ($remainingSundays ngày)", value = additionalSundaysPay, isAddition = true, isAccent = true)
+                    if (additionalSundaysDayPay > 0.0) {
+                        LocalPayslipMoneyRow(label = "OT CN - Ca ngày (Dự kiến) ($remainingSundaysDay ngày)", value = additionalSundaysDayPay, isAddition = true, isAccent = true)
+                    }
+                    if (additionalSundaysNightPay > 0.0) {
+                        LocalPayslipMoneyRow(label = "OT CN - Ca đêm (Dự kiến) ($remainingSundaysNight ngày)", value = additionalSundaysNightPay, isAddition = true, isAccent = true)
+                    }
                 }
 
                 // Bonus
@@ -4417,6 +5032,96 @@ fun EmployeePayslipView(
             }
         }
 
+        val fullEntriesForExport = remember(
+            timeEntries, selectedTab, isCurrentSelectedMonth, remainingWeekdays,
+            remainingSundays, includeSundayInProjection, remainingSundaysDay,
+            remainingSundaysNight, customOt15DaysCountDay, customOt15DaysCountNight
+        ) {
+            if (selectedTab != 1 || !isCurrentSelectedMonth) {
+                timeEntries
+            } else {
+                val list = timeEntries.toMutableList()
+                val cal = Calendar.getInstance()
+                val currentYear = cal.get(Calendar.YEAR)
+                val currentMonth = cal.get(Calendar.MONTH)
+                val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val todayDay = cal.get(Calendar.DAY_OF_MONTH)
+
+                val existingDates = timeEntries.map { it.date }.toSet()
+
+                var sunDayLeft = if (includeSundayInProjection) remainingSundaysDay else 0
+                var sunNightLeft = if (includeSundayInProjection) remainingSundaysNight else 0
+                var ot15DayLeft = customOt15DaysCountDay.toInt()
+                var ot15NightLeft = customOt15DaysCountNight.toInt()
+
+                for (day in (todayDay + 1)..daysInMonth) {
+                    val dCal = Calendar.getInstance().apply { set(currentYear, currentMonth, day) }
+                    val dateStr = String.format(Locale.US, "%02d/%02d/%04d", day, currentMonth + 1, currentYear)
+                    if (existingDates.contains(dateStr)) continue
+
+                    val isSun = dCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                    if (isSun) {
+                        if (sunDayLeft > 0) {
+                            list.add(
+                                com.example.data.model.TimeEntry(
+                                    id = 0,
+                                    userId = employee.maNhanVien,
+                                    date = dateStr,
+                                    checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0) }.timeInMillis,
+                                    checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
+                                    shiftType = "DAY",
+                                    dayType = "SUNDAY",
+                                    note = "Dự kiến (OT CN Ca ngày)"
+                                )
+                            )
+                            sunDayLeft--
+                        } else if (sunNightLeft > 0) {
+                            list.add(
+                                com.example.data.model.TimeEntry(
+                                    id = 0,
+                                    userId = employee.maNhanVien,
+                                    date = dateStr,
+                                    checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
+                                    checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                    shiftType = "NIGHT",
+                                    dayType = "SUNDAY",
+                                    note = "Dự kiến (OT CN Ca đêm)"
+                                )
+                            )
+                            sunNightLeft--
+                        }
+                    } else {
+                        val isHoliday = com.example.data.SalaryCalculator.isHoliday(dateStr)
+                        if (!isHoliday) {
+                            val isOtDay = ot15DayLeft > 0
+                            val isOtNight = !isOtDay && ot15NightLeft > 0
+                            if (isOtDay) ot15DayLeft--
+                            else if (isOtNight) ot15NightLeft--
+                            
+                            if (isOtDay || isOtNight) {
+                                val shiftT = if (isOtNight) "NIGHT" else "DAY"
+                                val noteStr = if (isOtDay) "Dự kiến (OT 1.5 Ca ngày)" else "Dự kiến (OT 1.5 Ca đêm)"
+                                
+                                list.add(
+                                    com.example.data.model.TimeEntry(
+                                        id = 0,
+                                        userId = employee.maNhanVien,
+                                        date = dateStr,
+                                        checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 19 else 7, 30, 0) }.timeInMillis,
+                                        checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 7 else 19, 30, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                        shiftType = shiftT,
+                                        dayType = "NORMAL",
+                                        note = noteStr
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+                list
+            }
+        }
+
         // Action Buttons (Export PDF / Resync)
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -4424,7 +5129,31 @@ fun EmployeePayslipView(
         ) {
             Button(
                 onClick = {
-                    adminViewModel.exportSingleEmployeePayslip(context, employee, selectedMonthYm)
+                    com.example.util.ExportUtils.sharePayslipAndAttendanceAsPdf(
+                        context = context,
+                        entries = fullEntriesForExport,
+                        summary = summary,
+                        config = employee,
+                        userSession = null,
+                        monthLabel = monthLabel,
+                        selectedMonth = selectedMonthYm,
+                        selectedTab = selectedTab,
+                        includeSundayInProjection = includeSundayInProjection,
+                        remainingWeekdays = remainingWeekdays,
+                        remainingSundays = remainingSundays,
+                        remainingSundaysDay = remainingSundaysDay,
+                        remainingSundaysNight = remainingSundaysNight,
+                        dailySalary = dailySalary,
+                        luongDuKienVal = finalLuongHienThi,
+                        soNgayCongDuKien = soNgayCongDuKienDouble,
+                        customOt15DaysCountDay = customOt15DaysCountDay,
+                        customOt15DaysCountNight = customOt15DaysCountNight,
+                        customOt15PayDay = customOt15PayDayVal,
+                        customOt15PayNight = customOt15PayNightVal,
+                        customNightAllowance = customNightAllowance,
+                        hasLoggedUnpaidOrAbsent = hasLoggedUnpaidOrAbsent,
+                        breakHours = breakHours
+                    )
                 },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = NeonBlue),

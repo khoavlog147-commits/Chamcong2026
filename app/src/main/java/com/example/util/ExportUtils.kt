@@ -414,9 +414,70 @@ object ExportUtils {
             summary.phuCapChuyenCan
         }
 
-        // 1. Create offline Bitmap with Dynamic Height
+        // 1. Dynamic Row Calculation to size the Bitmap properly
+        val shiftDurationPNG = com.example.data.SalaryCalculator.parseShiftDuration(config.lichTrinh)
+        val dailyOtHoursMaxPNG = (shiftDurationPNG - 8.0 - breakHours).coerceAtLeast(0.0)
+        val sundayHoursPerShiftPNG = (shiftDurationPNG - breakHours).coerceAtLeast(0.0)
+        val hourlySalaryPNG = dailySalary / 8.0
+
+        val projOtDayHoursPNG = if (selectedTab == 1) customOt15DaysCountDay * dailyOtHoursMaxPNG else 0.0
+        val totalOtDayHoursPNG = summary.otDayHours + projOtDayHoursPNG
+        val totalOtDayPayPNG = summary.tienOtNgay + (if (selectedTab == 1) customOt15PayDay else 0.0)
+
+        val projSunDayHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPNG else 0.0
+        val totalSunDayHoursPNG = summary.chuNhatDayHours + projSunDayHoursPNG
+        val totalSunDayPayPNG = summary.tienChuNhatNgay + (if (selectedTab == 1 && includeSundayInProjection) projSunDayHoursPNG * hourlySalaryPNG * config.heSoOtChuNhat else 0.0)
+
+        val projSunNightHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPNG else 0.0
+        val totalSunNightHoursPNG = summary.chuNhatNightHours + projSunNightHoursPNG
+        val totalSunNightPayPNG = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPNG * hourlySalaryPNG * config.heSoOtChuNhat else 0.0)
+
+        val projOtNightHoursPNG = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMaxPNG else 0.0
+        val totalOtNightHoursPNG = summary.otNightHours + projOtNightHoursPNG
+        val totalOtNightPayPNG = summary.tienOtDem + (if (selectedTab == 1) customOt15PayNight else 0.0)
+
+        val finalCaDemCountPNG = summary.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() + (if (includeSundayInProjection) remainingSundaysNight else 0) else 0)
+        val finalCaDemValPNG = summary.pcCaDemVal + (if (selectedTab == 1) customNightAllowance + (if (includeSundayInProjection) remainingSundaysNight * config.pcCaDem else 0.0) else 0.0)
+
+        var totalRowCount = 0
+        // Section 1
+        totalRowCount += 5
+        if (config.boPhan.isNotBlank()) totalRowCount++
+        if (config.emailDangKy.isNotBlank()) totalRowCount++
+        totalRowCount++ // Attendance row
+
+        // Section 2
+        totalRowCount++ // LCB thực nhận
+        if (pcChuyenCanShowPNG > 0.0) totalRowCount++
+        if (pcTrachNhiemShowPNG > 0.0) totalRowCount++
+        if (pcKyThuatShowPNG > 0.0) totalRowCount++
+        if (pcHieuSuatShowPNG > 0.0) totalRowCount++
+        if (pcSanPhamShowPNG > 0.0) totalRowCount++
+        if (pcChucVuShowPNG > 0.0) totalRowCount++
+        if (pcDocHaiShowPNG > 0.0) totalRowCount++
+        if (pcDtDoanhThuShowPNG > 0.0) totalRowCount++
+        if (pcThamNienShowPNG > 0.0) totalRowCount++
+        if (pcComCaShowPNG > 0.0) totalRowCount++
+        if (pcComOtShowPNG > 0.0) totalRowCount++
+        if (totalOtDayHoursPNG > 0.0) totalRowCount++
+        if (totalSunDayHoursPNG > 0.0) totalRowCount++
+        if (totalSunNightHoursPNG > 0.0) totalRowCount++
+        if (totalSunDayHoursPNG == 0.0 && totalSunNightHoursPNG == 0.0 && summary.tienChuNhat > 0.0) totalRowCount++
+        if (summary.tienOtLe > 0.0) totalRowCount++
+        if (totalOtNightHoursPNG > 0.0) totalRowCount++
+        if (finalCaDemValPNG > 0.0) totalRowCount++
+        if (pcXangXeShowPNG > 0.0) totalRowCount++
+        if (pcNhaOShowPNG > 0.0) totalRowCount++
+        if (pcKhac1ShowPNG > 0.0) totalRowCount++
+
+        // Section 3
+        if (summary.tienBh > 0.0) totalRowCount++
+        if (summary.doanPhi > 0.0) totalRowCount++
+        if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) totalRowCount++
+
+        // 2. Create offline Bitmap with Dynamic Height
         val width = 1000
-        var estimatedHeight = 1850
+        val estimatedHeight = (280 + 350 + (totalRowCount * 55) + 140 + 160 + 80).coerceAtLeast(1850)
         
         val bitmap = Bitmap.createBitmap(width, estimatedHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
@@ -535,23 +596,10 @@ object ExportUtils {
         if (pcComCaShowPNG > 0.0) drawRow("Phụ cấp cơm ca", "+${fmt.format(pcComCaShowPNG)}đ", paintGreen)
         if (pcComOtShowPNG > 0.0) drawRow("Phụ cấp cơm OT", "+${fmt.format(pcComOtShowPNG)}đ", paintGreen)
         
-        val shiftDurationPNG = com.example.data.SalaryCalculator.parseShiftDuration(config.lichTrinh)
-        val dailyOtHoursMaxPNG = (shiftDurationPNG - 8.0 - breakHours).coerceAtLeast(0.0)
-        val sundayHoursPerShiftPNG = (shiftDurationPNG - breakHours).coerceAtLeast(0.0)
-
-        val projOtDayHoursPNG = if (selectedTab == 1) customOt15DaysCountDay * dailyOtHoursMaxPNG else 0.0
-        val totalOtDayHoursPNG = summary.otDayHours + projOtDayHoursPNG
-        val totalOtDayPayPNG = summary.tienOtNgay + (if (selectedTab == 1) customOt15PayDay else 0.0)
         if (totalOtDayHoursPNG > 0.0) drawRow("OT ngày ${df.format(config.heSoOtNgayThuong)} (${df.format(totalOtDayHoursPNG)}h)", "+${fmt.format(totalOtDayPayPNG)}đ", paintGreen)
 
-        val projSunDayHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysDay * sundayHoursPerShiftPNG else 0.0
-        val totalSunDayHoursPNG = summary.chuNhatDayHours + projSunDayHoursPNG
-        val totalSunDayPayPNG = summary.tienChuNhatNgay + (if (selectedTab == 1 && includeSundayInProjection) projSunDayHoursPNG * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
         if (totalSunDayHoursPNG > 0.0) drawRow("OT CN - Ca ngày ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunDayHoursPNG)}h)", "+${fmt.format(totalSunDayPayPNG)}đ", paintGreen)
 
-        val projSunNightHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPNG else 0.0
-        val totalSunNightHoursPNG = summary.chuNhatNightHours + projSunNightHoursPNG
-        val totalSunNightPayPNG = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPNG * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
         if (totalSunNightHoursPNG > 0.0) drawRow("OT CN - Ca đêm ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunNightHoursPNG)}h)", "+${fmt.format(totalSunNightPayPNG)}đ", paintGreen)
 
         if (totalSunDayHoursPNG == 0.0 && totalSunNightHoursPNG == 0.0 && summary.tienChuNhat > 0.0) {
@@ -559,13 +607,8 @@ object ExportUtils {
         }
         if (summary.tienOtLe > 0.0) drawRow("OT lễ ${df.format(config.heSoOtNgayLe)} (${df.format(summary.otLeHours)}h)", "+${fmt.format(summary.tienOtLe)}đ", paintGreen)
 
-        val projOtNightHoursPNG = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMaxPNG else 0.0
-        val totalOtNightHoursPNG = summary.otNightHours + projOtNightHoursPNG
-        val totalOtNightPayPNG = summary.tienOtDem + (if (selectedTab == 1) customOt15PayNight else 0.0)
         if (totalOtNightHoursPNG > 0.0) drawRow("OT đêm ${df.format(config.heSoOtDem)} (${df.format(totalOtNightHoursPNG)}h)", "+${fmt.format(totalOtNightPayPNG)}đ", paintGreen)
         
-        val finalCaDemCountPNG = summary.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() + (if (includeSundayInProjection) remainingSundaysNight else 0) else 0)
-        val finalCaDemValPNG = summary.pcCaDemVal + (if (selectedTab == 1) customNightAllowance + (if (includeSundayInProjection) remainingSundaysNight * config.pcCaDem else 0.0) else 0.0)
         if (finalCaDemValPNG > 0.0) drawRow("Phụ cấp ca đêm ($finalCaDemCountPNG ca)", "+${fmt.format(finalCaDemValPNG)}đ", paintGreen)
         if (pcXangXeShowPNG > 0.0) drawRow("Phụ cấp xăng xe", "+${fmt.format(pcXangXeShowPNG)}đ", paintGreen)
         if (pcNhaOShowPNG > 0.0) drawRow("Phụ cấp nhà ở", "+${fmt.format(pcNhaOShowPNG)}đ", paintGreen)
@@ -576,21 +619,35 @@ object ExportUtils {
         drawSectionHeader("KHẤU TRỪ & NGHĨA VỤ (-)")
         if (summary.tienBh > 0.0) drawRow("Bảo hiểm xã hội (10.5%)", "-${fmt.format(summary.tienBh)}đ", paintRed)
         if (summary.doanPhi > 0.0) drawRow("Kinh phí công đoàn", "-${fmt.format(summary.doanPhi)}đ", paintRed)
+        if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) {
+            val missed = ((if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble() - summary.workingDays).coerceAtLeast(0.0)
+            drawRow("Khấu trừ nghỉ vắng (${df.format(missed)} ngày)", "-${fmt.format(summary.tienKhauTruNghi)}đ", paintRed)
+        }
         
-        // Total Footer
-        currentY += 40f
-        canvas.drawRect(60f, currentY, (width - 60).toFloat(), currentY + 120f, Paint().apply { color = android.graphics.Color.parseColor("#1A1D2E") })
+        // Total Footer Card
+        currentY += 30f
+        val cardTop = currentY
+        val cardHeight = 110f
+        val cardRect = android.graphics.RectF(60f, cardTop, (width - 60).toFloat(), cardTop + cardHeight)
+        val paintCardBg = Paint().apply { color = android.graphics.Color.parseColor("#1A1D2E") }
+        canvas.drawRoundRect(cardRect, 12f, 12f, paintCardBg)
         
-        currentY += 75f
         val totalLabel = if (selectedTab == 1) "DỰ KIẾN THỰC NHẬN" else "TỔNG LƯƠNG THỰC NHẬN"
         val totalValue = if (selectedTab == 1) luongDuKienVal else summary.luongThucNhan
-        canvas.drawText(totalLabel, 90f, currentY, paintTextSubTitle)
+        val textCenterY = cardTop + (cardHeight / 2) + 10f
+        canvas.drawText(totalLabel, 90f, textCenterY, paintTextSubTitle)
         
         val netText = "${fmt.format(totalValue)} VNĐ"
-        canvas.drawText(netText, (width - 90).toFloat(), currentY, Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 38f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT })
+        val paintNet = Paint().apply { 
+            color = android.graphics.Color.parseColor("#00E676")
+            textSize = 36f
+            isFakeBoldText = true
+            textAlign = Paint.Align.RIGHT 
+        }
+        canvas.drawText(netText, (width - 90).toFloat(), textCenterY, paintNet)
 
-        // Footer Brand
-        currentY = estimatedHeight - 100f
+        // Footer Brand - Sequential strictly below the Total Card with clean spacing
+        currentY = cardTop + cardHeight + 60f
         canvas.drawText("XUẤT TỪ HỆ THỐNG QUẢN LÝ TIMESNAP PRO", (width / 2).toFloat(), currentY, paintBrand)
         currentY += 30f
         canvas.drawText("DEVELOPED BY TRUONGVANKHOA", (width / 2).toFloat(), currentY, Paint().apply { color = android.graphics.Color.parseColor("#8F9BB3"); textSize = 14f; textAlign = Paint.Align.CENTER })

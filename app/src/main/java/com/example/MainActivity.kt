@@ -53,10 +53,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Info
 import kotlinx.coroutines.launch
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         try {
             com.google.firebase.FirebaseApp.initializeApp(applicationContext)
@@ -94,9 +96,7 @@ class MainActivity : ComponentActivity() {
                 
                 val rootNavController = rememberNavController()
 
-                val startDest = remember {
-                    if (viewModel.currentUserSession.value != null) "main" else "login"
-                }
+                val startDest = "splash"
 
                 val context = androidx.compose.ui.platform.LocalContext.current
                 var updateInfo by remember { mutableStateOf<com.example.data.AppVersionControl?>(null) }
@@ -333,6 +333,7 @@ class MainActivity : ComponentActivity() {
                 // Security Redirection Rule: Handled centrally using standard dynamic startDestination to prevent Navigation crashes
                 LaunchedEffect(sessionState) {
                     val currentDest = rootNavController.currentBackStackEntry?.destination?.route
+                    if (currentDest == "splash") return@LaunchedEffect
                     if (sessionState == null) {
                         if (currentDest != "login" && currentDest != "register") {
                             rootNavController.navigate("login") {
@@ -379,6 +380,17 @@ class MainActivity : ComponentActivity() {
                             navController = rootNavController,
                             startDestination = startDest
                         ) {
+                            composable("splash") {
+                                SplashScreen(
+                                    onSplashFinished = {
+                                        val target = if (viewModel.currentUserSession.value != null) "main" else "login"
+                                        rootNavController.navigate(target) {
+                                            popUpTo("splash") { inclusive = true }
+                                        }
+                                    }
+                                )
+                            }
+
                             composable("login") {
                                 LoginScreen(
                                     viewModel = viewModel,
