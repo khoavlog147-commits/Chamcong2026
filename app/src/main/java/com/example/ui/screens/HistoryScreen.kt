@@ -118,6 +118,29 @@ fun HistoryScreen(
         list.distinctBy { it.first }
     }
 
+    val holidayDatesSummaryText = remember(holidaysInMonth) {
+        holidaysInMonth.map { pair ->
+            val raw = pair.first
+            try {
+                if (raw.contains("-")) {
+                    val p = raw.split("-")
+                    val d = p[2].toInt()
+                    val m = p[1].toInt()
+                    "$d/$m"
+                } else if (raw.contains("/")) {
+                    val p = raw.split("/")
+                    val d = p[0].toInt()
+                    val m = p[1].toInt()
+                    "$d/$m"
+                } else {
+                    raw
+                }
+            } catch (e: Exception) {
+                raw
+            }
+        }.distinct().joinToString(", ")
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -228,44 +251,28 @@ fun HistoryScreen(
                 }
             }
 
-            // Holiday Highlights Banner for Currently Selected Month
+            // Holiday Highlights Banner for Currently Selected Month (Concise & Minimal)
             AnimatedVisibility(visible = holidaysInMonth.isNotEmpty()) {
                 Surface(
                     color = Color(0xFF2E2405),
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.65f)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.5f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 10.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(Color(0xFFFFD700).copy(alpha = 0.2f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("⭐", fontSize = 16.sp)
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "🎉 Tháng này có ${holidaysInMonth.size} ngày Lễ Quốc Gia:",
-                                color = Color(0xFFFFD700),
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = holidaysInMonth.joinToString(" • ") { "${it.first}: ${it.second}" } + "\n(Hưởng 100% lương khi nghỉ hoặc x300% lương khi đi làm)",
-                                color = Color(0xFFFFE57F),
-                                fontSize = 11.sp,
-                                lineHeight = 15.sp
-                            )
-                        }
+                        Text("⭐", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Tháng này Lễ $holidayDatesSummaryText",
+                            color = Color(0xFFFFD700),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
@@ -430,16 +437,73 @@ fun HistoryScreen(
                 }
             }
 
-            // Guide text
+            // Monthly Leaves Breakdown (Minimalist & Intuitive User Leaves Summary)
+            val isSameDateHelper: (String, String) -> Boolean = remember {
+                { d1, d2 ->
+                    if (d1 == d2) true
+                    else {
+                        try {
+                            val p1 = if (d1.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.US) else SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                            val p2 = if (d2.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.US) else SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                            val parsed1 = p1.parse(d1)
+                            val parsed2 = p2.parse(d2)
+                            parsed1 != null && parsed2 != null && parsed1 == parsed2
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
+                }
+            }
+
+            val annualLeaveDays = remember(daysInMonth, entries) {
+                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
+                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
+                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
+                    val isHoliday = day.isHoliday || matchingEntry?.dayType == "HOLIDAY" || matchingEntry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
+                    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay && !isHoliday
+                    if (isPaidLeave) day.dateString else null
+                }
+            }
+
+            val holidayLeaveDays = remember(daysInMonth, entries) {
+                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
+                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
+                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
+                    val isHoliday = day.isHoliday || matchingEntry?.dayType == "HOLIDAY" || matchingEntry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
+                    if (isHoliday && !isActualWorkingDay) day.dateString else null
+                }
+            }
+
+            val unpaidLeaveDays = remember(daysInMonth, entries) {
+                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
+                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
+                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
+                    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay
+                    if (isUnpaidLeave) day.dateString else null
+                }
+            }
+
+            val unauthorizedLeaveDays = remember(daysInMonth, entries) {
+                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
+                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
+                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
+                    val isUnauthorized = (matchingEntry?.dayType == "UNAUTHORIZED_LEAVE" || matchingEntry?.dayType == "KP" || matchingEntry?.dayType == "ABSENT") && !isActualWorkingDay
+                    if (isUnauthorized) day.dateString else null
+                }
+            }
+
             if (!isMultiSelectMode) {
-                Text(
-                    text = "* Ấn vào ngày bất kỳ trên lưới lịch để sửa giờ chấm công hoặc bù chấm công trễ.",
-                    color = MediumGray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
+                MonthLeavesSummaryCard(
+                    annualLeaveDays = annualLeaveDays,
+                    holidayLeaveDays = holidayLeaveDays,
+                    unpaidLeaveDays = unpaidLeaveDays,
+                    unauthorizedLeaveDays = unauthorizedLeaveDays,
+                    onDayClick = { dateStr ->
+                        val targetDay = daysInMonth.find { it.dateString == dateStr }
+                        if (targetDay != null) {
+                            showSingleDayDialog = targetDay
+                        }
+                    }
                 )
             } else {
                 Text(
@@ -1673,4 +1737,177 @@ private fun getDatesInRange(startStr: String, endStr: String): List<String> {
         e.printStackTrace()
     }
     return list
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MonthLeavesSummaryCard(
+    annualLeaveDays: List<String>,
+    holidayLeaveDays: List<String>,
+    unpaidLeaveDays: List<String>,
+    unauthorizedLeaveDays: List<String>,
+    onDayClick: (String) -> Unit
+) {
+    val totalCount = annualLeaveDays.size + holidayLeaveDays.size + unpaidLeaveDays.size + unauthorizedLeaveDays.size
+
+    Surface(
+        color = Color(0xFF131D2E),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF23354E)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(if (totalCount > 0) NeonBlue else Color(0xFF64748B), CircleShape)
+                    )
+                    Text(
+                        text = "Ngày nghỉ trong tháng",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Surface(
+                    color = if (totalCount > 0) NeonBlue.copy(alpha = 0.15f) else Color(0xFF1E293B),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        if (totalCount > 0) NeonBlue.copy(alpha = 0.45f) else Color(0xFF334155)
+                    )
+                ) {
+                    Text(
+                        text = if (totalCount > 0) "$totalCount ngày" else "0 ngày",
+                        color = if (totalCount > 0) NeonBlue else LightGray,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            if (totalCount == 0) {
+                Text(
+                    text = "Không có ngày nghỉ phát sinh trong tháng",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(vertical = 1.dp)
+                )
+            } else {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    holidayLeaveDays.forEach { dateStr ->
+                        LeaveDayBadge(
+                            dateStr = dateStr,
+                            label = "Lễ",
+                            accentColor = Color(0xFFFFD700),
+                            bgColor = Color(0xFFFFD700).copy(alpha = 0.15f),
+                            onClick = { onDayClick(dateStr) }
+                        )
+                    }
+                    annualLeaveDays.forEach { dateStr ->
+                        LeaveDayBadge(
+                            dateStr = dateStr,
+                            label = "Phép năm",
+                            accentColor = NeonBlue,
+                            bgColor = NeonBlue.copy(alpha = 0.15f),
+                            onClick = { onDayClick(dateStr) }
+                        )
+                    }
+                    unpaidLeaveDays.forEach { dateStr ->
+                        LeaveDayBadge(
+                            dateStr = dateStr,
+                            label = "Không lương",
+                            accentColor = AccentOrange,
+                            bgColor = AccentOrange.copy(alpha = 0.15f),
+                            onClick = { onDayClick(dateStr) }
+                        )
+                    }
+                    unauthorizedLeaveDays.forEach { dateStr ->
+                        LeaveDayBadge(
+                            dateStr = dateStr,
+                            label = "Không phép",
+                            accentColor = Color(0xFFEB5757),
+                            bgColor = Color(0xFFEB5757).copy(alpha = 0.15f),
+                            onClick = { onDayClick(dateStr) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeaveDayBadge(
+    dateStr: String,
+    label: String,
+    accentColor: Color,
+    bgColor: Color,
+    onClick: () -> Unit
+) {
+    val displayDate = remember(dateStr) {
+        try {
+            if (dateStr.contains("-")) {
+                val p = dateStr.split("-")
+                "${p[2]}/${p[1]}"
+            } else if (dateStr.contains("/")) {
+                val p = dateStr.split("/")
+                "${p[0].padStart(2, '0')}/${p[1].padStart(2, '0')}"
+            } else dateStr
+        } catch (e: Exception) {
+            dateStr
+        }
+    }
+
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(8.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.45f)),
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = displayDate,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "•",
+                color = accentColor.copy(alpha = 0.7f),
+                fontSize = 10.5.sp
+            )
+            Text(
+                text = label,
+                color = accentColor,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
 }

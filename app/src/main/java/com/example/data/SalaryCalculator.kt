@@ -425,7 +425,8 @@ object SalaryCalculator {
         todayStr: String,
         isCurrentSelectedMonth: Boolean,
         holidayDatesInMonth: Set<String>,
-        includeFuturePaidLeave: Boolean = false
+        includeFuturePaidLeave: Boolean = false,
+        tamUng: Double = 0.0
     ): SalarySummary {
         val luongBasic = config.luongCoBan
         val stdMonthDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
@@ -663,7 +664,7 @@ object SalaryCalculator {
         val roundedSundayPay = Math.round(sundayPay).toDouble()
 
         val grossAdditions = baseBasicSalary + roundedOtDay + roundedOtLePay + roundedOtNight + roundedSundayPay + phuCapTong + chuyenCanValue
-        val totalDeductions = tieuBaoHiem + doanPhi + tienKhauTruNghi
+        val totalDeductions = tieuBaoHiem + doanPhi + tienKhauTruNghi + tamUng
         val luongThucNhan = Math.round(grossAdditions - totalDeductions).coerceAtLeast(0L).toDouble()
 
         return SalarySummary(
@@ -683,6 +684,7 @@ object SalaryCalculator {
             tienBh = tieuBaoHiem,
             doanPhi = doanPhi,
             tienKhauTruNghi = tienKhauTruNghi,
+            tamUng = tamUng,
             luongThucNhan = luongThucNhan,
             baseBasicSalary = baseBasicSalary,
             expectedWorkDays = totalScheduledDaysInMonth,

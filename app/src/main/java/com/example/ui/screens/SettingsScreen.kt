@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AlarmOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
@@ -184,6 +185,7 @@ fun SettingsScreen(
     }
     var checkingUpdate by remember { mutableStateOf(false) }
     var manualUpdateInfo by remember { mutableStateOf<com.example.data.AppVersionControl?>(null) }
+    var showSalaryAdvanceDialog by remember { mutableStateOf(false) }
 
     fun convertYyyyMmDdToDdMmYyyy(input: String): String {
         if (input.isBlank()) return ""
@@ -796,6 +798,21 @@ fun SettingsScreen(
             // CATEGORY 1: HỢP ĐỒNG LƯƠNG & BẢO HIỂM
             CategoryLayout(title = "HỢP ĐỒNG LƯƠNG & BẢO HIỂM", icon = Icons.Default.Payments) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Quick Action: Tạm ứng lương
+                    Button(
+                        onClick = { showSalaryAdvanceDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("settings_salary_advance_button")
+                    ) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = NeonBlue)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("MENU TẠM ỨNG LƯƠNG", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = White)
+                    }
+
                     ConfigInputField(
                         label = "Mức lương cơ bản hàng tháng (LCB)",
                         value = luongCoBan,
@@ -2031,6 +2048,13 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showSalaryAdvanceDialog) {
+        SalaryAdvanceDialog(
+            viewModel = viewModel,
+            onDismiss = { showSalaryAdvanceDialog = false }
+        )
     }
 }
 

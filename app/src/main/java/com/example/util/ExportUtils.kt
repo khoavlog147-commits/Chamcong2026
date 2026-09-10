@@ -43,6 +43,7 @@ data class SalarySummary(
     val tienBh: Double,
     val doanPhi: Double,
     val tienKhauTruNghi: Double,
+    val tamUng: Double = 0.0,
     val luongThucNhan: Double,
     val baseBasicSalary: Double = 0.0,
     val expectedWorkDays: Int = 26,
@@ -472,6 +473,7 @@ object ExportUtils {
 
         // Section 3
         if (summary.tienBh > 0.0) totalRowCount++
+        if (summary.tamUng > 0.0) totalRowCount++
         if (summary.doanPhi > 0.0) totalRowCount++
         if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) totalRowCount++
 
@@ -618,6 +620,7 @@ object ExportUtils {
         currentY += 20f
         drawSectionHeader("KHẤU TRỪ & NGHĨA VỤ (-)")
         if (summary.tienBh > 0.0) drawRow("Bảo hiểm xã hội (10.5%)", "-${fmt.format(summary.tienBh)}đ", paintRed)
+        if (summary.tamUng > 0.0) drawRow("Tạm ứng lương", "-${fmt.format(summary.tamUng)}đ", paintRed)
         if (summary.doanPhi > 0.0) drawRow("Kinh phí công đoàn", "-${fmt.format(summary.doanPhi)}đ", paintRed)
         if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) {
             val missed = ((if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble() - summary.workingDays).coerceAtLeast(0.0)
@@ -1053,8 +1056,10 @@ object ExportUtils {
 
         // Required trích trừ
         drawPdfRow("BHXH bắt buộc người lao động đóng (10.5%)", 0.0, summary.tienBh)
+        if (summary.tamUng > 0.0) {
+            drawPdfRow("Tạm ứng lương", 0.0, summary.tamUng)
+        }
         drawPdfRow("Thuế thu nhập cá nhân (TNCN)", 0.0, 0.0)
-        drawPdfRow("Tạm ứng lương", 0.0, 0.0)
 
         // Optional trích trừ
         if (summary.doanPhi > 0.0) drawPdfRow("Kinh phí công đoàn", 0.0, summary.doanPhi)

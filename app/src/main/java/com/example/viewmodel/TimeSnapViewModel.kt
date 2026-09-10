@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.auth.AuthController
 import com.example.auth.UserSession
 import com.example.data.db.AppDatabase
+import com.example.data.model.SalaryAdvance
 import com.example.data.model.TimeEntry
 import com.example.data.model.UserConfig
 import com.example.data.repository.TimeRepository
@@ -134,6 +135,21 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             val monthPattern = if (parts.size == 2) "%/${parts[1]}/${parts[0]}" else "%"
             val altMonthPattern = if (parts.size == 2) "${parts[0]}-${parts[1]}-%" else "%"
             repository.getEntriesInMonth(session.uid, monthPattern, altMonthPattern)
+        } else {
+            flowOf(emptyList())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Reactive list of salary advances in active month
+    val monthSalaryAdvances: StateFlow<List<SalaryAdvance>> = combine(
+        currentUserSession,
+        currentSelectedMonth,
+        _triggerRefresh
+    ) { session, month, _ ->
+        Pair(session, month)
+    }.flatMapLatest { (session, month) ->
+        if (session != null) {
+            database.salaryAdvanceDao().getAdvancesForMonth(session.uid, month)
         } else {
             flowOf(emptyList())
         }
@@ -365,18 +381,17 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        // Calculate pay slip summaries automatically when month entries or config changes
+        // Calculate pay slip summaries automatically when month entries, config, or salary advances change
         viewModelScope.launch(Dispatchers.Default) {
-            combine(monthTimeEntries, userConfig, userEarliestEntryDate) { entries, config, earliestDate ->
-                Triple(entries, config, earliestDate)
-            }.collectLatest { (entries, config, earliestDate) ->
+            combine(monthTimeEntries, userConfig, userEarliestEntryDate, monthSalaryAdvances) { entries, config, earliestDate, advances ->
+                val advanceSum = advances.sumOf { it.amount }
                 if (config != null) {
-                    val summary = calculateSalarySummary(entries, config, earliestDate)
+                    val summary = calculateSalarySummary(entries, config, earliestDate, advanceSum)
                     _salarySummaryState.value = summary
                 } else {
                     _salarySummaryState.value = null
                 }
-            }
+            }.collect()
         }
 
         // Automatic cloud remote restore on success login removed to prevent parallel sync state conflicts
@@ -1526,15 +1541,16 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun calculateSalarySummary(entries: List<TimeEntry>, config: UserConfig, firstEntryDate: String? = null): SalarySummary {
-        return calculateSalarySummaryForMonth(currentSelectedMonth.value, entries, config, firstEntryDate)
+    private fun calculateSalarySummary(entries: List<TimeEntry>, config: UserConfig, firstEntryDate: String? = null, tamUng: Double = 0.0): SalarySummary {
+        return calculateSalarySummaryForMonth(currentSelectedMonth.value, entries, config, firstEntryDate, tamUng)
     }
 
     private fun calculateSalarySummaryForMonth(
         selectedMonth: String,
         entries: List<TimeEntry>,
         config: UserConfig,
-        firstEntryDate: String? = null
+        firstEntryDate: String? = null,
+        tamUng: Double = 0.0
     ): SalarySummary {
         var targetYear = 2026
         var targetMonth = 5
@@ -1629,8 +1645,79 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             selectedMonth = selectedMonth,
             todayStr = todayStr,
             isCurrentSelectedMonth = isCurrentSelectedMonth,
-            holidayDatesInMonth = holidayDatesInMonth
+            holidayDatesInMonth = holidayDatesInMonth,
+            tamUng = tamUng
         )
+    }
+
+    // Salary Advance Management Actions
+    fun addSalaryAdvance(
+        amount: Double,
+        date: String,
+        note: String?,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val session = currentUserSession.value ?: run {
+            onError("Chưa đăng nhập tài khoản")
+            return
+        }
+        val currentMonth = currentSelectedMonth.value
+        val currentSummary = salarySummaryState.value
+        val currentAdvances = monthSalaryAdvances.value
+        val existingTotalAdvance = currentAdvances.sumOf { it.amount }
+
+        // Earned salary so far in current month before advances
+        val earnedSalaryTillDate = (currentSummary?.luongThucNhan ?: 0.0) + existingTotalAdvance
+        val maxAllowableAdvance = (earnedSalaryTillDate - existingTotalAdvance).coerceAtLeast(0.0)
+
+        if (amount <= 0.0) {
+            onError("Vui lòng nhập số tiền tạm ứng hợp lệ (> 0đ)")
+            return
+        }
+
+        if (amount > maxAllowableAdvance) {
+            val fmt = java.text.DecimalFormat("#,###")
+            onError("Số tiền ứng không được vượt quá số lương ngày thực tế làm việc (Tối đa: ${fmt.format(maxAllowableAdvance)}đ)")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val advance = SalaryAdvance(
+                    userId = session.uid,
+                    month = currentMonth,
+                    date = date,
+                    amount = amount,
+                    note = note?.trim()?.ifEmpty { null }
+                )
+                database.salaryAdvanceDao().insertAdvance(advance)
+                _triggerRefresh.value = _triggerRefresh.value + 1
+                withContext(Dispatchers.Main) {
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onError("Lỗi lưu tạm ứng: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun deleteSalaryAdvance(advance: SalaryAdvance, onSuccess: () -> Unit = {}, onError: (String) -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                database.salaryAdvanceDao().deleteAdvance(advance)
+                _triggerRefresh.value = _triggerRefresh.value + 1
+                withContext(Dispatchers.Main) {
+                    onSuccess()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    onError("Lỗi xoá tạm ứng: ${e.message}")
+                }
+            }
+        }
     }
 
     // Notification Center Management & Persistent Local Caching
@@ -1891,6 +1978,7 @@ data class SalarySummary(
     val tienBh: Double,
     val doanPhi: Double,
     val tienKhauTruNghi: Double,
+    val tamUng: Double = 0.0,
     val luongThucNhan: Double,
     val baseBasicSalary: Double = 0.0,
     val expectedWorkDays: Int = 26,

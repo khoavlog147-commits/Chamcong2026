@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.ArrowForwardIos
@@ -92,6 +93,7 @@ fun PayslipScreen(
 
     var customOt15DaysCountDay by remember { mutableStateOf(0.0) }
     var customOt15DaysCountNight by remember { mutableStateOf(0.0) }
+    var showSalaryAdvanceDialog by remember { mutableStateOf(false) }
     LaunchedEffect(selectedMonth) {
         customOt15DaysCountDay = 0.0
         customOt15DaysCountNight = 0.0
@@ -115,7 +117,19 @@ fun PayslipScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Phiếu Lương Điện Tử", fontWeight = FontWeight.Bold, color = White) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                actions = {
+                    IconButton(
+                        onClick = { showSalaryAdvanceDialog = true },
+                        modifier = Modifier.testTag("open_salary_advance_top_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = "Tạm ứng lương",
+                            tint = NeonBlue
+                        )
+                    }
+                }
             )
         },
         containerColor = Color.Transparent
@@ -1390,6 +1404,9 @@ fun PayslipScreen(
                         if (s.tienBh > 0.0) {
                             PayslipMoneyRow(label = "BHXH/BHYT Khấu trừ (10.5%)", value = s.tienBh, isAddition = false)
                         }
+                        if (s.tamUng > 0.0) {
+                            PayslipMoneyRow(label = "Tạm ứng lương", value = s.tamUng, isAddition = false)
+                        }
                         if (s.doanPhi > 0.0) {
                             PayslipMoneyRow(label = "Phí Công Đoàn Bắt Buộc", value = s.doanPhi, isAddition = false)
                         }
@@ -1459,6 +1476,32 @@ fun PayslipScreen(
                 } // End of AnimatedContent
 
                 // JSON structure removed per user request
+
+                // SALARY ADVANCE ACTION BUTTON
+                Button(
+                    onClick = { showSalaryAdvanceDialog = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("open_salary_advance_action_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E293B))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountBalanceWallet,
+                        contentDescription = "Tạm ứng lương",
+                        tint = NeonBlue
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (s.tamUng > 0.0) "TẠM ỨNG LƯƠNG (ĐÃ ỨNG ${fmt.format(s.tamUng)}đ)" else "MENU TẠM ỨNG LƯƠNG",
+                        color = if (s.tamUng > 0.0) AccentOrange else White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // EXPORT HIGH-QUALITY PNG PORTABLE RECEIPT ACTION BUTTON
                 Button(
@@ -1561,6 +1604,13 @@ fun PayslipScreen(
             }
 
             Spacer(modifier = Modifier.height(80.dp))
+        }
+
+        if (showSalaryAdvanceDialog) {
+            SalaryAdvanceDialog(
+                viewModel = viewModel,
+                onDismiss = { showSalaryAdvanceDialog = false }
+            )
         }
     }
 }

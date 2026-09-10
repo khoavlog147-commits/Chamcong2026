@@ -6,13 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.data.model.SalaryAdvance
 import com.example.data.model.TimeEntry
 import com.example.data.model.UserConfig
 
-@Database(entities = [TimeEntry::class, UserConfig::class], version = 8, exportSchema = false)
+@Database(entities = [TimeEntry::class, UserConfig::class, SalaryAdvance::class], version = 9, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timeEntryDao(): TimeEntryDao
     abstract fun userConfigDao(): UserConfigDao
+    abstract fun salaryAdvanceDao(): SalaryAdvanceDao
 
     companion object {
         @Volatile
