@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -54,8 +56,6 @@ fun SalaryAdvanceDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
     val currentMonth by viewModel.currentSelectedMonth.collectAsState()
     val advances by viewModel.monthSalaryAdvances.collectAsState()
     val salarySummary by viewModel.salarySummaryState.collectAsState()
@@ -108,6 +108,18 @@ fun SalaryAdvanceDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val dialogFocusManager = LocalFocusManager.current
+        val dialogKeyboardController = LocalSoftwareKeyboardController.current
+        val dialogView = LocalView.current
+
+        val hideKeyboardAndClearFocus = {
+            dialogFocusManager.clearFocus(force = true)
+            dialogKeyboardController?.hide()
+            val imm = dialogView.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.hideSoftInputFromWindow(dialogView.windowToken, 0)
+            dialogView.clearFocus()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth(0.94f)
@@ -115,6 +127,12 @@ fun SalaryAdvanceDialog(
                 .clip(RoundedCornerShape(20.dp))
                 .background(DarkBg)
                 .border(1.dp, BorderDark, RoundedCornerShape(20.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    hideKeyboardAndClearFocus()
+                }
                 .testTag("salary_advance_dialog")
         ) {
             Column(
@@ -317,8 +335,7 @@ fun SalaryAdvanceDialog(
                                     ),
                                     keyboardActions = KeyboardActions(
                                         onDone = {
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
+                                            hideKeyboardAndClearFocus()
                                         }
                                     ),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -464,8 +481,7 @@ fun SalaryAdvanceDialog(
                                     ),
                                     keyboardActions = KeyboardActions(
                                         onDone = {
-                                            keyboardController?.hide()
-                                            focusManager.clearFocus()
+                                            hideKeyboardAndClearFocus()
                                         }
                                     ),
                                     label = { Text("Lý do tạm ứng / Ghi chú (Tuỳ chọn)", color = TextMuted, fontSize = 12.sp) },

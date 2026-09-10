@@ -3,6 +3,10 @@ package com.example.ui.screens
 import android.app.TimePickerDialog
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +30,8 @@ import androidx.compose.material.icons.filled.LibraryAddCheck
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1739,6 +1745,14 @@ private fun getDatesInRange(startStr: String, endStr: String): List<String> {
     return list
 }
 
+private data class LeaveCategoryItem(
+    val id: String,
+    val label: String,
+    val days: List<String>,
+    val accentColor: Color,
+    val bgColor: Color
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MonthLeavesSummaryCard(
@@ -1749,6 +1763,57 @@ private fun MonthLeavesSummaryCard(
     onDayClick: (String) -> Unit
 ) {
     val totalCount = annualLeaveDays.size + holidayLeaveDays.size + unpaidLeaveDays.size + unauthorizedLeaveDays.size
+
+    val categories = remember(annualLeaveDays, holidayLeaveDays, unpaidLeaveDays, unauthorizedLeaveDays) {
+        val list = mutableListOf<LeaveCategoryItem>()
+        if (holidayLeaveDays.isNotEmpty()) {
+            list.add(
+                LeaveCategoryItem(
+                    id = "HOLIDAY",
+                    label = "Lễ",
+                    days = holidayLeaveDays,
+                    accentColor = Color(0xFFFFD700),
+                    bgColor = Color(0xFFFFD700).copy(alpha = 0.15f)
+                )
+            )
+        }
+        if (annualLeaveDays.isNotEmpty()) {
+            list.add(
+                LeaveCategoryItem(
+                    id = "ANNUAL",
+                    label = "Phép năm",
+                    days = annualLeaveDays,
+                    accentColor = NeonBlue,
+                    bgColor = NeonBlue.copy(alpha = 0.15f)
+                )
+            )
+        }
+        if (unpaidLeaveDays.isNotEmpty()) {
+            list.add(
+                LeaveCategoryItem(
+                    id = "UNPAID",
+                    label = "Không lương",
+                    days = unpaidLeaveDays,
+                    accentColor = AccentOrange,
+                    bgColor = AccentOrange.copy(alpha = 0.15f)
+                )
+            )
+        }
+        if (unauthorizedLeaveDays.isNotEmpty()) {
+            list.add(
+                LeaveCategoryItem(
+                    id = "UNAUTHORIZED",
+                    label = "Không phép",
+                    days = unauthorizedLeaveDays,
+                    accentColor = Color(0xFFEB5757),
+                    bgColor = Color(0xFFEB5757).copy(alpha = 0.15f)
+                )
+            )
+        }
+        list
+    }
+
+    var expandedCategoryId by remember { mutableStateOf<String?>(null) }
 
     Surface(
         color = Color(0xFF131D2E),
@@ -1811,46 +1876,110 @@ private fun MonthLeavesSummaryCard(
                     modifier = Modifier.padding(vertical = 1.dp)
                 )
             } else {
+                // Category Chips Row (e.g. "Lễ 2 ngày", "Phép năm 1 ngày")
                 FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    holidayLeaveDays.forEach { dateStr ->
-                        LeaveDayBadge(
-                            dateStr = dateStr,
-                            label = "Lễ",
-                            accentColor = Color(0xFFFFD700),
-                            bgColor = Color(0xFFFFD700).copy(alpha = 0.15f),
-                            onClick = { onDayClick(dateStr) }
-                        )
+                    categories.forEach { cat ->
+                        val isExpanded = expandedCategoryId == cat.id
+                        Surface(
+                            color = if (isExpanded) cat.bgColor else Color(0xFF1B2838),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isExpanded) cat.accentColor else Color(0xFF2C3E55)
+                            ),
+                            modifier = Modifier.clickable {
+                                expandedCategoryId = if (isExpanded) null else cat.id
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(cat.accentColor, CircleShape)
+                                )
+                                Text(
+                                    text = "${cat.label} ${cat.days.size} ngày",
+                                    color = if (isExpanded) cat.accentColor else Color(0xFFE2E8F0),
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isExpanded) FontWeight.Bold else FontWeight.Medium
+                                )
+                                Icon(
+                                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    tint = if (isExpanded) cat.accentColor else Color(0xFF94A3B8),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
-                    annualLeaveDays.forEach { dateStr ->
-                        LeaveDayBadge(
-                            dateStr = dateStr,
-                            label = "Phép năm",
-                            accentColor = NeonBlue,
-                            bgColor = NeonBlue.copy(alpha = 0.15f),
-                            onClick = { onDayClick(dateStr) }
-                        )
-                    }
-                    unpaidLeaveDays.forEach { dateStr ->
-                        LeaveDayBadge(
-                            dateStr = dateStr,
-                            label = "Không lương",
-                            accentColor = AccentOrange,
-                            bgColor = AccentOrange.copy(alpha = 0.15f),
-                            onClick = { onDayClick(dateStr) }
-                        )
-                    }
-                    unauthorizedLeaveDays.forEach { dateStr ->
-                        LeaveDayBadge(
-                            dateStr = dateStr,
-                            label = "Không phép",
-                            accentColor = Color(0xFFEB5757),
-                            bgColor = Color(0xFFEB5757).copy(alpha = 0.15f),
-                            onClick = { onDayClick(dateStr) }
-                        )
+                }
+
+                // Expanded Section: List of dates for selected category
+                val selectedCategory = categories.find { it.id == expandedCategoryId }
+                AnimatedVisibility(
+                    visible = selectedCategory != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    if (selectedCategory != null) {
+                        Surface(
+                            color = Color(0xFF0F172A),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                selectedCategory.accentColor.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Chi tiết ngày nghỉ ${selectedCategory.label} (${selectedCategory.days.size} ngày):",
+                                        color = selectedCategory.accentColor,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "(Bấm ngày để xem chi tiết)",
+                                        color = Color(0xFF64748B),
+                                        fontSize = 10.sp
+                                    )
+                                }
+
+                                FlowRow(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                                ) {
+                                    selectedCategory.days.forEach { dateStr ->
+                                        LeaveDayBadge(
+                                            dateStr = dateStr,
+                                            label = selectedCategory.label,
+                                            accentColor = selectedCategory.accentColor,
+                                            bgColor = selectedCategory.bgColor,
+                                            onClick = { onDayClick(dateStr) }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1868,13 +1997,31 @@ private fun LeaveDayBadge(
 ) {
     val displayDate = remember(dateStr) {
         try {
-            if (dateStr.contains("-")) {
-                val p = dateStr.split("-")
-                "${p[2]}/${p[1]}"
-            } else if (dateStr.contains("/")) {
-                val p = dateStr.split("/")
-                "${p[0].padStart(2, '0')}/${p[1].padStart(2, '0')}"
-            } else dateStr
+            val parser = if (dateStr.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.US) else SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val d = parser.parse(dateStr)
+            if (d != null) {
+                val cal = Calendar.getInstance()
+                cal.time = d
+                val dayOfWeek = when (cal.get(Calendar.DAY_OF_WEEK)) {
+                    Calendar.MONDAY -> "Thứ 2"
+                    Calendar.TUESDAY -> "Thứ 3"
+                    Calendar.WEDNESDAY -> "Thứ 4"
+                    Calendar.THURSDAY -> "Thứ 5"
+                    Calendar.FRIDAY -> "Thứ 6"
+                    Calendar.SATURDAY -> "Thứ 7"
+                    Calendar.SUNDAY -> "CN"
+                    else -> ""
+                }
+                val p = if (dateStr.contains("-")) dateStr.split("-") else dateStr.split("/")
+                val dayPart = if (dateStr.contains("-")) p[2] else p[0]
+                val monthPart = if (dateStr.contains("-")) p[1] else p[1]
+                "$dayPart/$monthPart ($dayOfWeek)"
+            } else {
+                if (dateStr.contains("-")) {
+                    val p = dateStr.split("-")
+                    "${p[2]}/${p[1]}"
+                } else dateStr
+            }
         } catch (e: Exception) {
             dateStr
         }
