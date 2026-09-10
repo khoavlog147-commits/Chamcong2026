@@ -160,7 +160,7 @@ fun SplashScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp)
+                .padding(horizontal = 18.dp)
                 .statusBarsPadding()
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -169,7 +169,7 @@ fun SplashScreen(
             // Top Bar: System Status Tag
             Row(
                 modifier = Modifier
-                    .padding(top = 24.dp)
+                    .padding(top = 20.dp)
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color.White.copy(alpha = 0.06f))
                     .border(1.dp, Color(0xFF00D2FF).copy(alpha = 0.25f), RoundedCornerShape(20.dp))
@@ -194,7 +194,7 @@ fun SplashScreen(
             // Center Content: Hero Emblem + Brand + Slogan
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Futuristic Glowing App Emblem
                 Box(
@@ -268,14 +268,14 @@ fun SplashScreen(
                             painter = painterResource(id = R.drawable.timesnap_neon_icon_1779537266718),
                             contentDescription = "TimeSnap Pro Logo",
                             modifier = Modifier
-                                .size(72.dp)
-                                .padding(4.dp),
-                            contentScale = ContentScale.Fit
+                                .size(76.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            contentScale = ContentScale.Crop
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Brand Title & Tag
                 Column(
@@ -313,14 +313,18 @@ fun SplashScreen(
                         color = Color(0xFF94A3B8),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 12.dp)
                     )
                 }
 
-                // Features Chips Row
+                // Features Chips Row - Optimized for all screen sizes
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     FeaturePill(icon = Icons.Default.AutoAwesome, label = "AI Thông minh")
                     FeaturePill(icon = Icons.Default.Verified, label = "Chuẩn Thuật Toán")
@@ -399,12 +403,12 @@ private fun FeaturePill(
     label: String
 ) {
     Surface(
-        color = Color(0xFF1E293B).copy(alpha = 0.6f),
+        color = Color(0xFF1E293B).copy(alpha = 0.7f),
         shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155).copy(alpha = 0.6f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -412,13 +416,15 @@ private fun FeaturePill(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color(0xFF38BDF8),
-                modifier = Modifier.size(12.dp)
+                modifier = Modifier.size(11.dp)
             )
             Text(
                 text = label,
                 color = Color(0xFFE2E8F0),
                 fontSize = 10.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }

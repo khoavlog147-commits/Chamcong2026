@@ -550,19 +550,19 @@ object ExportUtils {
 
         val workDaysCountPNG = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
         val leavePartsPNG = mutableListOf<String>()
-        if (workDaysCountPNG > 0.0) leavePartsPNG.add("${df.format(workDaysCountPNG)} ngày làm việc")
-        if (annualLeavesCount > 0) leavePartsPNG.add("${annualLeavesCount} ngày phép năm")
-        if (holidayLeavesCount > 0) leavePartsPNG.add("${holidayLeavesCount} ngày lễ")
+        if (workDaysCountPNG > 0.0) leavePartsPNG.add("${df.format(workDaysCountPNG)} làm việc")
+        if (annualLeavesCount > 0) leavePartsPNG.add("${annualLeavesCount} phép năm")
+        if (holidayLeavesCount > 0) leavePartsPNG.add("${holidayLeavesCount} lễ")
         val breakdownStrPNG = if (leavePartsPNG.size > 1) " (${leavePartsPNG.joinToString(" + ")})" else ""
 
         val progressText = if (selectedTab == 1) "${df.format(soNgayCongDuKienDouble)} / ${summary.standardWorkDays} ngày$breakdownStrPNG" else "${df.format(summary.actualStandardWorkingDays)} / ${summary.standardWorkDays} ngày$breakdownStrPNG"
         drawRow("Tiến độ tháng (Công chuẩn):", progressText)
 
         val leaveParts = mutableListOf<String>()
-        if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}n")
-        if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}n")
-        if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount}n")
-        val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
+        if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}")
+        if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}")
+        if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount}")
+        val leaveDaysVal = if (leaveParts.isEmpty()) "0" else leaveParts.joinToString(", ")
         drawRow("Ngày nghỉ:", leaveDaysVal)
         
         val totalProjectedWorkDaysPNG = summary.actualPresenceDays + totalOtDays + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
@@ -862,9 +862,9 @@ object ExportUtils {
         val holidayLeavesCountPDF = entries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
         val workDaysPDF = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalOtDaysPDF).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
         val leavePartsPDF = mutableListOf<String>()
-        if (workDaysPDF > 0.0) leavePartsPDF.add("${df.format(workDaysPDF)} ngày làm việc")
-        if (annualLeavesCountPDF > 0) leavePartsPDF.add("${annualLeavesCountPDF} ngày phép năm")
-        if (holidayLeavesCountPDF > 0) leavePartsPDF.add("${holidayLeavesCountPDF} ngày lễ")
+        if (workDaysPDF > 0.0) leavePartsPDF.add("${df.format(workDaysPDF)} làm việc")
+        if (annualLeavesCountPDF > 0) leavePartsPDF.add("${annualLeavesCountPDF} phép năm")
+        if (holidayLeavesCountPDF > 0) leavePartsPDF.add("${holidayLeavesCountPDF} lễ")
         val breakdownStrPDF = if (leavePartsPDF.size > 1) " (${leavePartsPDF.joinToString(" + ")})" else ""
 
         // Row 1

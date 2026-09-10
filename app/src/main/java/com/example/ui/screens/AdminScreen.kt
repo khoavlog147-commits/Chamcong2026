@@ -2706,11 +2706,21 @@ fun AttendanceSummaryBoard(
                     ) {
                         items(leaveRecords) { r ->
                             val statusUpper = r.status.uppercase(Locale.ROOT)
+                            val isHoliday = com.example.data.SalaryCalculator.isHolidayLeaveType(r.status)
+                            val isAnnual = com.example.data.SalaryCalculator.isAnnualLeaveType(r.status)
+                            val isUnauthorized = statusUpper == "UNAUTHORIZED_LEAVE" || statusUpper == "KP" || 
+                                                statusUpper.contains("KHÔNG PHÉP") || statusUpper.contains("KHONG PHEP") || 
+                                                statusUpper.contains("KHONGPHEP")
+                            val isUnpaid = statusUpper == "UNPAID_LEAVE" || statusUpper == "UNPAID" || 
+                                          statusUpper.contains("PHÉP THƯỜNG") || statusUpper.contains("PHEP THUONG") || 
+                                          statusUpper.contains("KHÔNG LƯƠNG") || statusUpper.contains("KHONG LUONG") ||
+                                          com.example.data.SalaryCalculator.isUnpaidLeaveType(r.status)
+
                             val typeLabel = when {
-                                statusUpper == "HOLIDAY_LEAVE" || statusUpper == "HOLIDAY" || statusUpper.contains("LỄ") || statusUpper.contains("LE") -> "Lễ"
-                                statusUpper == "PAID_LEAVE" || statusUpper == "PAID" || statusUpper == "NP" || statusUpper.contains("PHÉP NĂM") || statusUpper.contains("PHEP NAM") -> "Phép năm"
-                                statusUpper == "UNAUTHORIZED_LEAVE" || statusUpper == "KP" || statusUpper.contains("KHÔNG PHÉP") || statusUpper.contains("KHONG PHEP") -> "Không phép"
-                                statusUpper == "UNPAID_LEAVE" || statusUpper == "UNPAID" || statusUpper.contains("PHÉP THƯỜNG") || statusUpper.contains("PHEP THUONG") -> "Phép thường"
+                                isHoliday -> "Lễ"
+                                isAnnual -> "Phép năm"
+                                isUnauthorized -> "Không phép"
+                                isUnpaid -> "Phép thường"
                                 else -> "Phép thường"
                             }
                             val badgeColor = when {
@@ -4475,9 +4485,9 @@ fun EmployeePayslipView(
                 val totalActualWorkDays = summary.actualPresenceDays
                 val workDaysVal = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalProjectedOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
                 val leavePartsBreakdown = mutableListOf<String>()
-                if (workDaysVal > 0.0) leavePartsBreakdown.add("${df.format(workDaysVal)} ngày làm việc")
-                if (annualLeavesCount > 0) leavePartsBreakdown.add("${annualLeavesCount} ngày phép năm")
-                if (holidayLeavesCount > 0) leavePartsBreakdown.add("${holidayLeavesCount} ngày lễ")
+                if (workDaysVal > 0.0) leavePartsBreakdown.add("${df.format(workDaysVal)} làm việc")
+                if (annualLeavesCount > 0) leavePartsBreakdown.add("${annualLeavesCount} phép năm")
+                if (holidayLeavesCount > 0) leavePartsBreakdown.add("${holidayLeavesCount} lễ")
                 val breakdownStr = if (leavePartsBreakdown.size > 1) " (${leavePartsBreakdown.joinToString(" + ")})" else ""
 
                 // Employee Metadata
@@ -4505,10 +4515,10 @@ fun EmployeePayslipView(
                     }
 
                     val leaveParts = mutableListOf<String>()
-                    if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount} ngày")
-                    if (holidayLeavesCount > 0) leaveParts.add("Nghỉ lễ: ${holidayLeavesCount} ngày")
-                    if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount} ngày")
-                    val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
+                    if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}")
+                    if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}")
+                    if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount}")
+                    val leaveDaysVal = if (leaveParts.isEmpty()) "0" else leaveParts.joinToString(", ")
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("Ngày nghỉ:", color = LightGray, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.width(8.dp))

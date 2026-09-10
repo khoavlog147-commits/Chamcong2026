@@ -731,18 +731,24 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 val remoteClockIn = log.clockInTime
                 val remoteStatusUpper = log.status.trim().uppercase(Locale.ROOT)
                 val mappedDayType = when {
-                    remoteStatusUpper == "PAID_LEAVE" || remoteStatusUpper == "NP" || remoteStatusUpper == "PHEP" || 
-                    remoteStatusUpper.contains("PHÉP") || remoteStatusUpper.contains("PHEP") -> "PAID_LEAVE"
+                    remoteStatusUpper == "HOLIDAY_LEAVE" || remoteStatusUpper == "HOLIDAY" || 
+                    remoteStatusUpper.contains("LỄ") || remoteStatusUpper == "LE" || 
+                    remoteStatusUpper == "NGHI LE" || remoteStatusUpper == "NGHỈ LỄ" -> "HOLIDAY_LEAVE"
                     
-                    remoteStatusUpper == "UNPAID_LEAVE" || remoteStatusUpper.contains("KHÔNG LƯƠNG") || 
-                    remoteStatusUpper.contains("KHONG LUONG") -> "UNPAID_LEAVE"
+                    remoteStatusUpper == "PAID_LEAVE" || remoteStatusUpper == "NP" || 
+                    remoteStatusUpper.contains("PHÉP NĂM") || remoteStatusUpper.contains("PHEP NAM") || 
+                    remoteStatusUpper == "PAID" || remoteStatusUpper == "PAIDLEAVE" -> "PAID_LEAVE"
                     
                     remoteStatusUpper == "UNAUTHORIZED_LEAVE" || remoteStatusUpper == "KP" || 
                     remoteStatusUpper.contains("KHÔNG PHÉP") || remoteStatusUpper.contains("KHONG PHEP") || 
                     remoteStatusUpper.contains("KHONGPHEP") || remoteStatusUpper == "ABSENT" -> "UNAUTHORIZED_LEAVE"
+
+                    remoteStatusUpper == "UNPAID_LEAVE" || remoteStatusUpper.contains("KHÔNG LƯƠNG") || 
+                    remoteStatusUpper.contains("KHONG LUONG") || remoteStatusUpper.contains("PHÉP THƯỜNG") || 
+                    remoteStatusUpper.contains("PHEP THUONG") || remoteStatusUpper == "UNPAID" || 
+                    remoteStatusUpper == "UNPAIDLEAVE" -> "UNPAID_LEAVE"
                     
-                    remoteStatusUpper == "HOLIDAY_LEAVE" || remoteStatusUpper.contains("LỄ") || 
-                    remoteStatusUpper.contains("LE") -> "HOLIDAY_LEAVE"
+                    remoteStatusUpper == "PHEP" || remoteStatusUpper.contains("PHÉP") || remoteStatusUpper.contains("PHEP") -> "PAID_LEAVE"
                     
                     remoteStatusUpper == "SUNDAY" || remoteStatusUpper.contains("CHỦ NHẬT") || 
                     remoteStatusUpper.contains("CHU NHAT") -> "SUNDAY"

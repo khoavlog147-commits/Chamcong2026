@@ -786,13 +786,13 @@ fun PayslipScreen(
                         val leaveBreakdownStr = buildString {
                             val parts = mutableListOf<String>()
                             if (workDaysCount > 0.0) {
-                                parts.add("${df.format(workDaysCount)} ngày làm việc")
+                                parts.add("${df.format(workDaysCount)} làm việc")
                             }
                             if (annualLeavesCount > 0) {
-                                parts.add("${annualLeavesCount} ngày phép năm")
+                                parts.add("${annualLeavesCount} phép năm")
                             }
                             if (holidayLeavesCount > 0) {
-                                parts.add("${holidayLeavesCount} ngày lễ")
+                                parts.add("${holidayLeavesCount} lễ")
                             }
                             if (parts.size > 1) {
                                 append(" (${parts.joinToString(" + ")})")
@@ -805,10 +805,10 @@ fun PayslipScreen(
                         )
 
                         val leaveParts = mutableListOf<String>()
-                        if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount} ngày")
-                        if (holidayLeavesCount > 0) leaveParts.add("Nghỉ lễ: ${holidayLeavesCount} ngày")
-                        if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount} ngày")
-                        val leaveDaysVal = if (leaveParts.isEmpty()) "0 ngày" else leaveParts.joinToString(", ")
+                        if (annualLeavesCount > 0) leaveParts.add("Phép năm: ${annualLeavesCount}")
+                        if (holidayLeavesCount > 0) leaveParts.add("Lễ: ${holidayLeavesCount}")
+                        if (unpaidLeavesCount > 0) leaveParts.add("Không lương: ${unpaidLeavesCount}")
+                        val leaveDaysVal = if (leaveParts.isEmpty()) "0" else leaveParts.joinToString(", ")
                         PayslipProfileRow(
                             label = "Ngày nghỉ:",
                             value = leaveDaysVal
