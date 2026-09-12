@@ -1639,8 +1639,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         return com.example.data.SalaryCalculator.calculateMonthlySalary(
             entries = entries,
             config = config,
-            scheduledDaysSoFar = expectedWorkDaysSoFar,
-            totalScheduledDaysInMonth = totalWorkDaysInMonth,
+            scheduledDaysSoFar = expectedWorkDaysSoFar.coerceAtMost(26),
+            totalScheduledDaysInMonth = 26,
             earliestDate = effectiveJoinDate,
             selectedMonth = selectedMonth,
             todayStr = todayStr,

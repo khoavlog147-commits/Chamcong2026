@@ -240,8 +240,8 @@ object ExportUtils {
         val vmSummary = com.example.data.SalaryCalculator.calculateMonthlySalary(
             entries = monthEntries,
             config = config,
-            scheduledDaysSoFar = expectedWorkDaysSoFar,
-            totalScheduledDaysInMonth = totalWorkDaysInMonth,
+            scheduledDaysSoFar = expectedWorkDaysSoFar.coerceAtMost(26),
+            totalScheduledDaysInMonth = 26,
             earliestDate = effectiveJoinDateYmd,
             selectedMonth = selectedMonth,
             todayStr = todayStr,
@@ -334,16 +334,16 @@ object ExportUtils {
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
         // UI Pre-calculations
-        val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val standardTargetDays = 26.0
         val totalOtDays = (customOt15DaysCountDay + customOt15DaysCountNight)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (isCurrentSelectedMonth && selectedTab == 1) {
                 val rawProjected = summary.workingDays + totalOtDays
-                rawProjected.coerceAtMost(standardTargetDays)
+                rawProjected.coerceAtLeast(0.0)
             } else {
-                summary.workingDays.coerceAtMost(standardTargetDays)
+                summary.workingDays
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
@@ -568,8 +568,8 @@ object ExportUtils {
         drawRow("Ngày nghỉ:", leaveDaysVal)
         
         val totalProjectedWorkDaysPNG = summary.actualPresenceDays + totalOtDays + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-        val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
-        val lcbActualWorkDaysPNG = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
+        val lcbProjectedWorkDaysPNG = soNgayCongDuKienDouble
+        val lcbActualWorkDaysPNG = summary.workingDays
 
         val attendanceInfo = if (selectedTab == 1) "${df.format(totalProjectedWorkDaysPNG)} / ${summary.standardWorkDays} ngày" 
                              else "${df.format(summary.actualPresenceDays)} / ${summary.standardWorkDays} ngày"
@@ -580,7 +580,7 @@ object ExportUtils {
         currentY += 20f
         drawSectionHeader("THU NHẬP CHI TIẾT (+)")
         
-        val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
+        val luongDuKienBaseSalary = Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
         val baseSalaryLabel = if (selectedTab == 1) "LCB thực nhận (${df.format(lcbProjectedWorkDaysPNG)} / ${summary.standardWorkDays})" 
                               else "LCB thực nhận (${df.format(lcbActualWorkDaysPNG)} / ${summary.standardWorkDays})"
         val baseSalaryValue = if (selectedTab == 1) luongDuKienBaseSalary else summary.baseBasicSalary
@@ -727,22 +727,22 @@ object ExportUtils {
         val currentMonth = todayCal.get(Calendar.MONTH) + 1
         val isCurrentSelectedMonth = selectedMonth.startsWith(String.format(Locale.US, "%04d-%02d", currentYear, currentMonth))
 
-        val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+        val standardTargetDays = 26.0
         val totalOtDaysPDF = (customOt15DaysCountDay + customOt15DaysCountNight)
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (isCurrentSelectedMonth && selectedTab == 1) {
                 val rawProjected = summary.workingDays + totalOtDaysPDF
-                rawProjected.coerceAtMost(standardTargetDays)
+                rawProjected.coerceAtLeast(0.0)
             } else {
-                summary.workingDays.coerceAtMost(standardTargetDays)
+                summary.workingDays
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
         val totalProjectedWorkDaysPDF = summary.actualPresenceDays + totalOtDaysPDF + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
-        val lcbProjectedWorkDaysPDF = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
-        val lcbActualWorkDaysPDF = summary.workingDays.coerceAtMost(summary.standardWorkDays.toDouble())
+        val lcbProjectedWorkDaysPDF = soNgayCongDuKienDouble
+        val lcbActualWorkDaysPDF = summary.workingDays
         fun calcPrPDF(fieldName: String, valRaw: Double): Double {
             return com.example.data.SalaryCalculator.calculateAllowanceValue(
                 fieldName = fieldName,
@@ -984,7 +984,7 @@ object ExportUtils {
         }
 
         val baseSalaryValue = if (selectedTab == 1) {
-            if (soNgayCongDuKienDouble >= standardTargetDays) config.luongCoBan else Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
+            Math.round((config.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
         } else summary.baseBasicSalary
         val baseSalaryLabelText = if (selectedTab == 1) "LCB thực nhận (${df.format(lcbProjectedWorkDaysPDF)} / ${summary.standardWorkDays})" 
                               else "LCB thực nhận (${df.format(lcbActualWorkDaysPDF)} / ${summary.standardWorkDays})"

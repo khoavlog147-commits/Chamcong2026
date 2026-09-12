@@ -381,7 +381,7 @@ fun PayslipScreen(
                 // TAB / SEGMENT CONTROL
                 var selectedTab by remember { mutableStateOf(0) }
 
-                val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) s.expectedWorkDays else s.standardWorkDays).toDouble().coerceAtLeast(1.0)
+                val standardTargetDays = 26.0
 
                 val dailySalary = remember(c.luongCoBan, standardTargetDays) {
                     c.luongCoBan / standardTargetDays
@@ -435,10 +435,9 @@ fun PayslipScreen(
 
                 val soNgayCongDuKien = if (isCurrentSelectedMonth) {
                     val rawProjected = s.workingDays + totalProjectedOtDays + futurePaidLeavesCount
-                    val maxReachableDays = if (unpaidDaysCount > 0) (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0) else standardTargetDays
-                    rawProjected.coerceAtMost(maxReachableDays).coerceAtLeast(0.0)
+                    rawProjected.coerceAtLeast(0.0)
                 } else {
-                    s.workingDays.coerceAtMost(standardTargetDays)
+                    s.workingDays
                 }
                 val soNgayCongDuKienDouble = soNgayCongDuKien
 
@@ -595,7 +594,7 @@ fun PayslipScreen(
                     s.phuCapChuyenCan
                 }
 
-                val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) c.luongCoBan else Math.round((c.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
+                val luongDuKienBaseSalary = Math.round(dailySalary * soNgayCongDuKienDouble).toDouble()
 
                 val currentProratedAllowancesSum = s.pcKyThuatVal + s.pcTrachNhiemVal + s.pcChucVuVal + s.pcHieuSuatVal +
                         s.pcSanPhamVal + s.pcComCaVal + s.pcComOtVal + s.pcNhaOVal + s.pcDocHaiVal + 
@@ -781,9 +780,9 @@ fun PayslipScreen(
                         PayslipProfileRow(label = "Mức lương cơ bản:", value = "${fmt.format(c.luongCoBan)}đ")
                         
                         val totalActualWorkDays = s.actualPresenceDays
-                        val lcbActualWorkDays = s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
+                        val lcbActualWorkDays = s.workingDays
                         val totalProjectedWorkDays = s.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
-                        val lcbProjectedWorkDays = soNgayCongDuKienDouble.coerceAtMost(standardTargetDays)
+                        val lcbProjectedWorkDays = soNgayCongDuKienDouble
 
                         // 1b. Ngày nghỉ phép / nghỉ thường (Dynamic)
                         val annualLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isAnnualLeaveType(it.dayType) }
@@ -791,7 +790,7 @@ fun PayslipScreen(
                         val unpaidLeavesCount = fullEntriesForExport.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
 
                         // 1. Tiến độ tháng (Số ngày công chuẩn của tháng để tính LCB)
-                        val totalLcbDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.workingDays.coerceAtMost(s.standardWorkDays.toDouble())
+                        val totalLcbDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.workingDays
                         val workDaysCount = if (selectedTab == 1) {
                             (s.actualStandardWorkingDays + totalProjectedOtDays).coerceAtLeast(0.0)
                         } else {

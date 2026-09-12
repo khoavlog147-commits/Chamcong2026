@@ -4121,8 +4121,8 @@ fun EmployeePayslipView(
     val summary = com.example.data.SalaryCalculator.calculateMonthlySalary(
         entries = timeEntries,
         config = employee,
-        scheduledDaysSoFar = expectedWorkDaysSoFar,
-        totalScheduledDaysInMonth = totalWorkDaysInMonth,
+        scheduledDaysSoFar = expectedWorkDaysSoFar.coerceAtMost(26),
+        totalScheduledDaysInMonth = 26,
         earliestDate = effectiveJoinDate,
         selectedMonth = selectedMonthYm,
         todayStr = todayStr,
@@ -4195,7 +4195,7 @@ fun EmployeePayslipView(
         }
     }
 
-    val standardTargetDays = (if (isCurrentSelectedMonth && selectedTab == 0) summary.expectedWorkDays else summary.standardWorkDays).toDouble().coerceAtLeast(1.0)
+    val standardTargetDays = 26.0
     val dailySalary = employee.luongCoBan / standardTargetDays
     val hourlySalary = dailySalary / 8.0
 
@@ -4250,10 +4250,9 @@ fun EmployeePayslipView(
 
     val soNgayCongDuKien = if (isCurrentSelectedMonth) {
         val rawProjected = summary.workingDays + totalProjectedOtDays + futurePaidLeavesCount
-        val maxReachableDays = if (unpaidDaysCount > 0) (standardTargetDays - unpaidDaysCount).coerceAtLeast(0.0) else standardTargetDays
-        rawProjected.coerceAtMost(maxReachableDays).coerceAtLeast(0.0)
+        rawProjected.coerceAtLeast(0.0)
     } else {
-        summary.workingDays.coerceAtMost(standardTargetDays)
+        summary.workingDays
     }
     val soNgayCongDuKienDouble = soNgayCongDuKien
 
@@ -4318,7 +4317,7 @@ fun EmployeePayslipView(
         summary.phuCapChuyenCan
     }
 
-    val luongDuKienBaseSalary = if (soNgayCongDuKienDouble >= standardTargetDays) employee.luongCoBan else Math.round((employee.luongCoBan / standardTargetDays) * soNgayCongDuKienDouble).toDouble()
+    val luongDuKienBaseSalary = Math.round(dailySalary * soNgayCongDuKienDouble).toDouble()
 
     val currentProratedAllowancesSum = summary.pcKyThuatVal + summary.pcTrachNhiemVal + summary.pcChucVuVal + summary.pcHieuSuatVal +
             summary.pcSanPhamVal + summary.pcComCaVal + summary.pcComOtVal + summary.pcNhaOVal + summary.pcDocHaiVal + 
@@ -4906,9 +4905,9 @@ fun EmployeePayslipView(
 
                 // 1. Base Salary
                 if (selectedTab == 1) {
-                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(soNgayCongDuKienDouble.coerceAtMost(standardTargetDays))} / ${summary.standardWorkDays})", value = luongDuKienBaseSalary, isAddition = true)
+                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(soNgayCongDuKienDouble)} / ${summary.standardWorkDays})", value = luongDuKienBaseSalary, isAddition = true)
                 } else {
-                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(summary.workingDays.toDouble().coerceAtMost(summary.standardWorkDays.toDouble()))} / ${summary.standardWorkDays})", value = summary.baseBasicSalary, isAddition = true)
+                    LocalPayslipMoneyRow(label = "LCB thực nhận (${df.format(summary.workingDays)} / ${summary.standardWorkDays})", value = summary.baseBasicSalary, isAddition = true)
                 }
 
                 // 2. Allowances
