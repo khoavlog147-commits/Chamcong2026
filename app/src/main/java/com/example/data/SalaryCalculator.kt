@@ -62,32 +62,75 @@ object SalaryCalculator {
         )
     )
 
-    fun getShiftForEntry(entry: TimeEntry): ShiftConfig {
-        val shiftId = entry.shiftId
-        if (shiftId != null && SHIFTS.containsKey(shiftId)) {
-            return SHIFTS[shiftId]!!
-        }
-        if (entry.shiftType == "NIGHT" || entry.dayType == "NIGHT") {
-            return SHIFTS["ca_dem"]!!
-        }
-        // Fallback: detect based on old data or check-in time
-        val inTime = entry.checkInTime ?: return SHIFTS["ca1"]!!
-        val cal = Calendar.getInstance().apply { timeInMillis = inTime }
-        val hour = cal.get(Calendar.HOUR_OF_DAY)
-        if (hour >= 15 || hour < 6) {
-            return SHIFTS["ca_dem"]!!
-        }
-        val outTime = entry.checkOutTime
-        if (outTime != null) {
-            val calOut = Calendar.getInstance().apply { timeInMillis = outTime }
-            val outHour = calOut.get(Calendar.HOUR_OF_DAY)
-            val outMin = calOut.get(Calendar.MINUTE)
-            val outTotalMin = outHour * 60 + outMin
-            if (outTotalMin >= 19 * 60 + 45) { // 19:45
-                return SHIFTS["ca2"]!!
+    fun parseScheduleHours(lichTrinh: String): List<Int> {
+        try {
+            val parts = lichTrinh.split("-")
+            if (parts.size == 2) {
+                val startParts = parts[0].trim().split(":")
+                val endParts = parts[1].trim().split(":")
+                if (startParts.size >= 2 && endParts.size >= 2) {
+                    val sH = startParts[0].trim().toIntOrNull() ?: 7
+                    val sM = startParts[1].trim().toIntOrNull() ?: 30
+                    val eH = endParts[0].trim().toIntOrNull() ?: 19
+                    val eM = endParts[1].trim().toIntOrNull() ?: 30
+                    return listOf(sH, sM, eH, eM)
+                }
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        return SHIFTS["ca1"]!!
+        return listOf(7, 30, 19, 30)
+    }
+
+    fun parseNightScheduleHours(caDemStart: String, caDemEnd: String): List<Int> {
+        try {
+            val startParts = caDemStart.trim().split(":")
+            val endParts = caDemEnd.trim().split(":")
+            val sH = startParts.getOrNull(0)?.trim()?.toIntOrNull() ?: 19
+            val sM = startParts.getOrNull(1)?.trim()?.toIntOrNull() ?: 30
+            val eH = endParts.getOrNull(0)?.trim()?.toIntOrNull() ?: 7
+            val eM = endParts.getOrNull(1)?.trim()?.toIntOrNull() ?: 30
+            return listOf(sH, sM, eH, eM)
+        } catch (e: Exception) {
+            return listOf(19, 30, 7, 30)
+        }
+    }
+
+    fun getShiftForEntry(entry: TimeEntry, config: UserConfig? = null): ShiftConfig {
+        val isNight = entry.shiftType == "NIGHT" || entry.dayType == "NIGHT" || run {
+            val inTime = entry.checkInTime ?: return@run false
+            val cal = Calendar.getInstance().apply { timeInMillis = inTime }
+            val hour = cal.get(Calendar.HOUR_OF_DAY)
+            hour >= 18 || hour < 5
+        }
+        val (schedStartH, schedStartM, schedEndH, schedEndM) = if (isNight) {
+            val sStart = config?.caDemStart?.ifBlank { "19:30" } ?: "19:30"
+            val sEnd = config?.caDemEnd?.ifBlank { "07:30" } ?: "07:30"
+            parseNightScheduleHours(sStart, sEnd)
+        } else {
+            val schedule = config?.lichTrinh?.ifBlank { "07:30 - 19:30" } ?: "07:30 - 19:30"
+            parseScheduleHours(schedule)
+        }
+        val sStartStr = String.format(Locale.US, "%02d:%02d", schedStartH, schedStartM)
+        val sEndStr = String.format(Locale.US, "%02d:%02d", schedEndH, schedEndM)
+        val breakHrs = if (config?.tinhKhauTruNghi == true) config.soGioNghiGiaiLao else 0.0
+
+        return ShiftConfig(
+            shiftId = if (isNight) "ca_dem" else "ca1",
+            shiftType = if (isNight) "NIGHT" else "DAY",
+            startTime = sStartStr,
+            endTime = sEndStr,
+            checkInWindowStart = sStartStr,
+            checkInWindowEnd = sStartStr,
+            checkOutWindowStart = sEndStr,
+            checkOutWindowEnd = sEndStr,
+            breakHours = breakHrs,
+            standardHours = 8.0
+        )
+    }
+
+    fun getShiftForEntry(entry: TimeEntry): ShiftConfig {
+        return getShiftForEntry(entry, null)
     }
 
     private fun getMillisForTime(baseTimeMs: Long, timeStr: String, dayOffset: Int = 0): Long {
@@ -257,49 +300,28 @@ object SalaryCalculator {
             )
         }
 
-        val hasTimes = entry.checkInTime != null && entry.checkOutTime != null
         val workingEntry = entry
-
         val rawInRaw = workingEntry.checkInTime ?: return workingEntry.copy(workDay = 0.0, otHours = 0.0, lateMinutes = 0, earlyLeaveMinutes = 0)
         // Round to nearest minute to avoid sub-minute floating point variance across different days
         val rawIn = Math.round(rawInRaw / 60000.0) * 60000L
         val rawOutRaw = workingEntry.checkOutTime
         val rawOut = rawOutRaw?.let { Math.round(it / 60000.0) * 60000L }
 
-        // 1. Load Shift configuration
-        val shift = getShiftForEntry(workingEntry)
+        // 1. Load Shift configuration from company setup
+        val shift = getShiftForEntry(workingEntry, config)
 
-        // 2. Normalization
+        // 2. Normalization based on company setup start time
         val stdInMs = getMillisForTime(rawIn, shift.startTime, 0)
 
-        // Check-In Normalization: Early check-in buffer is 30 minutes. 
-        // Any check-in at or before standard start time (stdInMs) is normalized to stdInMs.
+        // Check-In Normalization: Arriving before or at scheduled start time is normalized to standard start
         val normInMs = if (rawIn <= stdInMs) {
             stdInMs
         } else {
             rawIn
         }
 
-        // Check-Out Normalization: Any check-out within the shift's check-out window (stdOutMs to checkOutWindowEnd)
-        // is normalized to standard shift end (stdOutMs), so no extra OT or variation is counted.
-        // Any check-out exceeding the window is kept raw to count extra OT. Any check-out before standard end is kept raw (early leave).
-        val normOutMs = if (rawOut != null) {
-            val dayOffset = if (shift.shiftType == "NIGHT") 1 else 0
-            val stdOutMs = getMillisForTime(rawIn, shift.endTime, dayOffset)
-
-            if (rawOut >= stdOutMs) {
-                val diffMs = rawOut - stdOutMs
-                if (diffMs < 30 * 60000L) {
-                    stdOutMs
-                } else {
-                    rawOut
-                }
-            } else {
-                rawOut
-            }
-        } else {
-            null
-        }
+        // Check-Out: Use actual check-out time (removed old fixed clamping window)
+        val normOutMs = rawOut
 
         // 3. Late Check-In Minutes
         val lateMin = if (normInMs > stdInMs) {
@@ -308,15 +330,11 @@ object SalaryCalculator {
             0
         }
 
-        // 4. Early Leave Minutes
-        val earlyLeaveMin = if (normOutMs != null) {
-            val dayOffset = if (shift.shiftType == "NIGHT") 1 else 0
-            val stdOutMs = getMillisForTime(rawIn, shift.endTime, dayOffset)
-            if (normOutMs < stdOutMs) {
-                ((stdOutMs - normOutMs) / 60000.0).toInt()
-            } else {
-                0
-            }
+        // 4. Early Leave Minutes based on company scheduled end time
+        val dayOffset = if (shift.shiftType == "NIGHT") 1 else 0
+        val stdOutMs = getMillisForTime(rawIn, shift.endTime, dayOffset)
+        val earlyLeaveMin = if (normOutMs != null && normOutMs < stdOutMs) {
+            ((stdOutMs - normOutMs) / 60000.0).toInt()
         } else {
             0
         }
@@ -328,32 +346,33 @@ object SalaryCalculator {
             0.0
         }
 
-        // 5. Calculate WorkDay according to company rules
-        val maxLateOrEarly = Math.max(lateMin, earlyLeaveMin)
-        val workD = if (rawOut == null) {
+        // 5. Calculate WorkDay and OT according to company setup:
+        // Công chuẩn 8 tiếng, nếu quá 8 tiếng thì sẽ tính OT. Áp dụng tất cả các hạng mục tính công.
+        val isSundayVal = workingEntry.dayType == "SUNDAY" || isSunday(workingEntry.date)
+        val (workD, otHrs) = if (rawOut == null) {
             // Checked in but still working
-            if (lateMin < 15) 1.0 else if (lateMin < 120) 0.5 else 0.0
+            val currentWorkDay = if (lateMin < 15) 1.0 else if (lateMin < 120) 0.5 else 0.0
+            Pair(currentWorkDay, 0.0)
         } else {
             // Completed check-out: Calculate actual hours worked
             val outMs = normOutMs ?: rawOut
-            val workedHrs = (outMs - normInMs) / 3600000.0
-            val actualWorkedHrs = (workedHrs - breakHrsToUse).coerceAtLeast(0.0)
-            when {
-                actualWorkedHrs >= 8.0 -> 1.0
-                actualWorkedHrs >= 4.0 -> 0.5
-                maxLateOrEarly < 15 -> 1.0
-                maxLateOrEarly < 120 -> 0.5
-                else -> 0.0
-            }
-        }
+            val totalSpanHrs = (outMs - normInMs) / 3600000.0
+            val actualWorkedHrs = (totalSpanHrs - breakHrsToUse).coerceAtLeast(0.0)
 
-        // 6. Calculate OT Hours according to shift
-        val otHrs = if (normOutMs != null) {
-            val workedHrs = (normOutMs - normInMs) / 3600000.0
-            val actualWorkedHrs = (workedHrs - breakHrsToUse).coerceAtLeast(0.0)
-            (actualWorkedHrs - shift.standardHours).coerceAtLeast(0.0)
-        } else {
-            0.0
+            if (isSundayVal) {
+                // Trên ca Chủ nhật: Toàn bộ số giờ làm là giờ OT Chủ nhật
+                val wd = if (actualWorkedHrs >= 8.0) 1.0 else Math.round((actualWorkedHrs / 8.0) * 100.0) / 100.0
+                Pair(wd, actualWorkedHrs)
+            } else {
+                // Công chuẩn 8 tiếng. Quá 8 tiếng tính OT
+                if (actualWorkedHrs >= 8.0) {
+                    val ot = actualWorkedHrs - 8.0
+                    Pair(1.0, ot)
+                } else {
+                    val wd = Math.round((actualWorkedHrs / 8.0) * 100.0) / 100.0
+                    Pair(wd, 0.0)
+                }
+            }
         }
 
         return workingEntry.copy(
@@ -566,11 +585,13 @@ object SalaryCalculator {
                 totalStandardHours += finalStandardHours
 
                 val finalOtHours = e.otHours
-                if (finalOtHours > 0.0) {
-                    if (e.dayType == "HOLIDAY") {
-                        totalOtLeHours += finalOtHours
-                        otLePay += finalOtHours * (hourlySalary * config.heSoOtNgayLe)
-                    } else if (e.shiftType == "NIGHT") {
+                if (e.dayType == "HOLIDAY" || isHolidayDateVal) {
+                    if (actualHours > 0.0) {
+                        totalOtLeHours += actualHours
+                        otLePay += actualHours * (hourlySalary * config.heSoOtNgayLe)
+                    }
+                } else if (finalOtHours > 0.0) {
+                    if (e.shiftType == "NIGHT") {
                         totalOtNightHours += finalOtHours
                         otNightPay += finalOtHours * (hourlySalary * config.heSoOtDem)
                     } else {

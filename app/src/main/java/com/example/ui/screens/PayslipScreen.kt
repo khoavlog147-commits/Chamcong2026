@@ -458,6 +458,9 @@ fun PayslipScreen(
 
                         val existingDates = entries.map { it.date }.toSet()
 
+                        val (daySH, daySM, dayEH, dayEM) = com.example.data.SalaryCalculator.parseScheduleHours(c.lichTrinh)
+                        val (nightSH, nightSM, nightEH, nightEM) = com.example.data.SalaryCalculator.parseNightScheduleHours(c.caDemStart, c.caDemEnd)
+
                         var sunDayLeft = if (includeSundayInProjection) remainingSundaysDay else 0
                         var sunNightLeft = if (includeSundayInProjection) remainingSundaysNight else 0
                         var ot15DayLeft = customOt15DaysCountDay.toInt()
@@ -476,8 +479,8 @@ fun PayslipScreen(
                                             id = 0,
                                             userId = c.maNhanVien,
                                             date = dateStr,
-                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0) }.timeInMillis,
-                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
+                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, daySH, daySM, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, dayEH, dayEM, 0) }.timeInMillis,
                                             shiftType = "DAY",
                                             dayType = "SUNDAY",
                                             note = "Dự kiến (OT CN Ca ngày)"
@@ -490,8 +493,8 @@ fun PayslipScreen(
                                             id = 0,
                                             userId = c.maNhanVien,
                                             date = dateStr,
-                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 19, 30, 0) }.timeInMillis,
-                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, 7, 30, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, nightSH, nightSM, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, nightEH, nightEM, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
                                             shiftType = "NIGHT",
                                             dayType = "SUNDAY",
                                             note = "Dự kiến (OT CN Ca đêm)"
@@ -510,14 +513,18 @@ fun PayslipScreen(
                                     if (isOtDay || isOtNight) {
                                         val shiftT = if (isOtNight) "NIGHT" else "DAY"
                                         val noteStr = if (isOtDay) "Dự kiến (OT 1.5 Ca ngày)" else "Dự kiến (OT 1.5 Ca đêm)"
+                                        val sH = if (isOtNight) nightSH else daySH
+                                        val sM = if (isOtNight) nightSM else daySM
+                                        val eH = if (isOtNight) nightEH else dayEH
+                                        val eM = if (isOtNight) nightEM else dayEM
                                         
                                         list.add(
                                             TimeEntry(
                                                 id = 0,
                                                 userId = c.maNhanVien,
                                                 date = dateStr,
-                                                checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 19 else 7, 30, 0) }.timeInMillis,
-                                                checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, if (isOtNight) 7 else 19, 30, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                                checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, sH, sM, 0) }.timeInMillis,
+                                                checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, eH, eM, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
                                                 shiftType = shiftT,
                                                 dayType = "NORMAL",
                                                 note = noteStr
