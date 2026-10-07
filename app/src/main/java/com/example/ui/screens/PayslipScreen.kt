@@ -94,9 +94,21 @@ fun PayslipScreen(
     var customOt15DaysCountDay by remember { mutableStateOf(0.0) }
     var customOt15DaysCountNight by remember { mutableStateOf(0.0) }
     var showSalaryAdvanceDialog by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf(0) }
     LaunchedEffect(selectedMonth) {
         customOt15DaysCountDay = 0.0
         customOt15DaysCountNight = 0.0
+        try {
+            val parts = selectedMonth.split("-")
+            val tYear = parts.getOrNull(0)?.toIntOrNull() ?: 2026
+            val tMonth = parts.getOrNull(1)?.toIntOrNull() ?: 1
+            val todayCal = Calendar.getInstance()
+            val cYear = todayCal.get(Calendar.YEAR)
+            val cMonth = todayCal.get(Calendar.MONTH) + 1
+            if (tYear > cYear || (tYear == cYear && tMonth > cMonth)) {
+                selectedTab = 1
+            }
+        } catch (e: Exception) {}
     }
 
     val fmt = DecimalFormat("#,###")
@@ -214,6 +226,8 @@ fun PayslipScreen(
                 val targetMonth = parts.getOrNull(1)?.toIntOrNull() ?: currentMonth
 
                 val isCurrentSelectedMonth = (targetYear == currentYear && targetMonth == currentMonth)
+                val isFutureSelectedMonth = (targetYear > currentYear || (targetYear == currentYear && targetMonth > currentMonth))
+                val isCurrentOrFutureMonth = isCurrentSelectedMonth || isFutureSelectedMonth
 
                 val nightShiftsCount = remember(entries) {
                     entries.count { e ->
@@ -280,8 +294,11 @@ fun PayslipScreen(
                     tempCal.getActualMaximum(Calendar.DAY_OF_MONTH)
                 }
 
-                val startProjectionDay = remember(hasTodayLogged, lastLoggedDayOfMonth, todayDayOfMonth, isCurrentSelectedMonth, maxDaysInMonth) {
-                    if (!isCurrentSelectedMonth) 1 else if (hasTodayLogged) (todayDayOfMonth + 1).coerceAtMost(maxDaysInMonth + 1) else todayDayOfMonth.coerceAtMost(maxDaysInMonth + 1)
+                val startProjectionDay = remember(hasTodayLogged, lastLoggedDayOfMonth, todayDayOfMonth, isCurrentSelectedMonth, isFutureSelectedMonth, maxDaysInMonth) {
+                    if (isFutureSelectedMonth) 1
+                    else if (!isCurrentSelectedMonth) 1
+                    else if (hasTodayLogged) (todayDayOfMonth + 1).coerceAtMost(maxDaysInMonth + 1)
+                    else todayDayOfMonth.coerceAtMost(maxDaysInMonth + 1)
                 }
 
                 val totalSundaysInMonth = remember(targetYear, targetMonth, maxDaysInMonth) {
@@ -300,8 +317,8 @@ fun PayslipScreen(
                     count
                 }
 
-                val defaultRemainingSundays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, entries) {
-                    if (!isCurrentSelectedMonth) 0 else {
+                val defaultRemainingSundays = remember(targetYear, targetMonth, startProjectionDay, isCurrentOrFutureMonth, entries) {
+                    if (!isCurrentOrFutureMonth) 0 else {
                         val cal = Calendar.getInstance()
                         var count = 0
                         for (day in startProjectionDay..maxDaysInMonth) {
@@ -329,8 +346,8 @@ fun PayslipScreen(
                 var remainingSundaysNight by remember { mutableStateOf(0) }
                 val remainingSundays = remainingSundaysDay + remainingSundaysNight
 
-                val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentSelectedMonth, entries) {
-                    if (!isCurrentSelectedMonth) 0 else {
+                val remainingWeekdays = remember(targetYear, targetMonth, startProjectionDay, isCurrentOrFutureMonth, entries) {
+                    if (!isCurrentOrFutureMonth) 0 else {
                         val cal = Calendar.getInstance()
                         var count = 0
                         for (day in startProjectionDay..maxDaysInMonth) {
@@ -379,8 +396,6 @@ fun PayslipScreen(
                 }
 
                 // TAB / SEGMENT CONTROL
-                var selectedTab by remember { mutableStateOf(0) }
-
                 val standardTargetDays = 26.0
 
                 val dailySalary = remember(c.luongCoBan, standardTargetDays) {
@@ -423,8 +438,8 @@ fun PayslipScreen(
 
                 val totalProjectedOtDays = customOt15DaysCountDay + customOt15DaysCountNight
 
-                val futurePaidLeavesCount = remember(entries, isCurrentSelectedMonth, startProjectionDay, targetYear, targetMonth) {
-                    if (!isCurrentSelectedMonth) 0.0 else {
+                val futurePaidLeavesCount = remember(entries, isCurrentOrFutureMonth, startProjectionDay, targetYear, targetMonth) {
+                    if (!isCurrentOrFutureMonth) 0.0 else {
                         val todayYmd = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, startProjectionDay)
                         entries.count { e ->
                             val normD = com.example.data.SalaryCalculator.normalizeToYmd(e.date)
@@ -433,7 +448,10 @@ fun PayslipScreen(
                     }
                 }
 
-                val soNgayCongDuKien = if (isCurrentSelectedMonth) {
+                val soNgayCongDuKien = if (isFutureSelectedMonth) {
+                    // For future month: base on 26 standard target workdays plus projected OT days and paid leaves
+                    (standardTargetDays + totalProjectedOtDays + futurePaidLeavesCount).coerceAtLeast(0.0)
+                } else if (isCurrentSelectedMonth) {
                     val rawProjected = s.workingDays + totalProjectedOtDays + futurePaidLeavesCount
                     rawProjected.coerceAtLeast(0.0)
                 } else {
@@ -442,33 +460,31 @@ fun PayslipScreen(
                 val soNgayCongDuKienDouble = soNgayCongDuKien
 
                 val fullEntriesForExport = remember(
-                    entries, selectedTab, isCurrentSelectedMonth, remainingWeekdays,
+                    entries, selectedTab, isCurrentOrFutureMonth, isFutureSelectedMonth, remainingWeekdays,
                     remainingSundays, includeSundayInProjection, remainingSundaysDay,
-                    remainingSundaysNight, customOt15DaysCountDay, customOt15DaysCountNight
+                    remainingSundaysNight, customOt15DaysCountDay, customOt15DaysCountNight, targetYear, targetMonth, startProjectionDay
                 ) {
-                    if (selectedTab != 1 || !isCurrentSelectedMonth) {
+                    if (selectedTab != 1 || !isCurrentOrFutureMonth) {
                         entries
                     } else {
                         val list = entries.toMutableList()
-                        val cal = Calendar.getInstance()
-                        val currentYear = cal.get(Calendar.YEAR)
-                        val currentMonth = cal.get(Calendar.MONTH)
+                        val cal = Calendar.getInstance().apply {
+                            set(Calendar.YEAR, targetYear)
+                            set(Calendar.MONTH, targetMonth - 1)
+                        }
                         val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-                        val todayDay = cal.get(Calendar.DAY_OF_MONTH)
+                        val fromDay = if (isFutureSelectedMonth) 1 else (todayDayOfMonth + 1)
 
                         val existingDates = entries.map { it.date }.toSet()
-
-                        val (daySH, daySM, dayEH, dayEM) = com.example.data.SalaryCalculator.parseScheduleHours(c.lichTrinh)
-                        val (nightSH, nightSM, nightEH, nightEM) = com.example.data.SalaryCalculator.parseNightScheduleHours(c.caDemStart, c.caDemEnd)
 
                         var sunDayLeft = if (includeSundayInProjection) remainingSundaysDay else 0
                         var sunNightLeft = if (includeSundayInProjection) remainingSundaysNight else 0
                         var ot15DayLeft = customOt15DaysCountDay.toInt()
                         var ot15NightLeft = customOt15DaysCountNight.toInt()
 
-                        for (day in (todayDay + 1)..daysInMonth) {
-                            val dCal = Calendar.getInstance().apply { set(currentYear, currentMonth, day) }
-                            val dateStr = String.format(Locale.US, "%02d/%02d/%04d", day, currentMonth + 1, currentYear)
+                        for (day in fromDay..daysInMonth) {
+                            val dCal = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day) }
+                            val dateStr = String.format(Locale.US, "%02d/%02d/%04d", day, targetMonth, targetYear)
                             if (existingDates.contains(dateStr)) continue
 
                             val isSun = dCal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
@@ -479,8 +495,8 @@ fun PayslipScreen(
                                             id = 0,
                                             userId = c.maNhanVien,
                                             date = dateStr,
-                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, daySH, daySM, 0) }.timeInMillis,
-                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, dayEH, dayEM, 0) }.timeInMillis,
+                                            checkInTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, 7, 30, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, 19, 30, 0) }.timeInMillis,
                                             shiftType = "DAY",
                                             dayType = "SUNDAY",
                                             note = "Dự kiến (OT CN Ca ngày)"
@@ -493,8 +509,8 @@ fun PayslipScreen(
                                             id = 0,
                                             userId = c.maNhanVien,
                                             date = dateStr,
-                                            checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, nightSH, nightSM, 0) }.timeInMillis,
-                                            checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, nightEH, nightEM, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                            checkInTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, 19, 30, 0) }.timeInMillis,
+                                            checkOutTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, 7, 30, 0); add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
                                             shiftType = "NIGHT",
                                             dayType = "SUNDAY",
                                             note = "Dự kiến (OT CN Ca đêm)"
@@ -513,18 +529,14 @@ fun PayslipScreen(
                                     if (isOtDay || isOtNight) {
                                         val shiftT = if (isOtNight) "NIGHT" else "DAY"
                                         val noteStr = if (isOtDay) "Dự kiến (OT 1.5 Ca ngày)" else "Dự kiến (OT 1.5 Ca đêm)"
-                                        val sH = if (isOtNight) nightSH else daySH
-                                        val sM = if (isOtNight) nightSM else daySM
-                                        val eH = if (isOtNight) nightEH else dayEH
-                                        val eM = if (isOtNight) nightEM else dayEM
                                         
                                         list.add(
                                             TimeEntry(
                                                 id = 0,
                                                 userId = c.maNhanVien,
                                                 date = dateStr,
-                                                checkInTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, sH, sM, 0) }.timeInMillis,
-                                                checkOutTime = Calendar.getInstance().apply { set(currentYear, currentMonth, day, eH, eM, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
+                                                checkInTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, if (isOtNight) 19 else 7, 30, 0) }.timeInMillis,
+                                                checkOutTime = Calendar.getInstance().apply { set(targetYear, targetMonth - 1, day, if (isOtNight) 7 else 19, 30, 0); if (isOtNight) add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis,
                                                 shiftType = shiftT,
                                                 dayType = "NORMAL",
                                                 note = noteStr
@@ -538,7 +550,7 @@ fun PayslipScreen(
                     }
                 }
 
-                val projectedPresenceDays = s.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
+                val projectedPresenceDays = (if (isFutureSelectedMonth) standardTargetDays else s.actualPresenceDays) + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
 
                 fun calcPr(fieldName: String, valRaw: Double): Double {
                     return com.example.data.SalaryCalculator.calculateAllowanceValue(
@@ -561,7 +573,7 @@ fun PayslipScreen(
                 val pcSanPhamShow = if (selectedTab == 1) calcPr("pcSanPham", c.pcSanPham) else s.pcSanPhamVal
 
                 val pcComCaShow = if (selectedTab == 1) {
-                    if (isCurrentSelectedMonth) {
+                    if (isCurrentOrFutureMonth) {
                         val calcType = c.getCalcTypeFor("pcComCa")
                         when (calcType) {
                             "PER_WORK_DAY" -> {
@@ -619,13 +631,17 @@ fun PayslipScreen(
 
                 val allowanceAdjustment = fullProjectedAllowancesSum - currentProratedAllowancesSum
 
-                val baseSalaryAdjustment = if (isCurrentSelectedMonth) (luongDuKienBaseSalary - s.baseBasicSalary) else 0.0
+                val baseSalaryAdjustment = if (isCurrentOrFutureMonth) (luongDuKienBaseSalary - s.baseBasicSalary) else 0.0
                 val totalOtDayHours = customOt15DaysCountDay * dailyOtHoursMax
                 val totalOtNightHours = customOt15DaysCountNight * dailyOtHoursMax
                 val customOt15PayDayVal = totalOtDayHours * hourlySalary * c.heSoOtNgayThuong
                 val customOt15PayNightVal = totalOtNightHours * hourlySalary * c.heSoOtDem
                 val customOt15Pay = customOt15PayDayVal + customOt15PayNightVal
-                val luongDuKienVal = s.luongThucNhan + baseSalaryAdjustment + additionalSundaysPay + additionalSundaysNightAllowance + allowanceAdjustment + customOt15Pay + customNightAllowance
+                
+                // Projected calculation: cleanly sums base salary + allowances + all OT - deductions
+                val projectedGross = luongDuKienBaseSalary + (s.tienOtNgay + customOt15PayDayVal) + (s.tienOtDem + customOt15PayNightVal) + (s.tienChuNhat + additionalSundaysPay) + s.tienOtLe + fullProjectedAllowancesSum
+                val projectedDeductions = s.tienBh + s.doanPhi + s.tamUng
+                val luongDuKienVal = (projectedGross - projectedDeductions).coerceAtLeast(0.0)
 
                 Row(
                     modifier = Modifier
@@ -673,7 +689,7 @@ fun PayslipScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (isCurrentSelectedMonth) "DỰ KIẾN CUỐI THÁNG" else "LƯƠNG FULL THÁNG",
+                            text = if (isCurrentOrFutureMonth) "DỰ KIẾN CUỐI THÁNG" else "LƯƠNG FULL THÁNG",
                             color = if (selectedTab == 1) White else LightGray,
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp
@@ -755,7 +771,7 @@ fun PayslipScreen(
                             if (selectedTab == 1) {
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = "🔮 ĐÃ BÙ TOÀN BỘ CÁC NGÀY CÒN LẠI",
+                                    text = if (isFutureSelectedMonth) "🔮 DỰ KIẾN TOÀN BỘ 26 CÔNG CHUẨN" else "🔮 ĐÃ BÙ TOÀN BỘ CÁC NGÀY CÒN LẠI",
                                     color = NeonBlue,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -788,7 +804,7 @@ fun PayslipScreen(
                         
                         val totalActualWorkDays = s.actualPresenceDays
                         val lcbActualWorkDays = s.workingDays
-                        val totalProjectedWorkDays = s.actualPresenceDays + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
+                        val totalProjectedWorkDays = (if (isFutureSelectedMonth) standardTargetDays else s.actualPresenceDays) + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
                         val lcbProjectedWorkDays = soNgayCongDuKienDouble
 
                         // 1b. Ngày nghỉ phép / nghỉ thường (Dynamic)
@@ -799,7 +815,7 @@ fun PayslipScreen(
                         // 1. Tiến độ tháng (Số ngày công chuẩn của tháng để tính LCB)
                         val totalLcbDays = if (selectedTab == 1) soNgayCongDuKienDouble else s.workingDays
                         val workDaysCount = if (selectedTab == 1) {
-                            (s.actualStandardWorkingDays + totalProjectedOtDays).coerceAtLeast(0.0)
+                            ((if (isFutureSelectedMonth) standardTargetDays else s.actualStandardWorkingDays) + totalProjectedOtDays).coerceAtLeast(0.0)
                         } else {
                             s.actualStandardWorkingDays
                         }
@@ -837,7 +853,7 @@ fun PayslipScreen(
                                 label = "Ngày làm việc (Dự kiến):", 
                                 value = "${df.format(totalProjectedWorkDays)} / ${standardTargetDays.toInt()} ngày"
                             )
-                            if (isCurrentSelectedMonth) {
+                            if (isCurrentOrFutureMonth) {
                                 val sundayDetails = buildString {
                                     if (includeSundayInProjection && remainingSundays > 0) {
                                         if (remainingSundaysDay > 0) append(" + $remainingSundaysDay CN ngày")
@@ -862,7 +878,7 @@ fun PayslipScreen(
                         }
 
                         // Interactive Projection Switch inside Receipt Paper
-                        if (selectedTab == 1 && isCurrentSelectedMonth) {
+                        if (selectedTab == 1 && isCurrentOrFutureMonth) {
                             HorizontalDivider(
                                 color = Color(0xFF2C2C2C),
                                 thickness = 0.5.dp,
