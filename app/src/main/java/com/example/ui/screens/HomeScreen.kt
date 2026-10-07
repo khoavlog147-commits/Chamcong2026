@@ -2554,7 +2554,11 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     val rawDurationMs = (finalCheckOut - finalCheckIn).coerceAtLeast(0L)
     val durationMs = Math.round(rawDurationMs / 60000.0) * 60000L
     val rawHours = durationMs / 3600000.0
-    val breakHours = if (config.tinhKhauTruNghi) config.soGioNghiGiaiLao else 0.0
+    val breakHours = if (processed.customBreakDeduction != null) {
+        if (processed.customBreakDeduction == true) (processed.customBreakHours ?: config.soGioNghiGiaiLao) else 0.0
+    } else {
+        if (config.tinhKhauTruNghi) config.soGioNghiGiaiLao else 0.0
+    }
     val actualHours = (rawHours - breakHours).coerceAtLeast(0.0)
 
     val finalStandardHours = processed.workDay * 8.0

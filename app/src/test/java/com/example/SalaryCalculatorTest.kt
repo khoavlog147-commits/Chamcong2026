@@ -174,6 +174,30 @@ class SalaryCalculatorTest {
         assertEquals("earlyLeaveMinutes should be 0", 0, result.earlyLeaveMinutes)
     }
 
+    @Test
+    fun testCase7b_caDem_withUserConfigNoBreakDeduction() {
+        val inTime = getTimeMs(day = 15, hour = 19, minute = 30)
+        val outTime = getTimeMs(day = 16, hour = 7, minute = 30)
+        val entry = TimeEntry(
+            userId = "user1",
+            date = "2026-09-15",
+            shiftId = "ca_dem",
+            checkInTime = inTime,
+            checkOutTime = outTime,
+            customBreakDeduction = false
+        )
+        val config = com.example.data.model.UserConfig(
+            userId = "user1",
+            tinhKhauTruNghi = false,
+            soGioNghiGiaiLao = 1.5
+        )
+
+        val result = SalaryCalculator.calculateSingleEntry(entry, config)
+
+        assertEquals("workDay should be 1.0", 1.0, result.workDay, 0.001)
+        assertEquals("otHours should be 4.0", 4.0, result.otHours, 0.001)
+    }
+
     // 8. Case dayType = "PAID_LEAVE" -> workDay phải = 1.0, otHours = 0.0
     @Test
     fun testCase8_paidLeave() {

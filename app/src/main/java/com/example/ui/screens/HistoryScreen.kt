@@ -555,7 +555,7 @@ fun HistoryScreen(
             
             var selectedDayType by remember { mutableStateOf("NORMAL") }
             var noteString by remember { mutableStateOf("") }
-            var isBreakDeducted by remember { mutableStateOf(configState?.tinhKhauTruNghi ?: true) }
+            var isBreakDeducted by remember { mutableStateOf(configState?.tinhKhauTruNghi ?: false) }
 
             // Pre-fill if entry already exists
             val existing = entries.find { it.date == day.dateString }
@@ -563,7 +563,7 @@ fun HistoryScreen(
                 if (existing != null) {
                     noteString = existing.note ?: ""
                     selectedDayType = existing.dayType
-                    isBreakDeducted = existing.customBreakDeduction ?: configState?.tinhKhauTruNghi ?: true
+                    isBreakDeducted = existing.customBreakDeduction ?: configState?.tinhKhauTruNghi ?: false
                     
                     if (existing.checkInTime != null) {
                         val cal = Calendar.getInstance().apply { timeInMillis = existing.checkInTime }
@@ -589,7 +589,7 @@ fun HistoryScreen(
                     } else {
                         selectedDayType = if (day.isSunday) "SUNDAY" else "NORMAL"
                     }
-                    isBreakDeducted = configState?.tinhKhauTruNghi ?: true
+                    isBreakDeducted = configState?.tinhKhauTruNghi ?: false
                     checkInHour = TextFieldValue("07")
                     checkInMin = TextFieldValue("30")
                     checkOutHour = TextFieldValue("19")
