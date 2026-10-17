@@ -72,16 +72,17 @@ object SalaryCalculator {
         }
         // Fallback: detect based on old data or check-in time
         val inTime = entry.checkInTime ?: return SHIFTS["ca1"]!!
-        val cal = Calendar.getInstance().apply { timeInMillis = inTime }
+        val cal = threadLocalCal.get() ?: Calendar.getInstance()
+        cal.timeInMillis = inTime
         val hour = cal.get(Calendar.HOUR_OF_DAY)
         if (hour >= 15 || hour < 6) {
             return SHIFTS["ca_dem"]!!
         }
         val outTime = entry.checkOutTime
         if (outTime != null) {
-            val calOut = Calendar.getInstance().apply { timeInMillis = outTime }
-            val outHour = calOut.get(Calendar.HOUR_OF_DAY)
-            val outMin = calOut.get(Calendar.MINUTE)
+            cal.timeInMillis = outTime
+            val outHour = cal.get(Calendar.HOUR_OF_DAY)
+            val outMin = cal.get(Calendar.MINUTE)
             val outTotalMin = outHour * 60 + outMin
             if (outTotalMin >= 19 * 60 + 45) { // 19:45
                 return SHIFTS["ca2"]!!
@@ -90,11 +91,14 @@ object SalaryCalculator {
         return SHIFTS["ca1"]!!
     }
 
+    private val threadLocalCal = ThreadLocal.withInitial { Calendar.getInstance() }
+
     private fun getMillisForTime(baseTimeMs: Long, timeStr: String, dayOffset: Int = 0): Long {
-        val cal = Calendar.getInstance().apply { timeInMillis = baseTimeMs }
-        val parts = timeStr.split(":")
-        val hour = parts[0].toInt()
-        val min = parts[1].toInt()
+        val cal = threadLocalCal.get() ?: Calendar.getInstance()
+        cal.timeInMillis = baseTimeMs
+        val colonIdx = timeStr.indexOf(':')
+        val hour = if (colonIdx >= 0) timeStr.substring(0, colonIdx).toIntOrNull() ?: 0 else 0
+        val min = if (colonIdx >= 0) timeStr.substring(colonIdx + 1).toIntOrNull() ?: 0 else 0
         cal.set(Calendar.HOUR_OF_DAY, hour)
         cal.set(Calendar.MINUTE, min)
         cal.set(Calendar.SECOND, 0)
@@ -797,33 +801,43 @@ object SalaryCalculator {
     )
 
     fun getHolidayName(dateString: String): String? {
-        return try {
-            val parser = if (dateString.contains("/")) {
-                SimpleDateFormat("dd/MM/yyyy", Locale.US)
+        val s = dateString.trim()
+        val d: Int
+        val m: Int
+        val y: Int
+        try {
+            if (s.contains("/")) {
+                val parts = s.split("/")
+                if (parts.size != 3) return null
+                d = parts[0].toIntOrNull() ?: return null
+                m = parts[1].toIntOrNull() ?: return null
+                y = parts[2].toIntOrNull() ?: return null
+            } else if (s.contains("-")) {
+                val parts = s.split("-")
+                if (parts.size != 3) return null
+                y = parts[0].toIntOrNull() ?: return null
+                m = parts[1].toIntOrNull() ?: return null
+                d = parts[2].toIntOrNull() ?: return null
             } else {
-                SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                return null
             }
-            val date = parser.parse(dateString) ?: return null
-            val cal = Calendar.getInstance().apply { time = date }
-            val day = cal.get(Calendar.DAY_OF_MONTH)
-            val month = cal.get(Calendar.MONTH) + 1
-            val year = cal.get(Calendar.YEAR)
-            val md = String.format(Locale.US, "%02d/%02d", day, month)
-            val dmy = String.format(Locale.US, "%02d/%02d/%04d", day, month, year)
-
-            // 1. Check fixed Solar Holidays (Chỉ các ngày lễ chính thức)
-            when (md) {
-                "01/01" -> return "Tết Dương Lịch"
-                "30/04" -> return "Giải Phóng Miền Nam"
-                "01/05" -> return "Quốc Tế Lao Động"
-                "02/09" -> return "Quốc Khánh (2/9)"
-            }
-
-            // 2. Check Vietnamese Lunar Holidays (Tết Âm Lịch & Giỗ Tổ Hùng Vương)
-            LUNAR_HOLIDAY_EXACT_MAP[dmy]
         } catch (e: Exception) {
-            null
+            return null
         }
+
+        val md = String.format(Locale.US, "%02d/%02d", d, m)
+        val dmy = String.format(Locale.US, "%02d/%02d/%04d", d, m, y)
+
+        // 1. Check fixed Solar Holidays (Chỉ các ngày lễ chính thức)
+        when (md) {
+            "01/01" -> return "Tết Dương Lịch"
+            "30/04" -> return "Giải Phóng Miền Nam"
+            "01/05" -> return "Quốc Tế Lao Động"
+            "02/09" -> return "Quốc Khánh (2/9)"
+        }
+
+        // 2. Check Vietnamese Lunar Holidays (Tết Âm Lịch & Giỗ Tổ Hùng Vương)
+        return LUNAR_HOLIDAY_EXACT_MAP[dmy]
     }
 
     fun isHoliday(dateString: String): Boolean {
@@ -837,22 +851,35 @@ object SalaryCalculator {
     fun isNearHolidayWindow(dateString: String, daysRange: Int = 2): Boolean {
         if (isHoliday(dateString)) return true
         return try {
-            val parser = if (dateString.contains("/")) {
-                SimpleDateFormat("dd/MM/yyyy", Locale.US)
+            val s = dateString.trim()
+            val d: Int
+            val m: Int
+            val y: Int
+            if (s.contains("/")) {
+                val parts = s.split("/")
+                if (parts.size != 3) return false
+                d = parts[0].toIntOrNull() ?: return false
+                m = parts[1].toIntOrNull() ?: return false
+                y = parts[2].toIntOrNull() ?: return false
+            } else if (s.contains("-")) {
+                val parts = s.split("-")
+                if (parts.size != 3) return false
+                y = parts[0].toIntOrNull() ?: return false
+                m = parts[1].toIntOrNull() ?: return false
+                d = parts[2].toIntOrNull() ?: return false
             } else {
-                SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                return false
             }
-            val date = parser.parse(dateString) ?: return false
-            val cal = Calendar.getInstance().apply { time = date }
-            
+            val cal = threadLocalCal.get() ?: Calendar.getInstance()
+            cal.set(y, m - 1, d)
             for (offset in -daysRange..daysRange) {
                 if (offset == 0) continue
-                val checkCal = (cal.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, offset) }
+                cal.set(y, m - 1, d + offset)
                 val checkStr = String.format(
                     Locale.US, "%02d/%02d/%04d",
-                    checkCal.get(Calendar.DAY_OF_MONTH),
-                    checkCal.get(Calendar.MONTH) + 1,
-                    checkCal.get(Calendar.YEAR)
+                    cal.get(Calendar.DAY_OF_MONTH),
+                    cal.get(Calendar.MONTH) + 1,
+                    cal.get(Calendar.YEAR)
                 )
                 if (isHoliday(checkStr)) {
                     return true
@@ -864,17 +891,34 @@ object SalaryCalculator {
         }
     }
 
+    fun isSunday(year: Int, month: Int, day: Int): Boolean {
+        if (month !in 1..12 || day !in 1..31) return false
+        val t = intArrayOf(0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4)
+        val yAdj = if (month < 3) year - 1 else year
+        val dow = (yAdj + yAdj / 4 - yAdj / 100 + yAdj / 400 + t[month - 1] + day) % 7
+        return dow == 0
+    }
+
     fun isSunday(dateString: String): Boolean {
+        val s = dateString.trim()
         return try {
-            val parser = if (dateString.contains("-")) {
-                SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            } else {
-                SimpleDateFormat("dd/MM/yyyy", Locale.US)
-            }
-            val date = parser.parse(dateString) ?: return false
-            val cal = Calendar.getInstance()
-            cal.time = date
-            cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+            if (s.contains("-")) {
+                val parts = s.split("-")
+                if (parts.size == 3) {
+                    val y = parts[0].toIntOrNull() ?: return false
+                    val m = parts[1].toIntOrNull() ?: return false
+                    val d = parts[2].toIntOrNull() ?: return false
+                    isSunday(y, m, d)
+                } else false
+            } else if (s.contains("/")) {
+                val parts = s.split("/")
+                if (parts.size == 3) {
+                    val d = parts[0].toIntOrNull() ?: return false
+                    val m = parts[1].toIntOrNull() ?: return false
+                    val y = parts[2].toIntOrNull() ?: return false
+                    isSunday(y, m, d)
+                } else false
+            } else false
         } catch (e: Exception) {
             false
         }

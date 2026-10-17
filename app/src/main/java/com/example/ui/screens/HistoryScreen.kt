@@ -105,12 +105,25 @@ fun HistoryScreen(
         getCalendarDaysForMonth(currentMonthDate)
     }
 
+    // Pre-indexed map of entries by date for fast O(1) lookups
+    val entriesMap = remember(entries) {
+        val map = HashMap<String, TimeEntry>(entries.size * 3 + 1)
+        for (e in entries) {
+            map[e.date] = e
+            val dmy = com.example.data.SalaryCalculator.normalizeDateToDmy(e.date)
+            map[dmy] = e
+            val ymd = com.example.data.SalaryCalculator.normalizeToYmd(e.date)
+            map[ymd] = e
+        }
+        map
+    }
+
     // List of public holidays in the currently selected month
-    val holidaysInMonth = remember(daysInMonth, entries) {
+    val holidaysInMonth = remember(daysInMonth, entriesMap) {
         val list = mutableListOf<Pair<String, String>>()
         daysInMonth.filter { !it.isEmpty }.forEach { day ->
             val holidayName = day.holidayName ?: run {
-                val e = entries.find { it.date == day.dateString }
+                val e = entriesMap[day.dateString]
                 if (e?.dayType == "HOLIDAY" || e?.dayType == "HOLIDAY_LEAVE") "Nghỉ lễ" else null
             }
             if (holidayName != null) {
@@ -313,12 +326,15 @@ fun HistoryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(daysInMonth) { day ->
+                items(
+                    items = daysInMonth,
+                    key = { day -> if (day.isEmpty) "empty_${daysInMonth.indexOf(day)}" else day.dateString }
+                ) { day ->
                     if (day.isEmpty) {
                         Box(modifier = Modifier.aspectRatio(1f))
                     } else {
                         val isSelected = selectedDates.contains(day.dateString)
-                        val matchingEntry = entries.find { it.date == day.dateString }
+                        val matchingEntry = entriesMap[day.dateString]
 
                         DayGridCell(
                             day = day,
@@ -444,59 +460,34 @@ fun HistoryScreen(
             }
 
             // Monthly Leaves Breakdown (Minimalist & Intuitive User Leaves Summary)
-            val isSameDateHelper: (String, String) -> Boolean = remember {
-                { d1, d2 ->
-                    if (d1 == d2) true
-                    else {
-                        try {
-                            val p1 = if (d1.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.US) else SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                            val p2 = if (d2.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.US) else SimpleDateFormat("yyyy-MM-dd", Locale.US)
-                            val parsed1 = p1.parse(d1)
-                            val parsed2 = p2.parse(d2)
-                            parsed1 != null && parsed2 != null && parsed1 == parsed2
-                        } catch (e: Exception) {
-                            false
-                        }
+            val leavesSummary = remember(daysInMonth, entriesMap) {
+                val annual = mutableListOf<String>()
+                val holiday = mutableListOf<String>()
+                val unpaid = mutableListOf<String>()
+                val unauthorized = mutableListOf<String>()
+
+                for (day in daysInMonth) {
+                    if (day.isEmpty) continue
+                    val matchingEntry = entriesMap[day.dateString]
+                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
+                    val isHoliday = day.isHoliday || matchingEntry?.dayType == "HOLIDAY" || matchingEntry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
+
+                    if (isHoliday && !isActualWorkingDay) {
+                        holiday.add(day.dateString)
+                    } else if (com.example.data.SalaryCalculator.isPaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay) {
+                        annual.add(day.dateString)
+                    } else if (com.example.data.SalaryCalculator.isUnpaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay) {
+                        unpaid.add(day.dateString)
+                    } else if ((matchingEntry?.dayType == "UNAUTHORIZED_LEAVE" || matchingEntry?.dayType == "KP" || matchingEntry?.dayType == "ABSENT") && !isActualWorkingDay) {
+                        unauthorized.add(day.dateString)
                     }
                 }
+                listOf(annual, holiday, unpaid, unauthorized)
             }
-
-            val annualLeaveDays = remember(daysInMonth, entries) {
-                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
-                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
-                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
-                    val isHoliday = day.isHoliday || matchingEntry?.dayType == "HOLIDAY" || matchingEntry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
-                    val isPaidLeave = com.example.data.SalaryCalculator.isPaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay && !isHoliday
-                    if (isPaidLeave) day.dateString else null
-                }
-            }
-
-            val holidayLeaveDays = remember(daysInMonth, entries) {
-                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
-                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
-                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
-                    val isHoliday = day.isHoliday || matchingEntry?.dayType == "HOLIDAY" || matchingEntry?.dayType == "HOLIDAY_LEAVE" || com.example.data.SalaryCalculator.isHoliday(day.dateString)
-                    if (isHoliday && !isActualWorkingDay) day.dateString else null
-                }
-            }
-
-            val unpaidLeaveDays = remember(daysInMonth, entries) {
-                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
-                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
-                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
-                    val isUnpaidLeave = com.example.data.SalaryCalculator.isUnpaidLeaveType(matchingEntry?.dayType) && !isActualWorkingDay
-                    if (isUnpaidLeave) day.dateString else null
-                }
-            }
-
-            val unauthorizedLeaveDays = remember(daysInMonth, entries) {
-                daysInMonth.filter { !it.isEmpty }.mapNotNull { day ->
-                    val matchingEntry = entries.find { isSameDateHelper(it.date, day.dateString) }
-                    val isActualWorkingDay = matchingEntry != null && matchingEntry.checkInTime != null && matchingEntry.checkOutTime != null
-                    val isUnauthorized = (matchingEntry?.dayType == "UNAUTHORIZED_LEAVE" || matchingEntry?.dayType == "KP" || matchingEntry?.dayType == "ABSENT") && !isActualWorkingDay
-                    if (isUnauthorized) day.dateString else null
-                }
-            }
+            val annualLeaveDays = leavesSummary[0]
+            val holidayLeaveDays = leavesSummary[1]
+            val unpaidLeaveDays = leavesSummary[2]
+            val unauthorizedLeaveDays = leavesSummary[3]
 
             if (!isMultiSelectMode) {
                 MonthLeavesSummaryCard(
@@ -558,7 +549,7 @@ fun HistoryScreen(
             var isBreakDeducted by remember { mutableStateOf(configState?.tinhKhauTruNghi ?: true) }
 
             // Pre-fill if entry already exists
-            val existing = entries.find { it.date == day.dateString }
+            val existing = entriesMap[day.dateString]
             LaunchedEffect(day) {
                 if (existing != null) {
                     noteString = existing.note ?: ""

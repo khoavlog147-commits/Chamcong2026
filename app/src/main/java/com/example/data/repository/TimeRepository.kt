@@ -33,8 +33,20 @@ class TimeRepository(
         timeEntryDao.insertOrUpdate(entry)
     }
 
+    suspend fun insertOrUpdateAll(entries: List<TimeEntry>) {
+        if (entries.isNotEmpty()) {
+            timeEntryDao.insertOrUpdateAll(entries)
+        }
+    }
+
     suspend fun delete(entry: TimeEntry) {
         timeEntryDao.delete(entry)
+    }
+
+    suspend fun deleteAll(entries: List<TimeEntry>) {
+        if (entries.isNotEmpty()) {
+            timeEntryDao.deleteAll(entries)
+        }
     }
 
     suspend fun deleteByDate(userId: String, date: String) {

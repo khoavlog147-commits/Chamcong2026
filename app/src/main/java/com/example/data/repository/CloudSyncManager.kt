@@ -121,40 +121,7 @@ class CloudSyncManager(private val context: Context) {
                 Log.e("CloudSyncManager", "Failed to upload to Firebase Firestore: ${e.message}", e)
             }
 
-            // 4. Upload config and entries to cloud database (disabled)
-            val client = OkHttpClient.Builder()
-                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
-
             Log.d("CloudSyncManager", "Local database successfully backed up to Server for userId: $userId")
-
-            // 4. Make a real HTTP network connection to check connection and post database packet
-            val mediaTypeJson = "application/json; charset=utf-8".toMediaTypeOrNull()
-            val payload = """
-                {
-                    "uid": "$userId",
-                    "entries_count": ${entries.size},
-                    "timestamp": ${System.currentTimeMillis()},
-                    "status": "synchronized"
-                }
-            """.trimIndent()
-            
-            val request = Request.Builder()
-                .url("https://httpbin.org/post")
-                .post(payload.toRequestBody(mediaTypeJson))
-                .build()
-
-            try {
-                client.newCall(request).execute().use { response ->
-                    val isSuccess = response.isSuccessful
-                    Log.d("CloudSyncManager", "Real Cloud Server network call resolved. Status: $isSuccess")
-                }
-            } catch (ex: java.io.IOException) {
-                Log.w("CloudSyncManager", "Auxiliary cloud network check timed out or failed (non-blocking): ${ex.message}")
-            }
-
             return@withContext true
         } catch (e: Exception) {
             Log.e("CloudSyncManager", "Failed to backup to server", e)

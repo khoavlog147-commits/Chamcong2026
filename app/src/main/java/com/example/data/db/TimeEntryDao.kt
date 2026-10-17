@@ -27,8 +27,14 @@ interface TimeEntryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(entry: TimeEntry)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateAll(entries: List<TimeEntry>)
+
     @Delete
     suspend fun delete(entry: TimeEntry)
+
+    @Delete
+    suspend fun deleteAll(entries: List<TimeEntry>)
 
     @Query("DELETE FROM time_entries WHERE userId = :userId")
     suspend fun clearAllForUser(userId: String)

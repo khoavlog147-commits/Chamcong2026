@@ -32,6 +32,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
     private var syncJob: kotlinx.coroutines.Job? = null
     private var adminNotifListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
     val hasRestoredForSession = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+    @Volatile
+    private var isSyncingAttendanceLogs = false
 
     // Current logged-in UI session state
     val currentUserSession: StateFlow<UserSession?> = authController.currentUserFlow
@@ -120,7 +122,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             } else {
                 flowOf(emptyList())
             }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Reactive list of active month entries
     val monthTimeEntries: StateFlow<List<TimeEntry>> = combine(
@@ -661,6 +663,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
     private suspend fun syncAttendanceLogsFromFirestore(userId: String) {
         if (userId.startsWith("demo") || userId.contains("demo")) return
+        if (isSyncingAttendanceLogs) return
+        isSyncingAttendanceLogs = true
         try {
             android.util.Log.d("TimeSnapViewModel", "Syncing attendance logs from Firestore for $userId")
             val remoteRecords = com.example.data.FirestoreService.getAttendanceLogsForUser(userId)
@@ -717,21 +721,22 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 normDate.isNotBlank() && !remoteDates.contains(normDate)
             }
 
-            for (entryToDelete in toDeleteLocally) {
-                android.util.Log.d("TimeSnapViewModel", "Local entry for ${entryToDelete.date} was deleted on Firestore. Deleting locally.")
-                repository.delete(entryToDelete)
-                
+            if (toDeleteLocally.isNotEmpty()) {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
                 val todayDmy = com.example.data.SalaryCalculator.normalizeDateToDmy(todayStr)
-                val entryNormDate = com.example.data.SalaryCalculator.normalizeDateToDmy(entryToDelete.date)
-                
-                if (entryNormDate == todayDmy) {
-                    android.util.Log.d("TimeSnapViewModel", "Cancelling automated processes for today because today's entry was deleted.")
-                    com.example.notification.NotificationHelper.cancelAutoCheckIn(getApplication(), userId)
-                    com.example.notification.NotificationHelper.cancelAutoCheckOut(getApplication(), userId)
+                for (entryToDelete in toDeleteLocally) {
+                    val entryNormDate = com.example.data.SalaryCalculator.normalizeDateToDmy(entryToDelete.date)
+                    if (entryNormDate == todayDmy) {
+                        android.util.Log.d("TimeSnapViewModel", "Cancelling automated processes for today because today's entry was deleted.")
+                        com.example.notification.NotificationHelper.cancelAutoCheckIn(getApplication(), userId)
+                        com.example.notification.NotificationHelper.cancelAutoCheckOut(getApplication(), userId)
+                    }
                 }
+                repository.deleteAll(toDeleteLocally)
+                currentEntries.removeAll(toDeleteLocally)
             }
-            currentEntries.removeAll(toDeleteLocally)
+
+            val toUpsert = mutableListOf<TimeEntry>()
 
             for (log in mergedRemoteRecords) {
                 val formattedDate = log.dateString
@@ -781,7 +786,6 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                                       (remoteClockIn > 0L && existingEntry.checkInTime != remoteClockIn)
 
                     if (needsUpdate) {
-                        android.util.Log.d("TimeSnapViewModel", "Updating local TimeEntry for $formattedDate from Firestore (dayType: ${existingEntry.dayType} -> $finalDayType, isWorking: ${existingEntry.isWorking} -> $remoteIsWorking)")
                         val updated = existingEntry.copy(
                             checkInTime = if (remoteClockIn > 0L) remoteClockIn else existingEntry.checkInTime,
                             checkOutTime = if (isLeaveType) null else remoteClockOut,
@@ -790,26 +794,14 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                             note = if (log.notes.isNotBlank()) log.notes else existingEntry.note
                         )
                         val calculated = com.example.data.SalaryCalculator.calculateSingleEntry(updated, config)
-                        repository.insertOrUpdate(calculated)
+                        toUpsert.add(calculated)
                         val idx = currentEntries.indexOfFirst { it.id == existingEntry.id || it.date == existingEntry.date }
                         if (idx >= 0) {
                             currentEntries[idx] = calculated
                         }
                     }
                 } else {
-                    val cal = Calendar.getInstance()
-                    var isSunday = false
-                    try {
-                        val parser = SimpleDateFormat("dd/MM/yyyy", Locale.US)
-                        val date = parser.parse(formattedDate)
-                        if (date != null) {
-                            cal.time = date
-                            isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-
+                    val isSunday = com.example.data.SalaryCalculator.isSunday(formattedDate)
                     val dayType = mappedDayType ?: if (isSunday) "SUNDAY" else "NORMAL"
                     val newEntry = TimeEntry(
                         id = 0,
@@ -822,20 +814,24 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                         note = log.notes.takeIf { it.isNotBlank() }
                     )
                     val calculated = com.example.data.SalaryCalculator.calculateSingleEntry(newEntry, config)
-                    repository.insertOrUpdate(calculated)
-                    // Reload currentEntries from the database to ensure the newly generated primary key ID is loaded correctly
-                    currentEntries.clear()
-                    currentEntries.addAll(repository.getEntries(userId).first())
+                    toUpsert.add(calculated)
+                    currentEntries.add(calculated)
                 }
             }
-            // Run local deduplication/normalization to clean up any old duplicates
-            normalizeTimeEntryDates(userId)
-            
+
+            if (toUpsert.isNotEmpty()) {
+                repository.insertOrUpdateAll(toUpsert)
+            }
+
             val active = repository.getActiveEntry(userId)
             _activeWorkingEntry.value = active
-            _triggerRefresh.value += 1
+            if (toDeleteLocally.isNotEmpty() || toUpsert.isNotEmpty()) {
+                _triggerRefresh.value += 1
+            }
         } catch (e: Exception) {
             android.util.Log.e("TimeSnapViewModel", "Error syncing attendance logs from Firestore for $userId", e)
+        } finally {
+            isSyncingAttendanceLogs = false
         }
     }
 
@@ -1244,7 +1240,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
             val calculated = com.example.data.SalaryCalculator.calculateSingleEntry(newEntry, userConfig.value)
             repository.insertOrUpdate(calculated)
             syncTimeEntryToLegacyLog(calculated)
-            triggerSync()
+            triggerSyncDebounced()
 
             if (isLeave) {
                 val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -1275,36 +1271,17 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch(Dispatchers.IO) {
             val todayDate = Date()
             val parser = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            val todayStr = parser.format(todayDate)
+            val todayYmd = com.example.data.SalaryCalculator.normalizeToYmd(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(todayDate))
             
+            val newEntries = mutableListOf<TimeEntry>()
+
             for (rawDateStr in selectedDates) {
                 val dateStr = com.example.data.SalaryCalculator.normalizeDateToDmy(rawDateStr)
-                var isFuture = false
-                try {
-                    val parsedDate = parser.parse(dateStr)
-                    if (parsedDate != null) {
-                        val cal1 = Calendar.getInstance().apply { time = todayDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                        val cal2 = Calendar.getInstance().apply { time = parsedDate; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
-                        isFuture = cal2.after(cal1)
-                    }
-                } catch (e: Exception) {}
-                
-                if (isFuture) continue
+                val dateYmd = com.example.data.SalaryCalculator.normalizeToYmd(dateStr)
+                if (dateYmd > todayYmd) continue
 
-                var dateVal: Date? = null
-                var isSunday = false
-                var isHoliday = false
-                try {
-                    dateVal = parser.parse(dateStr)
-                    if (dateVal != null) {
-                        val cal = Calendar.getInstance()
-                        cal.time = dateVal
-                        isSunday = cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-                        isHoliday = isHolidayDate(dateStr)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                val isSunday = com.example.data.SalaryCalculator.isSunday(dateStr)
+                val isHoliday = isHolidayDate(dateStr)
 
                 if (skipSunday && isSunday) continue
                 if (skipHoliday && isHoliday) continue
@@ -1359,10 +1336,18 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     shiftType = sType
                 )
                 val calculated = com.example.data.SalaryCalculator.calculateSingleEntry(entry, userConfig.value)
-                repository.insertOrUpdate(calculated)
-                syncTimeEntryToLegacyLog(calculated)
+                newEntries.add(calculated)
             }
-            triggerSync()
+
+            if (newEntries.isNotEmpty()) {
+                repository.insertOrUpdateAll(newEntries)
+                viewModelScope.launch(Dispatchers.IO) {
+                    for (entry in newEntries) {
+                        syncTimeEntryToLegacyLog(entry)
+                    }
+                }
+            }
+            triggerSyncDebounced()
         }
     }
 
@@ -1595,10 +1580,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
 
         // Calculate total work days in month first
         for (day in 1..maxDaysInMo) {
-            val dateStr = String.format(Locale.US, "%04d-%02d-%02d", targetYear, targetMonth, day)
-            val cal = Calendar.getInstance()
-            cal.set(targetYear, targetMonth - 1, day)
-            val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
+            val isSunday = com.example.data.SalaryCalculator.isSunday(targetYear, targetMonth, day)
             if (!isSunday) {
                 totalWorkDaysInMonth++
             }
@@ -1610,9 +1592,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 if (effectiveJoinDate != null && dateStr < effectiveJoinDate) {
                     continue
                 }
-                val cal = Calendar.getInstance()
-                cal.set(currentYear, currentMonth - 1, day)
-                val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
+                val isSunday = com.example.data.SalaryCalculator.isSunday(currentYear, currentMonth, day)
                 if (!isSunday) {
                     expectedWorkDaysSoFar++
                 }
@@ -1624,9 +1604,7 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                     if (dateStr < effectiveJoinDate) {
                         continue
                     }
-                    val cal = Calendar.getInstance()
-                    cal.set(targetYear, targetMonth - 1, day)
-                    val isSunday = (cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY)
+                    val isSunday = com.example.data.SalaryCalculator.isSunday(targetYear, targetMonth, day)
                     if (!isSunday) {
                         expectedWorkDaysSoFar++
                     }

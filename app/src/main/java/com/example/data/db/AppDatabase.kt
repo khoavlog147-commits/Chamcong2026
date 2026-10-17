@@ -10,7 +10,7 @@ import com.example.data.model.SalaryAdvance
 import com.example.data.model.TimeEntry
 import com.example.data.model.UserConfig
 
-@Database(entities = [TimeEntry::class, UserConfig::class, SalaryAdvance::class], version = 9, exportSchema = false)
+@Database(entities = [TimeEntry::class, UserConfig::class, SalaryAdvance::class], version = 10, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timeEntryDao(): TimeEntryDao
     abstract fun userConfigDao(): UserConfigDao
@@ -42,6 +42,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_time_entries_userId_date ON time_entries(userId, date)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_time_entries_userId_isWorking ON time_entries(userId, isWorking)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -49,7 +56,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "timesnap_pro_db"
                 )
-                .addMigrations(MIGRATION_5_6, MIGRATION_7_8)
+                .addMigrations(MIGRATION_5_6, MIGRATION_7_8, MIGRATION_9_10)
                 .fallbackToDestructiveMigration() // safe for production prototyping iteration
                 .build()
                 INSTANCE = instance
