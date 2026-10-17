@@ -341,12 +341,16 @@ object ExportUtils {
         // UI Pre-calculations
         val standardTargetDays = 26.0
         val totalOtDays = (customOt15DaysCountDay + customOt15DaysCountNight)
+        val paidLeavesCountPNG = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }.toDouble()
+        val unpaidLeavesCountPNG = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) || it.dayType == "UNAUTHORIZED_LEAVE" }.toDouble()
+        val baseFuturePresenceDays = (standardTargetDays - paidLeavesCountPNG - unpaidLeavesCountPNG).coerceAtLeast(0.0)
+
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (selectedTab == 1) {
                 if (isFutureSelectedMonth) {
-                    standardTargetDays + totalOtDays
+                    (standardTargetDays - unpaidLeavesCountPNG + totalOtDays).coerceAtLeast(0.0)
                 } else if (isCurrentSelectedMonth) {
                     val rawProjected = summary.workingDays + totalOtDays
                     rawProjected.coerceAtLeast(0.0)
@@ -364,7 +368,7 @@ object ExportUtils {
                 allowanceValue = valRaw,
                 calcType = config.getCalcTypeFor(fieldName),
                 totalWorkDays = soNgayCongDuKienDouble,
-                comCaCount = if (isFutureSelectedMonth) (standardTargetDays + totalOtDays + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)).toInt() else soNgayCongDuKienDouble.toInt(),
+                comCaCount = if (isFutureSelectedMonth) (baseFuturePresenceDays + totalOtDays + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)).toInt() else soNgayCongDuKienDouble.toInt(),
                 comOtCount = 0,
                 nightShiftsCount = summary.caDemCount + (if (selectedTab == 1) customOt15DaysCountNight.toInt() else 0),
                 scheduledDaysSoFar = soNgayCongDuKienDouble.toInt(),
@@ -563,7 +567,7 @@ object ExportUtils {
         val holidayLeavesCount = entries.count { com.example.data.SalaryCalculator.isHolidayLeaveType(it.dayType) }
         val unpaidLeavesCount = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) }
 
-        val workDaysCountPNG = if (selectedTab == 1) (summary.actualStandardWorkingDays + totalOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
+        val workDaysCountPNG = if (selectedTab == 1) ((if (isFutureSelectedMonth) baseFuturePresenceDays else summary.actualStandardWorkingDays) + totalOtDays).coerceAtLeast(0.0) else summary.actualStandardWorkingDays
         val leavePartsPNG = mutableListOf<String>()
         if (workDaysCountPNG > 0.0) leavePartsPNG.add("${df.format(workDaysCountPNG)} làm việc")
         if (annualLeavesCount > 0) leavePartsPNG.add("${annualLeavesCount} phép năm")
@@ -747,12 +751,16 @@ object ExportUtils {
 
         val standardTargetDays = 26.0
         val totalOtDaysPDF = (customOt15DaysCountDay + customOt15DaysCountNight)
+        val paidLeavesCountPDF = entries.count { com.example.data.SalaryCalculator.isPaidLeaveType(it.dayType) }.toDouble()
+        val unpaidLeavesCountPDF = entries.count { com.example.data.SalaryCalculator.isUnpaidLeaveType(it.dayType) || it.dayType == "UNAUTHORIZED_LEAVE" }.toDouble()
+        val baseFuturePresenceDaysPDF = (standardTargetDays - paidLeavesCountPDF - unpaidLeavesCountPDF).coerceAtLeast(0.0)
+
         val effectiveSoNgayCong = if (soNgayCongDuKien > 0.0) {
             soNgayCongDuKien
         } else {
             if (selectedTab == 1) {
                 if (isFutureSelectedMonth) {
-                    standardTargetDays + totalOtDaysPDF
+                    (standardTargetDays - unpaidLeavesCountPDF + totalOtDaysPDF).coerceAtLeast(0.0)
                 } else if (isCurrentSelectedMonth) {
                     val rawProjected = summary.workingDays + totalOtDaysPDF
                     rawProjected.coerceAtLeast(0.0)
@@ -764,7 +772,7 @@ object ExportUtils {
             }
         }
         val soNgayCongDuKienDouble = effectiveSoNgayCong
-        val totalProjectedWorkDaysPDF = (if (isFutureSelectedMonth) standardTargetDays else summary.actualPresenceDays) + totalOtDaysPDF + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
+        val totalProjectedWorkDaysPDF = (if (isFutureSelectedMonth) baseFuturePresenceDaysPDF else summary.actualPresenceDays) + totalOtDaysPDF + (if (includeSundayInProjection) remainingSundays.toDouble() else 0.0)
         val lcbProjectedWorkDaysPDF = soNgayCongDuKienDouble
         val lcbActualWorkDaysPDF = summary.workingDays
         fun calcPrPDF(fieldName: String, valRaw: Double): Double {

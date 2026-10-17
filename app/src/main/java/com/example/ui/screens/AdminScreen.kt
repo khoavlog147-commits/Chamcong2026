@@ -4253,8 +4253,10 @@ fun EmployeePayslipView(
         }
     }
 
+    val baseFuturePresenceDays = (standardTargetDays - futurePaidLeavesCount - unpaidDaysCount).coerceAtLeast(0.0)
+
     val soNgayCongDuKien = if (isFutureSelectedMonth) {
-        (standardTargetDays + totalProjectedOtDays + futurePaidLeavesCount).coerceAtLeast(0.0)
+        (standardTargetDays - unpaidDaysCount + totalProjectedOtDays).coerceAtLeast(0.0)
     } else if (isCurrentSelectedMonth) {
         val rawProjected = summary.workingDays + totalProjectedOtDays + futurePaidLeavesCount
         rawProjected.coerceAtLeast(0.0)
@@ -4263,7 +4265,7 @@ fun EmployeePayslipView(
     }
     val soNgayCongDuKienDouble = soNgayCongDuKien
 
-    val projectedPresenceDays = (if (isFutureSelectedMonth) standardTargetDays else summary.actualPresenceDays) + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
+    val projectedPresenceDays = (if (isFutureSelectedMonth) baseFuturePresenceDays else summary.actualPresenceDays) + totalProjectedOtDays + (if (includeSundayInProjection) (remainingSundaysDay + remainingSundaysNight).toDouble() else 0.0)
 
     fun calcPr(fieldName: String, valRaw: Double): Double {
         return com.example.data.SalaryCalculator.calculateAllowanceValue(
