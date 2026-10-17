@@ -383,7 +383,7 @@ object SalaryCalculator {
         scheduledDaysSoFar: Int,
         totalScheduledDaysInMonth: Int
     ): Double {
-        val stdDays = 26.0
+        val stdDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
         return when (calcType) {
             "MONTHLY_PRO_RATED" -> {
                 val ratio = (totalWorkDays / stdDays).coerceAtMost(1.0)
@@ -429,7 +429,7 @@ object SalaryCalculator {
         tamUng: Double = 0.0
     ): SalarySummary {
         val luongBasic = config.luongCoBan
-        val stdMonthDays = 26.0
+        val stdMonthDays = totalScheduledDaysInMonth.toDouble().coerceAtLeast(1.0)
         val dailySalary = luongBasic / stdMonthDays
         val hourlySalary = dailySalary / 8.0
 
@@ -537,11 +537,7 @@ object SalaryCalculator {
 
             if (e.rawCheckOut == null) continue
 
-            val eBreakHours = if (e.customBreakDeduction != null) {
-                if (e.customBreakDeduction == true) (e.customBreakHours ?: config.soGioNghiGiaiLao) else 0.0
-            } else {
-                if (config.tinhKhauTruNghi) (e.customBreakHours ?: config.soGioNghiGiaiLao) else 0.0
-            }
+            val eBreakHours = e.customBreakHours ?: breakHours
 
             // Standard Day Work Contribution
             if (isSundayVal) {
@@ -658,8 +654,9 @@ object SalaryCalculator {
         val doanPhi = config.doanPhiCongDoan
         val tienKhauTruNghi = 0.0
 
-        // 8. Calculate Monthly Salary: đủ 26 công đạt 100% LCB, làm 27 công sẽ được thêm 1 ngày công LCB
-        val baseBasicSalary = Math.round(totalWorkDays * dailySalary).toDouble()
+        // 8. Calculate Monthly Salary
+        val lcbWorkDays = totalWorkDays.coerceAtMost(totalScheduledDaysInMonth.toDouble())
+        val baseBasicSalary = Math.round(lcbWorkDays * dailySalary).toDouble()
 
         val roundedOtDay = Math.round(otDayPay).toDouble()
         val roundedOtLePay = Math.round(otLePay).toDouble()
@@ -690,8 +687,8 @@ object SalaryCalculator {
             tamUng = tamUng,
             luongThucNhan = luongThucNhan,
             baseBasicSalary = baseBasicSalary,
-            expectedWorkDays = 26,
-            standardWorkDays = 26,
+            expectedWorkDays = totalScheduledDaysInMonth,
+            standardWorkDays = totalScheduledDaysInMonth,
             scheduledDaysSoFar = scheduledDaysSoFar,
             isCurrentMonth = isCurrentSelectedMonth,
             
