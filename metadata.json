@@ -1,6 +1,6 @@
 {
-  "name": "TimeSnap Pro",
-  "description": "Hệ thống Quản lý Chấm công & Lương Cá nhân chuyên nghiệp với giao diện Dark Mode",
+  "name": "TimeSnap",
+  "description": "Attendance and Payslip Management App for employees and admins",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
