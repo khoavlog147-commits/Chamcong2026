@@ -1,0 +1,1 @@
+sed -i 's/val companyCode: String = "DEFAULT",/val companyCode: String = "DEFAULT",\n    val roleId: String = "",\n    val roleName: String = "",/g' app/src/main/java/com/example/data/model/UserConfig.kt
