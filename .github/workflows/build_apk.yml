@@ -61,14 +61,25 @@ jobs:
           printf '%s' "$KEYSTORE_DATA" | tr -d '\r\n ' | base64 -d > debug.keystore 2>/dev/null || true
           printf '%s' "$KEYSTORE_DATA" | tr -d '\r\n ' | base64 -d > my-upload-key.jks 2>/dev/null || true
           echo "Decoded keystore from secret."
+        elif [ -f "debug.keystore.base64" ]; then
+          base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || true
+          echo "Decoded keystore from local debug.keystore.base64."
+        fi
+        if [ ! -f "debug.keystore" ]; then
+          echo "Generating standard debug.keystore with keytool..."
+          keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "Generated fallback debug.keystore successfully."
+        fi
+        if [ ! -f "my-upload-key.jks" ]; then
+          cp debug.keystore my-upload-key.jks 2>/dev/null || true
         fi
 
     - name: Build Android APK
       env:
-        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
+        KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
         KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
-      run: gradle assembleDebug --stacktrace
+      run: gradle assembleDebug --stacktrace --no-daemon
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
