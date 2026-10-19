@@ -1,1 +1,0 @@
-sed -i 's/fun EmployeeConfigEdit(/fun EmployeeConfigEdit(\n    adminViewModel: AdminViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),/g' app/src/main/java/com/example/ui/screens/AdminScreen.kt
