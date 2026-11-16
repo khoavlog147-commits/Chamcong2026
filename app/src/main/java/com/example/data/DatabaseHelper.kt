@@ -30,7 +30,7 @@ class DatabaseHelper private constructor(private val database: LegacyAppDatabase
                             context.applicationContext,
                             LegacyAppDatabase::class.java,
                             "timesnap_pro.db"
-                        ).fallbackToDestructiveMigration(dropAllTables = true).build()
+                        ).fallbackToDestructiveMigration().build()
                         INSTANCE = DatabaseHelper(db)
                     }
                 }

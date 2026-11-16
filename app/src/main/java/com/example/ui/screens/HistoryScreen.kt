@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.ArrowBackIosNew
@@ -98,8 +100,14 @@ fun HistoryScreen(
     var showBulkDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     // Month parsing calculations
-    val sdfMonth = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-    val currentMonthDate = remember(selectedMonth) { sdfMonth.parse(selectedMonth) ?: Date() }
+    val sdfMonth = remember { SimpleDateFormat("yyyy-MM", Locale.US) }
+    val currentMonthDate = remember(selectedMonth) {
+        try {
+            sdfMonth.parse(selectedMonth) ?: Date()
+        } catch (_: Exception) {
+            Date()
+        }
+    }
 
     // Calendar generation
     val daysInMonth = remember(currentMonthDate) {
@@ -245,10 +253,14 @@ fun HistoryScreen(
 
                 // Month Label
                 val vietnameseMonthLabel = remember(selectedMonth) {
-                    val parser = SimpleDateFormat("yyyy-MM", Locale.getDefault())
-                    val d = parser.parse(selectedMonth) ?: Date()
-                    val formatter = SimpleDateFormat("MMMM yyyy", Locale("vi", "VN"))
-                    formatter.format(d).replaceFirstChar { it.uppercase() }
+                    try {
+                        val parser = SimpleDateFormat("yyyy-MM", Locale.US)
+                        val d = parser.parse(selectedMonth) ?: Date()
+                        val formatter = SimpleDateFormat("MMMM yyyy", Locale("vi", "VN"))
+                        formatter.format(d).replaceFirstChar { it.uppercase() }
+                    } catch (_: Exception) {
+                        selectedMonth
+                    }
                 }
 
                 Text(
@@ -518,7 +530,7 @@ fun HistoryScreen(
                 )
             }
             
-            Spacer(modifier = Modifier.height(72.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // ==================== SINGLE ENTRY DIALOG POPUP (CHẾ ĐỘ 1) ====================
@@ -605,6 +617,7 @@ fun HistoryScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -1177,6 +1190,7 @@ fun HistoryScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
                             .padding(vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
@@ -1594,7 +1608,7 @@ fun DayGridCell(
                             val processed = com.example.data.SalaryCalculator.calculateSingleEntry(entry, config)
                             val shift = com.example.data.SalaryCalculator.getShiftForEntry(entry)
                             val stdHrs = processed.workDay * shift.standardHours
-                            val totalHrs = stdHrs + processed.otHours
+                            val totalHrs = (stdHrs + processed.otHours).takeIf { it.isFinite() } ?: 0.0
                             val df = DecimalFormat("#.#")
                             Text(
                                 text = "${df.format(totalHrs)}h",
@@ -1623,7 +1637,7 @@ fun DayGridCell(
                             val processed = com.example.data.SalaryCalculator.calculateSingleEntry(entry, config)
                             val shift = com.example.data.SalaryCalculator.getShiftForEntry(entry)
                             val stdHrs = processed.workDay * shift.standardHours
-                            val totalHrs = stdHrs + processed.otHours
+                            val totalHrs = (stdHrs + processed.otHours).takeIf { it.isFinite() } ?: 0.0
                             
                             val df = DecimalFormat("#.#")
                             Text(

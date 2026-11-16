@@ -58,14 +58,15 @@ fun TabHistoryContent(
     val attendanceMap = remember(attendanceLogs, currentMonth) {
         val targetMonth = currentMonth.get(Calendar.MONTH) + 1
         val targetYear = currentMonth.get(Calendar.YEAR)
-        attendanceLogs.filter { log ->
-            val parts = log.dateString.split("/")
+        attendanceLogs.mapNotNull { log ->
+            val normDate = com.example.data.SalaryCalculator.normalizeDateToDmy(log.dateString)
+            val parts = normDate.split("/")
             if (parts.size >= 3) {
                 val m = parts[1].toIntOrNull()
                 val y = parts[2].toIntOrNull()
-                m == targetMonth && y == targetYear
-            } else false
-        }.associateBy { it.dateString }
+                if (m == targetMonth && y == targetYear) normDate to log else null
+            } else null
+        }.toMap()
     }
 
     var selectedDates by remember { mutableStateOf(setOf<String>()) }
@@ -82,8 +83,8 @@ fun TabHistoryContent(
     var firstDayOfWeek = firstDayOfMonth.get(Calendar.DAY_OF_WEEK) - Calendar.MONDAY
     if (firstDayOfWeek < 0) firstDayOfWeek += 7
 
-    val headerFormatter = SimpleDateFormat("MM/yyyy", Locale.getDefault())
-    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+    val headerFormatter = SimpleDateFormat("MM/yyyy", Locale.US)
+    val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale.US)
 
     val monthHolidays = remember(currentMonth) {
         val targetMonth = currentMonth.get(Calendar.MONTH) + 1
@@ -236,13 +237,13 @@ fun TabHistoryContent(
         // Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            items(firstDayOfWeek) {
+            items(count = firstDayOfWeek, key = { idx -> "empty_$idx" }) {
                 Box(modifier = Modifier.aspectRatio(1f))
             }
-            items((1..daysInMonth).toList()) { day ->
+            items(items = (1..daysInMonth).toList(), key = { day -> "day_$day" }) { day ->
                 val cal = currentMonth.clone() as Calendar
                 cal.set(Calendar.DAY_OF_MONTH, day)
                 val dateStr = dateFormatter.format(cal.time)
@@ -323,12 +324,14 @@ fun TabHistoryContent(
                                 Text(text = "Không phép", fontSize = 9.sp, color = Color(0xFFEB5757), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
                             } else if (isUnpaidLeave) {
                                 Text(text = "Phép thường", fontSize = 9.sp, color = Color(0xFFFF9800), textAlign = TextAlign.Center, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
-                            } else {
-                                val inStr = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockInTime))
+                            } else if (record.clockInTime > 0L) {
+                                val inStr = SimpleDateFormat("HH:mm", Locale.US).format(Date(record.clockInTime))
                                 val outStr = if (record.clockOutTime != null && record.clockOutTime > 0L) {
-                                    SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(record.clockOutTime))
+                                    SimpleDateFormat("HH:mm", Locale.US).format(Date(record.clockOutTime))
                                 } else "..."
                                 Text(text = "$inStr\n$outStr", fontSize = 9.sp, color = Color.LightGray, textAlign = TextAlign.Center)
+                            } else {
+                                Text(text = "--:--", fontSize = 9.sp, color = Color.LightGray, textAlign = TextAlign.Center)
                             }
                         } else if (isHolidayDate) {
                             Text(text = "Nghỉ lễ", fontSize = 8.sp, color = Color(0xFFFFD700), fontWeight = FontWeight.Bold)

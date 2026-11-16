@@ -2,9 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -22,7 +21,7 @@ jobs:
         java-version: '21'
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+      uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: '9.3.1'
 
@@ -35,7 +34,7 @@ jobs:
           printf '%s\n' "$GOOGLE_SERVICES_DATA" > app/google-services.json
           echo "Created app/google-services.json from secret."
         elif [ ! -f "app/google-services.json" ]; then
-          echo '{"project_info":{"project_number":"123456789012","project_id":"timesnappro-placeholder","storage_bucket":"timesnappro-placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef1234567890","android_client_info":{"package_name":"com.aistudio.timesnappro.vklypa"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyMockKeyForLocalStudioBuildOnly"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
+          printf '%s\n' '{"project_info":{"project_number":"123456789012","project_id":"timesnap-placeholder","storage_bucket":"timesnap-placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef1234567890","android_client_info":{"package_name":"com.aistudio.timesnap.abxyz"}},"oauth_client":[],"api_key":[{"current_key":"placeholder-api-key-for-ci"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
           echo "Created fallback placeholder app/google-services.json for build."
         fi
 
@@ -81,9 +80,14 @@ jobs:
         KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
       run: gradle assembleDebug --stacktrace --no-daemon
 
-    - name: Upload APK
+    - name: Verify APK output
+      run: ls -lh app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload APK (Zipped Artifact)
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
-        path: app/build/outputs/apk/**/*.apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
+        retention-days: 30
 
