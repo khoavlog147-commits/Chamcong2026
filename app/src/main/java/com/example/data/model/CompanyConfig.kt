@@ -16,8 +16,9 @@ data class CompanyConfig(
     
     val heSoOtNgayThuong: Double = 1.5,
     val heSoOtChuNhat: Double = 2.0,
+    val heSoOtChuNhatDem: Double = 2.7,
     val heSoOtNgayLe: Double = 3.0,
-    val heSoOtDem: Double = 1.75,
+    val heSoOtDem: Double = 1.8,
     val caDemStart: String = "22:00",
     val caDemEnd: String = "06:00",
     
@@ -81,6 +82,7 @@ data class CompanyConfig(
             doanPhiCongDoan = this.doanPhiCongDoan,
             heSoOtNgayThuong = this.heSoOtNgayThuong,
             heSoOtChuNhat = this.heSoOtChuNhat,
+            heSoOtChuNhatDem = this.heSoOtChuNhatDem,
             heSoOtNgayLe = this.heSoOtNgayLe,
             heSoOtDem = this.heSoOtDem,
             caDemStart = this.caDemStart,
@@ -149,8 +151,9 @@ data class CompanyConfig(
             doanPhiCongDoan = 40000.0,
             heSoOtNgayThuong = 1.5,
             heSoOtChuNhat = 2.0,
+            heSoOtChuNhatDem = 2.7,
             heSoOtNgayLe = 3.0,
-            heSoOtDem = 1.75,
+            heSoOtDem = 1.8,
             tienChuyenCanGoc = 500000.0,
             pcComCa = 30000.0,
             pcComOt = 15000.0

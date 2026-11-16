@@ -99,6 +99,7 @@ fun CompanyManagementDialog(
     var tinhKhauTruNghi by remember(currentCompany.companyId) { mutableStateOf(currentCompany.tinhKhauTruNghi) }
     var hsOtThuong by remember(currentCompany.companyId) { mutableStateOf(currentCompany.heSoOtNgayThuong.toString()) }
     var hsOtChuNhat by remember(currentCompany.companyId) { mutableStateOf(currentCompany.heSoOtChuNhat.toString()) }
+    var hsOtChuNhatDem by remember(currentCompany.companyId) { mutableStateOf(currentCompany.heSoOtChuNhatDem.toString()) }
     var hsOtNgayLe by remember(currentCompany.companyId) { mutableStateOf(currentCompany.heSoOtNgayLe.toString()) }
     var hsOtDem by remember(currentCompany.companyId) { mutableStateOf(currentCompany.heSoOtDem.toString()) }
 
@@ -432,6 +433,21 @@ fun CompanyManagementDialog(
                                             modifier = Modifier.weight(1f)
                                         )
                                     }
+                                    OutlinedTextField(
+                                        value = hsOtChuNhatDem,
+                                        onValueChange = { hsOtChuNhatDem = it },
+                                        label = { Text("OT Chủ nhật Ca đêm (VD: 2.7)") },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = White,
+                                            unfocusedTextColor = White,
+                                            focusedBorderColor = NeonBlue,
+                                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                                            focusedLabelColor = NeonBlue,
+                                            unfocusedLabelColor = LightGray
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
                             }
                         }
@@ -862,6 +878,7 @@ fun CompanyManagementDialog(
                                 doanPhiCongDoan = doanPhiCongDoan.toDoubleOrNull() ?: localCompanyConfig.doanPhiCongDoan,
                                 heSoOtNgayThuong = hsOtThuong.toDoubleOrNull() ?: localCompanyConfig.heSoOtNgayThuong,
                                 heSoOtChuNhat = hsOtChuNhat.toDoubleOrNull() ?: localCompanyConfig.heSoOtChuNhat,
+                                heSoOtChuNhatDem = hsOtChuNhatDem.toDoubleOrNull() ?: localCompanyConfig.heSoOtChuNhatDem,
                                 heSoOtNgayLe = hsOtNgayLe.toDoubleOrNull() ?: localCompanyConfig.heSoOtNgayLe,
                                 heSoOtDem = hsOtDem.toDoubleOrNull() ?: localCompanyConfig.heSoOtDem,
                                 soGioNghiGiaiLao = soGioNghiGiaiLao.toDoubleOrNull() ?: localCompanyConfig.soGioNghiGiaiLao,
@@ -912,6 +929,7 @@ fun CompanyManagementDialog(
                                 doanPhiCongDoan = doanPhiCongDoan.toDoubleOrNull() ?: localCompanyConfig.doanPhiCongDoan,
                                 heSoOtNgayThuong = hsOtThuong.toDoubleOrNull() ?: localCompanyConfig.heSoOtNgayThuong,
                                 heSoOtChuNhat = hsOtChuNhat.toDoubleOrNull() ?: localCompanyConfig.heSoOtChuNhat,
+                                heSoOtChuNhatDem = hsOtChuNhatDem.toDoubleOrNull() ?: localCompanyConfig.heSoOtChuNhatDem,
                                 heSoOtNgayLe = hsOtNgayLe.toDoubleOrNull() ?: localCompanyConfig.heSoOtNgayLe,
                                 heSoOtDem = hsOtDem.toDoubleOrNull() ?: localCompanyConfig.heSoOtDem,
                                 soGioNghiGiaiLao = soGioNghiGiaiLao.toDoubleOrNull() ?: localCompanyConfig.soGioNghiGiaiLao,

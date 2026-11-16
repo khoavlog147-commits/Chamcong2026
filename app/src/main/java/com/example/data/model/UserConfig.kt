@@ -15,6 +15,7 @@ data class UserConfig(
     // OT multiplication coefficients
     val heSoOtNgayThuong: Double = 1.5,
     val heSoOtChuNhat: Double = 2.0,
+    val heSoOtChuNhatDem: Double = 2.7,
     val heSoOtNgayLe: Double = 3.0,
     
     val tienChuyenCanGoc: Double = 0.0, // Chuyên cần gốc
@@ -29,7 +30,7 @@ data class UserConfig(
     val pcHieuSuat: Double = 0.0,
     val pcSanPham: Double = 0.0,
     val pcComCa: Double = 0.0, // Flat meal allowance (per shift rate)
-    val pcComOt: Double = 0.0, // Extra overtime meal (per shift rate for OT >= 10h)
+    val pcComOt: Double = 0.0, // Extra overtime meal (per shift rate for OT >= 2h)
     val pcNhaO: Double = 0.0,
     val pcDocHai: Double = 0.0,
     val pcDtDoanhThu: Double = 0.0,
@@ -40,6 +41,7 @@ data class UserConfig(
     val allowanceCalcTypes: String = "", // Stores calc type overrides as "field1:type1;field2:type2..."
     val soGioNghiGiaiLao: Double = 1.5, // Break hours (unpaid hours) per shift
     val tinhKhauTruNghi: Boolean = false, // Enable break time deduction from hours worked
+    val isThuViec: Boolean = false, // Probation mode (tạm khấu trừ 10% TNCN, chuyên cần tính theo thực tế & mất nếu nghỉ)
     
     // Editable User Profile details (so that they are saved & synced on SQLite/Cloud)
     val hoVaTen: String = "User Demo",
@@ -65,7 +67,7 @@ data class UserConfig(
     val phuCapNhaO: Double = 1000000.0,
     val phuCapChuyenCan: Double = 500000.0,
     val thuong: Double = 0.0,
-    val heSoOtDem: Double = 1.75,
+    val heSoOtDem: Double = 1.8,
     val caDemStart: String = "22:00",
     val caDemEnd: String = "06:00",
     val isAdmin: Boolean = false
@@ -95,10 +97,10 @@ data class UserConfig(
         fun getDefaultCalcType(field: String): String {
             return when (field) {
                 "pcComCa" -> "PER_WORK_DAY"
-                "pcComOt" -> "OT_MEAL_GE_1H"
+                "pcComOt" -> "OT_MEAL_GE_2H"
                 "pcCaDem" -> "PER_NIGHT_SHIFT" // Phụ cấp ca đêm
                 "pcThamNien" -> "MONTHLY_FLAT"
-                "tienChuyenCanGoc" -> "MONTHLY_PRO_RATED"
+                "tienChuyenCanGoc" -> "MONTHLY_FLAT"
                 else -> "MONTHLY_PRO_RATED"
             }
         }

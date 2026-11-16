@@ -10,7 +10,7 @@ data class UserConfig(
     val hourlyRate: Double = 50000.0, // default hourly wage in VND
     val currency: String = "đ",
     val dailyTargetHours: Double = 8.0,
-    val he_so_ot_dem: Double = 1.75,
+    val he_so_ot_dem: Double = 1.8,
     val thoi_gian_ca_dem: String = "22:00",
     
     // Core parameters
@@ -23,6 +23,7 @@ data class UserConfig(
     // OT parameters
     val he_so_ot_normal: Double = 1.5,
     val he_so_ot_sunday: Double = 2.0,
+    val he_so_ot_sunday_night: Double = 2.7,
     val he_so_ot_holiday: Double = 3.0,
     
     // Active parameters

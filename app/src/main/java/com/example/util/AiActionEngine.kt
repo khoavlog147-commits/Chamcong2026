@@ -322,6 +322,7 @@ object AiActionEngine {
                         "tinhkhautrunghi" -> cur.copy(tinhKhauTruNghi = cVal.toBooleanStrictOrNull() ?: cur.tinhKhauTruNghi)
                         "hesootngaythuong" -> cur.copy(heSoOtNgayThuong = cVal.toDoubleOrNull() ?: cur.heSoOtNgayThuong)
                         "hesootchunhat" -> cur.copy(heSoOtChuNhat = cVal.toDoubleOrNull() ?: cur.heSoOtChuNhat)
+                        "hesootchunhatdem" -> cur.copy(heSoOtChuNhatDem = cVal.toDoubleOrNull() ?: cur.heSoOtChuNhatDem)
                         "hesootngayle" -> cur.copy(heSoOtNgayLe = cVal.toDoubleOrNull() ?: cur.heSoOtNgayLe)
                         "hesootdem" -> cur.copy(heSoOtDem = cVal.toDoubleOrNull() ?: cur.heSoOtDem)
                         "cademstart" -> cur.copy(caDemStart = cVal)

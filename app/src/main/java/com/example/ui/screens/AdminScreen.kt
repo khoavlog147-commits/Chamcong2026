@@ -3244,6 +3244,11 @@ fun EmployeeConfigEdit(
                     )
                     if (updatedRole != null) {
                         updatedUser = updatedUser.copy(
+                            heSoOtNgayThuong = currentCompany.heSoOtNgayThuong,
+                            heSoOtChuNhat = currentCompany.heSoOtChuNhat,
+                            heSoOtChuNhatDem = currentCompany.heSoOtChuNhatDem,
+                            heSoOtNgayLe = currentCompany.heSoOtNgayLe,
+                            heSoOtDem = currentCompany.heSoOtDem,
                             luongCoBan = if (updatedRole.luongCoBan > 0.0) updatedRole.luongCoBan else currentCompany.luongCoBan,
                             pcKyThuat = if (updatedRole.pcKyThuat > 0.0) updatedRole.pcKyThuat else currentCompany.pcKyThuat,
                             pcTrachNhiem = if (updatedRole.pcTrachNhiem > 0.0) updatedRole.pcTrachNhiem else currentCompany.pcTrachNhiem,
@@ -3264,6 +3269,11 @@ fun EmployeeConfigEdit(
                         )
                     } else {
                         updatedUser = updatedUser.copy(
+                            heSoOtNgayThuong = currentCompany.heSoOtNgayThuong,
+                            heSoOtChuNhat = currentCompany.heSoOtChuNhat,
+                            heSoOtChuNhatDem = currentCompany.heSoOtChuNhatDem,
+                            heSoOtNgayLe = currentCompany.heSoOtNgayLe,
+                            heSoOtDem = currentCompany.heSoOtDem,
                             luongCoBan = currentCompany.luongCoBan,
                             pcKyThuat = currentCompany.pcKyThuat,
                             pcTrachNhiem = currentCompany.pcTrachNhiem,
@@ -4224,7 +4234,7 @@ fun EmployeePayslipView(
         0.0
     }
     val additionalSundaysNightPay = if (includeSundayInProjection) {
-        additionalSundaysNightHours * hourlySalary * employee.heSoOtChuNhat
+        additionalSundaysNightHours * hourlySalary * employee.heSoOtChuNhatDem
     } else {
         0.0
     }
@@ -4308,7 +4318,8 @@ fun EmployeePayslipView(
         summary.pcComCaVal
     }
 
-    val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
+    val otMealThresholdEmp = if (employee.getCalcTypeFor("pcComOt") == "OT_MEAL_GE_1H") 1.0 else 2.0
+    val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= otMealThresholdEmp) projectedSundays else 0
     val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * employee.pcComOt else 0.0
     val pcComOtShow = if (selectedTab == 1) summary.pcComOtVal + otMealAllowance else summary.pcComOtVal
 
@@ -4352,7 +4363,8 @@ fun EmployeePayslipView(
     val customOt15Pay = customOt15PayDayVal + customOt15PayNightVal
 
     val projectedGross = luongDuKienBaseSalary + (summary.tienOtNgay + customOt15PayDayVal) + (summary.tienOtDem + customOt15PayNightVal) + (summary.tienChuNhat + additionalSundaysPay) + summary.tienOtLe + fullProjectedAllowancesSum + summary.thuong
-    val projectedDeductions = summary.tienBh + summary.doanPhi + summary.tamUng
+    val projectedPit = if (employee.isThuViec) Math.round(projectedGross * 0.10).toDouble() else 0.0
+    val projectedDeductions = summary.tienBh + summary.doanPhi + summary.tamUng + projectedPit
     val luongDuKienVal = (projectedGross - projectedDeductions).coerceAtLeast(0.0)
 
     val finalLuongHienThi = if (selectedTab == 1) {
@@ -4685,7 +4697,7 @@ fun EmployeePayslipView(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text("🌙 Ca đêm (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("(x${df.format(employee.heSoOtChuNhat)} + đêm)", color = NeonBlue, fontSize = 11.sp)
+                                        Text("(x${df.format(employee.heSoOtChuNhatDem)})", color = NeonBlue, fontSize = 11.sp)
                                     }
 
                                     var sundayNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysNight.toString())) }
@@ -4986,7 +4998,7 @@ fun EmployeePayslipView(
                     LocalPayslipMoneyRow(label = "OT CN - Ca ngày ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatDayHours)}h)", value = summary.tienChuNhatNgay, isAddition = true, isAccent = true)
                 }
                 if (summary.tienChuNhatDem > 0.0) {
-                    LocalPayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatNightHours)}h)", value = summary.tienChuNhatDem, isAddition = true, isAccent = true)
+                    LocalPayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(employee.heSoOtChuNhatDem)} (${df.format(summary.chuNhatNightHours)}h)", value = summary.tienChuNhatDem, isAddition = true, isAccent = true)
                 }
                 if (summary.tienChuNhatNgay == 0.0 && summary.tienChuNhatDem == 0.0 && summary.tienChuNhat > 0.0) {
                     LocalPayslipMoneyRow(label = "OT chủ nhật ${df.format(employee.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", value = summary.tienChuNhat, isAddition = true, isAccent = true)
@@ -5025,6 +5037,10 @@ fun EmployeePayslipView(
                 }
                 if (summary.doanPhi > 0.0) {
                     LocalPayslipMoneyRow(label = "Khấu trừ Đoàn phí công đoàn", value = summary.doanPhi, isAddition = false)
+                }
+                val shownEmpPit = if (selectedTab == 1) projectedPit else summary.tienThueTncn
+                if (shownEmpPit > 0.0) {
+                    LocalPayslipMoneyRow(label = "Thuế TNCN thử việc (10%)", value = shownEmpPit, isAddition = false)
                 }
                 if (summary.tienKhauTruNghi > 0.0) {
                     LocalPayslipMoneyRow(label = "Khấu trừ nghỉ giữa giờ / nghỉ lễ", value = summary.tienKhauTruNghi, isAddition = false)

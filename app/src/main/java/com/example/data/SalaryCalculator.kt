@@ -28,23 +28,23 @@ object SalaryCalculator {
             shiftId = "ca1",
             shiftType = "DAY",
             startTime = "07:30",
-            endTime = "19:30",
+            endTime = "16:30",
             checkInWindowStart = "07:00",
             checkInWindowEnd = "07:30",
-            checkOutWindowStart = "19:30",
-            checkOutWindowEnd = "20:00",
-            breakHours = 0.0,
+            checkOutWindowStart = "16:30",
+            checkOutWindowEnd = "17:00",
+            breakHours = 1.0,
             standardHours = 8.0
         ),
         "ca2" to ShiftConfig(
             shiftId = "ca2",
             shiftType = "DAY_REST",
             startTime = "07:30",
-            endTime = "20:00",
+            endTime = "16:30",
             checkInWindowStart = "07:00",
             checkInWindowEnd = "07:30",
-            checkOutWindowStart = "20:00",
-            checkOutWindowEnd = "20:30",
+            checkOutWindowStart = "16:30",
+            checkOutWindowEnd = "17:00",
             breakHours = 1.5,
             standardHours = 8.0
         ),
@@ -52,12 +52,12 @@ object SalaryCalculator {
             shiftId = "ca_dem",
             shiftType = "NIGHT",
             startTime = "19:30",
-            endTime = "07:30",
+            endTime = "04:30",
             checkInWindowStart = "19:00",
             checkInWindowEnd = "19:30",
-            checkOutWindowStart = "07:30",
-            checkOutWindowEnd = "08:00",
-            breakHours = 0.0,
+            checkOutWindowStart = "04:30",
+            checkOutWindowEnd = "05:00",
+            breakHours = 1.0,
             standardHours = 8.0
         )
     )
@@ -213,22 +213,32 @@ object SalaryCalculator {
     fun isHolidayLeaveType(dayType: String?): Boolean {
         if (dayType.isNullOrBlank()) return false
         val upper = dayType.uppercase(Locale.ROOT)
-        return upper == "HOLIDAY_LEAVE" || upper == "HOLIDAYLEAVE" || upper == "LỄ" || upper == "LE" || upper == "HOLIDAY" ||
-               upper.contains("LỄ") || upper.contains("HOLIDAY")
+        if (upper == "HOLIDAY") return false
+        return upper == "HOLIDAY_LEAVE" || upper == "HOLIDAYLEAVE" || upper == "PAIDHOLIDAYLEAVE" ||
+               upper == "LỄ" || upper == "LE" || upper == "NGHỈ LỄ" || upper == "NGHI LE" || upper == "NGHI_LE" ||
+               (upper.contains("HOLIDAY") && upper.contains("LEAVE")) ||
+               (upper.contains("LỄ") && !upper.contains("LÀM"))
     }
 
     fun isPaidLeaveType(dayType: String?): Boolean {
         return isAnnualLeaveType(dayType) || isHolidayLeaveType(dayType)
     }
 
+    fun isUnauthorizedLeaveType(dayType: String?): Boolean {
+        if (dayType.isNullOrBlank()) return false
+        val upper = dayType.uppercase(Locale.ROOT)
+        return upper == "UNAUTHORIZED_LEAVE" || upper == "UNAUTHORIZEDLEAVE" ||
+               upper == "KP" || upper == "KHONGPHEP" || upper == "ABSENT" ||
+               upper.contains("UNAUTHORIZED") || upper.contains("KHÔNG PHÉP") || upper.contains("KHONG PHEP")
+    }
+
     fun isUnpaidLeaveType(dayType: String?): Boolean {
         if (dayType.isNullOrBlank()) return false
         val upper = dayType.uppercase(Locale.ROOT)
-        return upper == "UNPAID_LEAVE" || upper == "UNPAIDLEAVE" || upper == "UNAUTHORIZED_LEAVE" || 
-               upper == "UNAUTHORIZEDLEAVE" || upper == "KP" || upper == "KHONGPHEP" || 
-               upper.contains("UNPAID") || upper.contains("UNAUTHORIZED") || 
-               upper.contains("KHÔNG LƯƠNG") || upper.contains("KHONG LUONG") || 
-               upper.contains("KHÔNG PHÉP") || upper.contains("KHONG PHEP") ||
+        return isUnauthorizedLeaveType(dayType) ||
+               upper == "UNPAID_LEAVE" || upper == "UNPAIDLEAVE" ||
+               upper.contains("UNPAID") ||
+               upper.contains("KHÔNG LƯƠNG") || upper.contains("KHONG LUONG") ||
                upper.contains("THƯỜNG") || upper.contains("THUONG") || upper == "PHÉP THƯỜNG" || upper == "PHEP THUONG"
     }
 
@@ -240,6 +250,17 @@ object SalaryCalculator {
                upper == "NP" || upper == "PHEP" || upper == "KP" || upper == "KHONGPHEP" || upper == "ABSENT" ||
                upper.contains("LEAVE") || upper.contains("PHÉP") || upper.contains("PHEP") || upper.contains("NGHỈ") || upper.contains("NGHI") ||
                upper.contains("LỄ")
+    }
+
+    fun computeEffectiveBreakHours(shift: ShiftConfig, rawSpanHours: Double, configuredBreak: Double): Double {
+        if (configuredBreak <= 0.0) return 0.0
+        return if (shift.shiftType == "NIGHT") {
+            // Bestar night shift (19:30 - 04:30, OT 04:30 - 07:30): 1h mid-shift break only, no 30m break before night OT
+            configuredBreak.coerceAtMost(1.0)
+        } else {
+            // Day shift: 1h lunch break (11:30 - 12:30); if staying for afternoon OT (>= 17:00, span >= 9.5h), include 30m break (16:30 - 17:00)
+            if (rawSpanHours < 9.5) configuredBreak.coerceAtMost(1.0) else configuredBreak
+        }
     }
 
     /**
@@ -326,8 +347,10 @@ object SalaryCalculator {
         }
 
         val resolvedBreakDeduction = workingEntry.customBreakDeduction ?: config?.tinhKhauTruNghi ?: (shift.breakHours > 0.0)
+        val configuredBreak = config?.soGioNghiGiaiLao ?: shift.breakHours
+        val rawSpanHours = if (normOutMs != null) (normOutMs - normInMs) / 3600000.0 else 0.0
         val breakHrsToUse = if (resolvedBreakDeduction) {
-            workingEntry.customBreakHours ?: config?.soGioNghiGiaiLao ?: shift.breakHours
+            computeEffectiveBreakHours(shift, rawSpanHours, configuredBreak)
         } else {
             0.0
         }
@@ -344,8 +367,8 @@ object SalaryCalculator {
             val actualWorkedHrs = (workedHrs - breakHrsToUse).coerceAtLeast(0.0)
             when {
                 actualWorkedHrs >= 8.0 -> 1.0
+                maxLateOrEarly < 15 && actualWorkedHrs >= 7.5 -> 1.0
                 actualWorkedHrs >= 4.0 -> 0.5
-                maxLateOrEarly < 15 -> 1.0
                 maxLateOrEarly < 120 -> 0.5
                 else -> 0.0
             }
@@ -522,7 +545,7 @@ object SalaryCalculator {
                     totalSundayHours += activeHours
                     if (isNight) {
                         totalSundayNightHours += activeHours
-                        sundayNightPay += activeHours * hourlySalary * config.heSoOtChuNhat
+                        sundayNightPay += activeHours * hourlySalary * config.heSoOtChuNhatDem
                     } else {
                         totalSundayDayHours += activeHours
                         sundayDayPay += activeHours * hourlySalary * config.heSoOtChuNhat
@@ -551,7 +574,7 @@ object SalaryCalculator {
                 totalSundayHours += actualHours
                 if (isNight) {
                     totalSundayNightHours += actualHours
-                    sundayNightPay += actualHours * hourlySalary * config.heSoOtChuNhat
+                    sundayNightPay += actualHours * hourlySalary * config.heSoOtChuNhatDem
                 } else {
                     totalSundayDayHours += actualHours
                     sundayDayPay += actualHours * hourlySalary * config.heSoOtChuNhat
@@ -588,6 +611,7 @@ object SalaryCalculator {
         // Calculate counts for meal and OT allowances
         var comCaCount = 0
         var comOtCount = 0
+        val otMealThreshold = if (config.getCalcTypeFor("pcComOt") == "OT_MEAL_GE_1H") 1.0 else 2.0
 
         for (e in processedEntries) {
             val normEntryDate = normalizeToYmd(e.date)
@@ -601,17 +625,36 @@ object SalaryCalculator {
                 comCaCount++
             }
             
-            // comOtCount: Only count if calculated OT is >= 1.0h (satisfying OT meal >= 1 hour condition)
-            if (e.otHours >= 1.0) {
+            // comOtCount: Default >= 2.0h (Bestar rule) or >= 1.0h when OT_MEAL_GE_1H selected
+            if (e.otHours >= otMealThreshold) {
                 comOtCount++
             }
         }
+
+        // 7. Evaluate leave / discipline counters (Bestar Rules)
+        val normEarliestDate = earliestDate?.let { normalizeToYmd(it) }
+        val activeMonthEntries = processedEntries.filter { e ->
+            val normD = normalizeToYmd(e.date)
+            (normEarliestDate == null || normD >= normEarliestDate) &&
+                (!isCurrentSelectedMonth || normD <= normTodayStr || e.rawCheckIn != null || isLeaveType(e.dayType))
+        }
+        val unauthorizedLeaveDays = activeMonthEntries.count { isUnauthorizedLeaveType(it.dayType) }
+        val personalLeaveDays = activeMonthEntries.count { isUnpaidLeaveType(it.dayType) && !isUnauthorizedLeaveType(it.dayType) }
+        val forgotPunchCount = activeMonthEntries.count { it.isForgotPunch }
+        val totalLateEarlyMinutes = activeMonthEntries
+            .filter { !isLeaveType(it.dayType) && it.rawCheckIn != null }
+            .sumOf { it.lateMinutes + it.earlyLeaveMinutes }
 
         // Dynamic Allowance Calculation Engine based on Calculation Types
         val pcKyThuatPr = calculateAllowanceValue("pcKyThuat", config.pcKyThuat, config.getCalcTypeFor("pcKyThuat"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
         val pcTrachNhiemPr = calculateAllowanceValue("pcTrachNhiem", config.pcTrachNhiem, config.getCalcTypeFor("pcTrachNhiem"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
         val pcChucVuPr = calculateAllowanceValue("pcChucVu", config.pcChucVu, config.getCalcTypeFor("pcChucVu"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
-        val pcHieuSuatPr = calculateAllowanceValue("pcHieuSuat", config.pcHieuSuat, config.getCalcTypeFor("pcHieuSuat"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
+        val pcHieuSuatBase = calculateAllowanceValue("pcHieuSuat", config.pcHieuSuat, config.getCalcTypeFor("pcHieuSuat"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
+        val pcHieuSuatPr = when {
+            unauthorizedLeaveDays == 1 -> pcHieuSuatBase * 0.5
+            unauthorizedLeaveDays > 1 -> 0.0
+            else -> pcHieuSuatBase
+        }
         val pcSanPhamPr = calculateAllowanceValue("pcSanPham", config.pcSanPham, config.getCalcTypeFor("pcSanPham"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
         val pcComCaPr = calculateAllowanceValue("pcComCa", config.pcComCa, config.getCalcTypeFor("pcComCa"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
         val pcComOtPr = calculateAllowanceValue("pcComOt", config.pcComOt, config.getCalcTypeFor("pcComOt"), totalWorkDays, comCaCount, comOtCount, nightShiftsCount, scheduledDaysSoFar, totalScheduledDaysInMonth)
@@ -630,15 +673,38 @@ object SalaryCalculator {
                 pcDocHaiPr + pcDtDoanhThuPr + pcXangXePr + pcThamNienPr + 
                 pcKhac1Pr + pcCaDemPr
 
-        // 7. Calculate Chuyên cần (Diligence)
-        val normEarliestDate = earliestDate?.let { normalizeToYmd(it) }
-        val hasUnpaidOrAbsent = processedEntries.any { 
-            val normD = normalizeToYmd(it.date)
-            isUnpaidLeaveType(it.dayType) && (normEarliestDate == null || normD >= normEarliestDate)
-        } || (scheduledDaysSoFar > 0 && totalWorkDays < scheduledDaysSoFar)
+        // Chuyên cần (Diligence)
+        val accountedDates = activeMonthEntries
+            .filter { e ->
+                val isSundayEntry = e.dayType == "SUNDAY" || isSunday(e.date)
+                !isSundayEntry && (e.rawCheckIn != null || isLeaveType(e.dayType))
+            }
+            .map { normalizeToYmd(it.date) }
+            .toSet()
+        val unworkedHolidaySet = holidayDatesInMonth
+            .map { normalizeToYmd(it) }
+            .filter { d ->
+                !workedHolidayDates.contains(d) &&
+                    !isSunday(d) &&
+                    (normEarliestDate == null || d >= normEarliestDate) &&
+                    (!isCurrentSelectedMonth || d <= normTodayStr)
+            }
+            .toSet()
+        val accountedScheduledCount = (accountedDates + unworkedHolidaySet).size
+        val unloggedAbsent = scheduledDaysSoFar > 0 && accountedScheduledCount < scheduledDaysSoFar
 
-        val chuyenCanValue = if (hasUnpaidOrAbsent) {
-            0.0
+        val chuyenCanBase = if (config.isThuViec) {
+            calculateAllowanceValue(
+                "tienChuyenCanGoc",
+                config.tienChuyenCanGoc,
+                "MONTHLY_PRO_RATED",
+                totalWorkDays,
+                comCaCount,
+                comOtCount,
+                nightShiftsCount,
+                scheduledDaysSoFar,
+                totalScheduledDaysInMonth
+            )
         } else {
             calculateAllowanceValue(
                 "tienChuyenCanGoc",
@@ -652,6 +718,21 @@ object SalaryCalculator {
                 totalScheduledDaysInMonth
             )
         }
+
+        val chuyenCanPenalty = when {
+            config.tienChuyenCanGoc <= 0.0 -> 0.0
+            unloggedAbsent || unauthorizedLeaveDays >= 1 -> chuyenCanBase
+            config.isThuViec && (personalLeaveDays >= 1 || totalLateEarlyMinutes >= 30 || forgotPunchCount > 3) -> chuyenCanBase
+            personalLeaveDays >= 2 -> chuyenCanBase
+            else -> {
+                var penalty = 0.0
+                if (personalLeaveDays == 1) penalty += 150000.0
+                if (forgotPunchCount > 3) penalty += (forgotPunchCount - 3) * 10000.0
+                if (totalLateEarlyMinutes >= 30) penalty += 30000.0
+                penalty.coerceAtMost(chuyenCanBase)
+            }
+        }
+        val chuyenCanValue = (chuyenCanBase - chuyenCanPenalty).coerceAtLeast(0.0)
 
         // Deductions
         val tieuBaoHiem = Math.round(config.luongDongBaoHiem * (config.tiLeDongBaoHiem / 100.0)).toDouble()
@@ -668,7 +749,8 @@ object SalaryCalculator {
         val roundedSundayPay = Math.round(sundayPay).toDouble()
 
         val grossAdditions = baseBasicSalary + roundedOtDay + roundedOtLePay + roundedOtNight + roundedSundayPay + phuCapTong + chuyenCanValue
-        val totalDeductions = tieuBaoHiem + doanPhi + tienKhauTruNghi + tamUng
+        val tienThueTncn = if (config.isThuViec) Math.round(grossAdditions * 0.10).toDouble() else 0.0
+        val totalDeductions = tieuBaoHiem + doanPhi + tienKhauTruNghi + tamUng + tienThueTncn
         val luongThucNhan = Math.round(grossAdditions - totalDeductions).coerceAtLeast(0L).toDouble()
 
         return SalarySummary(
@@ -722,7 +804,11 @@ object SalaryCalculator {
             otLeHours = totalOtLeHours,
             tienOtLe = roundedOtLePay,
             actualPresenceDays = actualPresenceDaysCount,
-            actualStandardWorkingDays = actualStandardWorkingDaysCount
+            actualStandardWorkingDays = actualStandardWorkingDaysCount,
+            tienThueTncn = tienThueTncn,
+            tienPhatChuyenCan = chuyenCanPenalty,
+            forgotPunchCount = forgotPunchCount,
+            totalLateEarlyMinutes = totalLateEarlyMinutes
         )
     }
 

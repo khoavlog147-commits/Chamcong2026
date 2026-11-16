@@ -417,7 +417,7 @@ fun PayslipScreen(
                     0.0
                 }
                 val additionalSundaysNightPay = if (includeSundayInProjection) {
-                    additionalSundaysNightHours * hourlySalary * c.heSoOtChuNhat
+                    additionalSundaysNightHours * hourlySalary * c.heSoOtChuNhatDem
                 } else {
                     0.0
                 }
@@ -623,7 +623,8 @@ fun PayslipScreen(
                     s.pcComCaVal
                 }
 
-                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= 1.0) projectedSundays else 0
+                val otMealThresholdProj = if (c.getCalcTypeFor("pcComOt") == "OT_MEAL_GE_1H") 1.0 else 2.0
+                val projectedSundaysOtMeals = if (includeSundayInProjection && (sundayHoursPerShift - 8.0) >= otMealThresholdProj) projectedSundays else 0
                 val otMealAllowance = if (selectedTab == 1) ((customOt15DaysCountDay + customOt15DaysCountNight) + projectedSundaysOtMeals) * c.pcComOt else 0.0
                 val pcComOtShow = if (selectedTab == 1) s.pcComOtVal + otMealAllowance else s.pcComOtVal
 
@@ -668,7 +669,8 @@ fun PayslipScreen(
                 
                 // Projected calculation: cleanly sums base salary + allowances + all OT - deductions
                 val projectedGross = luongDuKienBaseSalary + (s.tienOtNgay + customOt15PayDayVal) + (s.tienOtDem + customOt15PayNightVal) + (s.tienChuNhat + additionalSundaysPay) + s.tienOtLe + fullProjectedAllowancesSum
-                val projectedDeductions = s.tienBh + s.doanPhi + s.tamUng
+                val projectedPit = if (c.isThuViec) Math.round(projectedGross * 0.10).toDouble() else 0.0
+                val projectedDeductions = s.tienBh + s.doanPhi + s.tamUng + projectedPit
                 val luongDuKienVal = (projectedGross - projectedDeductions).coerceAtLeast(0.0)
 
                 Row(
@@ -1028,7 +1030,7 @@ fun PayslipScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Text("🌙 Ca đêm (CN):", color = White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text("(x${df.format(c.heSoOtChuNhat)} + đêm)", color = NeonBlue, fontSize = 11.sp)
+                                                Text("(x${df.format(c.heSoOtChuNhatDem)})", color = NeonBlue, fontSize = 11.sp)
                                             }
 
                                             var sundayNightInputText by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(remainingSundaysNight.toString())) }
@@ -1363,7 +1365,7 @@ fun PayslipScreen(
                             PayslipMoneyRow(label = "OT CN - Ca ngày ${df.format(c.heSoOtChuNhat)} (${df.format(totalSundayDayHours)}h)", value = totalSundayDayPay, isAddition = true, isAccent = true)
                         }
                         if (totalSundayNightHours > 0.0) {
-                            PayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(c.heSoOtChuNhat)} (${df.format(totalSundayNightHours)}h)", value = totalSundayNightPay, isAddition = true, isAccent = true)
+                            PayslipMoneyRow(label = "OT CN - Ca đêm ${df.format(c.heSoOtChuNhatDem)} (${df.format(totalSundayNightHours)}h)", value = totalSundayNightPay, isAddition = true, isAccent = true)
                         }
                         if (totalSundayDayHours == 0.0 && totalSundayNightHours == 0.0 && (s.tienChuNhat + (if (selectedTab == 1 && includeSundayInProjection) additionalSundaysPay else 0.0)) > 0.0) {
                             val totalSunHours = s.chuNhatHours + (if (selectedTab == 1 && includeSundayInProjection) (remainingSundays * sundayHoursPerShift) else 0.0)
@@ -1427,6 +1429,18 @@ fun PayslipScreen(
                         }
                         if (s.doanPhi > 0.0) {
                             PayslipMoneyRow(label = "Phí Công Đoàn Bắt Buộc", value = s.doanPhi, isAddition = false)
+                        }
+                        val shownPit = if (selectedTab == 1) projectedPit else s.tienThueTncn
+                        if (shownPit > 0.0) {
+                            PayslipMoneyRow(label = "Thuế TNCN thử việc (10%)", value = shownPit, isAddition = false)
+                        }
+                        if (selectedTab == 0 && s.tienPhatChuyenCan > 0.0) {
+                            val ccReason = buildList {
+                                if (s.forgotPunchCount > 3) add("quên bấm ${s.forgotPunchCount} lần")
+                                if (s.totalLateEarlyMinutes >= 30) add("trễ/sớm ${s.totalLateEarlyMinutes}p")
+                            }.joinToString(", ")
+                            val ccLabel = if (ccReason.isNotBlank()) "Giảm trừ chuyên cần ($ccReason)" else "Giảm trừ chuyên cần (nghỉ phép)"
+                            PayslipMoneyRow(label = ccLabel, value = s.tienPhatChuyenCan, isAddition = false)
                         }
                         
                         // Missed days deduction - only visible on actual payslip
@@ -1769,7 +1783,11 @@ fun com.example.viewmodel.SalarySummary.toExportSummary(): com.example.util.Sala
         otLeHours = this.otLeHours,
         tienOtLe = this.tienOtLe,
         actualPresenceDays = this.actualPresenceDays,
-        actualStandardWorkingDays = this.actualStandardWorkingDays
+        actualStandardWorkingDays = this.actualStandardWorkingDays,
+        tienThueTncn = this.tienThueTncn,
+        tienPhatChuyenCan = this.tienPhatChuyenCan,
+        forgotPunchCount = this.forgotPunchCount,
+        totalLateEarlyMinutes = this.totalLateEarlyMinutes
     )
 }
 

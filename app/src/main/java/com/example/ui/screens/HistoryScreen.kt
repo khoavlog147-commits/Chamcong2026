@@ -560,6 +560,7 @@ fun HistoryScreen(
             var selectedDayType by remember { mutableStateOf("NORMAL") }
             var noteString by remember { mutableStateOf("") }
             var isBreakDeducted by remember { mutableStateOf(configState?.tinhKhauTruNghi ?: true) }
+            var isForgotPunch by remember { mutableStateOf(false) }
 
             // Pre-fill if entry already exists
             val existing = entriesMap[day.dateString]
@@ -568,6 +569,7 @@ fun HistoryScreen(
                     noteString = existing.note ?: ""
                     selectedDayType = existing.dayType
                     isBreakDeducted = existing.customBreakDeduction ?: configState?.tinhKhauTruNghi ?: true
+                    isForgotPunch = existing.isForgotPunch
                     
                     if (existing.checkInTime != null) {
                         val cal = Calendar.getInstance().apply { timeInMillis = existing.checkInTime }
@@ -594,6 +596,7 @@ fun HistoryScreen(
                         selectedDayType = if (day.isSunday) "SUNDAY" else "NORMAL"
                     }
                     isBreakDeducted = configState?.tinhKhauTruNghi ?: true
+                    isForgotPunch = false
                     checkInHour = TextFieldValue("07")
                     checkInMin = TextFieldValue("30")
                     checkOutHour = TextFieldValue("19")
@@ -950,6 +953,27 @@ fun HistoryScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+
+                            // Special switch: "Quên bấm thẻ"
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clickable { isForgotPunch = !isForgotPunch }
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Checkbox(
+                                    checked = isForgotPunch,
+                                    onCheckedChange = { isForgotPunch = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = AccentOrange)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Quên bấm thẻ (Miễn phí 3 lần/tháng, từ lần 4 -10k)",
+                                    color = AccentOrange,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         } else if (isFutureDate) {
                             // Notice for Future Leave setups
                             Box(
@@ -1066,7 +1090,8 @@ fun HistoryScreen(
                                             checkOutMin = outMin,
                                             dayTypeOverride = selectedDayType,
                                             noteStr = noteString.ifEmpty { null },
-                                            customBreakDeduction = isBreakDeducted
+                                            customBreakDeduction = isBreakDeducted,
+                                            isForgotPunch = isForgotPunch
                                         )
                                     }
                                     showSingleDayDialog = null

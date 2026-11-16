@@ -107,25 +107,30 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 private fun getCoeff(config: com.example.data.model.UserConfig?): Double {
+    val cal = Calendar.getInstance()
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    val isNight = hour >= 18 || hour < 6
+    val todayYmd = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
     return when {
-        Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY -> config?.heSoOtChuNhat ?: 2.0
-        run {
-            val sdfMonthDay = SimpleDateFormat("MM-dd", java.util.Locale.getDefault())
-            val md = sdfMonthDay.format(java.util.Date())
-            md == "01-01" || md == "04-30" || md == "05-01" || md == "09-02"
-        } -> config?.heSoOtNgayLe ?: 3.0
+        com.example.data.SalaryCalculator.isHoliday(todayYmd) -> config?.heSoOtNgayLe ?: 3.0
+        cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY ->
+            if (isNight) (config?.heSoOtChuNhatDem ?: 2.7) else (config?.heSoOtChuNhat ?: 2.0)
+        isNight -> config?.heSoOtDem ?: 1.8
         else -> 1.0
     }
 }
 
 private fun getCoeffLabel(config: com.example.data.model.UserConfig?): String {
+    val df = DecimalFormat("#.##")
+    val cal = Calendar.getInstance()
+    val hour = cal.get(Calendar.HOUR_OF_DAY)
+    val isNight = hour >= 18 || hour < 6
+    val todayYmd = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
     return when {
-        Calendar.getInstance().get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY -> " (Chủ nhật x2)"
-        run {
-            val sdfMonthDay = SimpleDateFormat("MM-dd", java.util.Locale.getDefault())
-            val md = sdfMonthDay.format(java.util.Date())
-            md == "01-01" || md == "04-30" || md == "05-01" || md == "09-02"
-        } -> " (Ngày lễ x3)"
+        com.example.data.SalaryCalculator.isHoliday(todayYmd) -> " (Ngày lễ x${df.format(config?.heSoOtNgayLe ?: 3.0)})"
+        cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY ->
+            if (isNight) " (CN đêm x${df.format(config?.heSoOtChuNhatDem ?: 2.7)})" else " (Chủ nhật x${df.format(config?.heSoOtChuNhat ?: 2.0)})"
+        isNight -> " (OT đêm x${df.format(config?.heSoOtDem ?: 1.8)})"
         else -> ""
     }
 }
@@ -2469,24 +2474,18 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
                        inHour >= 22 || inHour <= 6 || 
                        processed.dayType == "NIGHT" || shift.shiftType == "NIGHT" || shift.shiftId == "ca_dem"
 
-    val isSunday = processed.dayType == "SUNDAY" || (run {
-        try {
-            val parser = if (processed.date.contains("/")) SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) else SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val dateVal = parser.parse(processed.date)
-            if (dateVal != null) {
-                val cal = Calendar.getInstance()
-                cal.time = dateVal
-                cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
-            } else false
-        } catch (e: Exception) { false }
-    } && (processed.dayType == "NIGHT" || isNightShift || processed.dayType == "SUNDAY"))
+    val isSunday = processed.dayType == "SUNDAY" || com.example.data.SalaryCalculator.isSunday(processed.date)
 
-    val isHoliday = com.example.data.SalaryCalculator.isHoliday(processed.date)
+    val isHoliday = processed.dayType == "HOLIDAY" || com.example.data.SalaryCalculator.isHoliday(processed.date)
+
+    val dfCoeff = DecimalFormat("#.##")
+    val sundayCoeff = if (isNightShift) config.heSoOtChuNhatDem else config.heSoOtChuNhat
+    val weekdayOtCoeff = if (isNightShift) config.heSoOtDem else config.heSoOtNgayThuong
 
     val dayTypeLabel = when {
-        isHoliday -> "Ngày Lễ (Hệ số ${DecimalFormat("#.#").format(config.heSoOtNgayLe)})"
-        isSunday -> "Chủ Nhật (Hệ số ${DecimalFormat("#.#").format(config.heSoOtChuNhat)})"
-        else -> "Ngày thường (Hệ số ${DecimalFormat("#.#").format(config.heSoOtNgayThuong)})"
+        isHoliday -> "Ngày Lễ (Hệ số ${dfCoeff.format(config.heSoOtNgayLe)})"
+        isSunday -> "Chủ Nhật ${if (isNightShift) "Ca đêm" else "Ca ngày"} (Hệ số ${dfCoeff.format(sundayCoeff)})"
+        else -> "Ngày thường (OT ${dfCoeff.format(weekdayOtCoeff)})"
     }
 
     val shiftName = if (isNightShift) "Ca đêm" else "Ca ngày"
@@ -2500,11 +2499,11 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     } else "--"
 
     if (processed.checkOutTime == null) {
-        val amount = if (isSunday) 8.0 * hourlySalary * config.heSoOtChuNhat else dailySalary
+        val amount = if (isSunday) 8.0 * hourlySalary * sundayCoeff else dailySalary
         items.add(
             ShiftEarningsBreakdownItem(
                 name = if (isSunday) "Lương ca Chủ Nhật (Đang trong ca)" else "Lương ngày công tiêu chuẩn",
-                formula = if (isSunday) "8.0 giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${config.heSoOtChuNhat}" else "1 ngày công dự kiến",
+                formula = if (isSunday) "8.0 giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${dfCoeff.format(sundayCoeff)}" else "1 ngày công dự kiến",
                 amount = amount,
                 icon = Icons.Default.AccessTime,
                 iconTint = if (isSunday) AccentOrange else PrimaryBlue
@@ -2532,7 +2531,7 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     val rawDurationMs = (finalCheckOut - finalCheckIn).coerceAtLeast(0L)
     val durationMs = Math.round(rawDurationMs / 60000.0) * 60000L
     val rawHours = durationMs / 3600000.0
-    val breakHours = if (config.tinhKhauTruNghi) config.soGioNghiGiaiLao else 0.0
+    val breakHours = processed.customBreakHours ?: 0.0
     val actualHours = (rawHours - breakHours).coerceAtLeast(0.0)
 
     val finalStandardHours = processed.workDay * 8.0
@@ -2540,11 +2539,11 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
 
     // 1. Tiền lương ca làm việc cơ bản / chuẩn
     if (isSunday) {
-        val sunAmount = actualHours * hourlySalary * config.heSoOtChuNhat
+        val sunAmount = actualHours * hourlySalary * sundayCoeff
         items.add(
             ShiftEarningsBreakdownItem(
-                name = "Tiền lương ca Chủ Nhật",
-                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtChuNhat)} (Hệ số CN)",
+                name = if (isNightShift) "Tiền lương ca Chủ Nhật (Ca đêm)" else "Tiền lương ca Chủ Nhật (Ca ngày)",
+                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${dfCoeff.format(sundayCoeff)} (Hệ số CN)",
                 amount = sunAmount,
                 icon = Icons.Default.AccessTime,
                 iconTint = AccentOrange
@@ -2555,7 +2554,7 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
         items.add(
             ShiftEarningsBreakdownItem(
                 name = "Tiền lương ca Ngày Lễ",
-                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtNgayLe)} (Hệ số Lễ)",
+                formula = "${DecimalFormat("#.##").format(actualHours)} giờ × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${dfCoeff.format(config.heSoOtNgayLe)} (Hệ số Lễ)",
                 amount = holAmount,
                 icon = Icons.Default.AccessTime,
                 iconTint = DangerRed
@@ -2573,11 +2572,11 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
             )
         )
         if (finalOtHours > 0.0) {
-            val otAmount = finalOtHours * hourlySalary * config.heSoOtNgayThuong
+            val otAmount = finalOtHours * hourlySalary * weekdayOtCoeff
             items.add(
                 ShiftEarningsBreakdownItem(
-                    name = "Tiền tăng ca (OT ngày thường)",
-                    formula = "${DecimalFormat("#.##").format(finalOtHours)} giờ OT × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${DecimalFormat("#.#").format(config.heSoOtNgayThuong)}",
+                    name = if (isNightShift) "Tiền tăng ca (OT đêm thường)" else "Tiền tăng ca (OT ngày thường)",
+                    formula = "${DecimalFormat("#.##").format(finalOtHours)} giờ OT × ${DecimalFormat("#,###").format(hourlySalary)} đ/g × ${dfCoeff.format(weekdayOtCoeff)}",
                     amount = otAmount,
                     icon = Icons.Default.TrendingUp,
                     iconTint = AccentOrange
@@ -2588,16 +2587,18 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
 
     // 2. Phụ cấp ca đêm
     if (isNightShift) {
-        val pcDemVal = if (config.pcCaDem > 0) config.pcCaDem else 100000.0
-        items.add(
-            ShiftEarningsBreakdownItem(
-                name = "Phụ cấp ca đêm",
-                formula = "Hỗ trợ làm việc ca đêm (+${DecimalFormat("#,###").format(pcDemVal)} đ/ca)",
-                amount = pcDemVal,
-                icon = Icons.Default.NightsStay,
-                iconTint = NightPurple
+        val pcDemVal = config.pcCaDem
+        if (pcDemVal > 0) {
+            items.add(
+                ShiftEarningsBreakdownItem(
+                    name = "Phụ cấp ca đêm",
+                    formula = "Hỗ trợ làm việc ca đêm (+${DecimalFormat("#,###").format(pcDemVal)} đ/ca)",
+                    amount = pcDemVal,
+                    icon = Icons.Default.NightsStay,
+                    iconTint = NightPurple
+                )
             )
-        )
+        }
     }
 
     // 3. Phụ cấp cơm ca
@@ -2617,13 +2618,14 @@ private fun getDayEarningsBreakdown(entry: TimeEntry, config: com.example.data.m
     }
 
     // 4. Phụ cấp cơm tăng ca (OT)
-    if (finalOtHours >= 2.0 || (finalOtHours >= 1.0 && config.pcComOt > 0)) {
+    val otMealThreshold = if (config.getCalcTypeFor("pcComOt") == "OT_MEAL_GE_1H") 1.0 else 2.0
+    if (finalOtHours >= otMealThreshold) {
         val comOtVal = if (config.pcComOt > 0) config.pcComOt else if (config.pcComCa > 0) config.pcComCa else 0.0
         if (comOtVal > 0) {
             items.add(
                 ShiftEarningsBreakdownItem(
                     name = "Phụ cấp cơm tăng ca (OT)",
-                    formula = "Tăng ca ${DecimalFormat("#.##").format(finalOtHours)} giờ (≥ 2.0g)",
+                    formula = "Tăng ca ${DecimalFormat("#.##").format(finalOtHours)} giờ (≥ ${dfCoeff.format(otMealThreshold)}g)",
                     amount = comOtVal,
                     icon = Icons.Default.Fastfood,
                     iconTint = AccentOrange

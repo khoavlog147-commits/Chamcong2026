@@ -75,7 +75,11 @@ data class SalarySummary(
     val otLeHours: Double = 0.0,
     val tienOtLe: Double = 0.0,
     val actualPresenceDays: Double = 0.0,
-    val actualStandardWorkingDays: Double = 0.0
+    val actualStandardWorkingDays: Double = 0.0,
+    val tienThueTncn: Double = 0.0,
+    val tienPhatChuyenCan: Double = 0.0,
+    val forgotPunchCount: Int = 0,
+    val totalLateEarlyMinutes: Int = 0
 )
 
 object ExportUtils {
@@ -296,7 +300,11 @@ object ExportUtils {
             otLeHours = vmSummary.otLeHours,
             tienOtLe = vmSummary.tienOtLe,
             actualPresenceDays = vmSummary.actualPresenceDays,
-            actualStandardWorkingDays = vmSummary.actualStandardWorkingDays
+            actualStandardWorkingDays = vmSummary.actualStandardWorkingDays,
+            tienThueTncn = vmSummary.tienThueTncn,
+            tienPhatChuyenCan = vmSummary.tienPhatChuyenCan,
+            forgotPunchCount = vmSummary.forgotPunchCount,
+            totalLateEarlyMinutes = vmSummary.totalLateEarlyMinutes
         )
     }
 
@@ -448,7 +456,7 @@ object ExportUtils {
 
         val projSunNightHoursPNG = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPNG else 0.0
         val totalSunNightHoursPNG = summary.chuNhatNightHours + projSunNightHoursPNG
-        val totalSunNightPayPNG = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPNG * hourlySalaryPNG * config.heSoOtChuNhat else 0.0)
+        val totalSunNightPayPNG = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPNG * hourlySalaryPNG * config.heSoOtChuNhatDem else 0.0)
 
         val projOtNightHoursPNG = if (selectedTab == 1) customOt15DaysCountNight * dailyOtHoursMaxPNG else 0.0
         val totalOtNightHoursPNG = summary.otNightHours + projOtNightHoursPNG
@@ -492,6 +500,7 @@ object ExportUtils {
         if (summary.tienBh > 0.0) totalRowCount++
         if (summary.tamUng > 0.0) totalRowCount++
         if (summary.doanPhi > 0.0) totalRowCount++
+        if (summary.tienThueTncn > 0.0) totalRowCount++
         if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) totalRowCount++
 
         // 2. Create offline Bitmap with Dynamic Height
@@ -621,7 +630,7 @@ object ExportUtils {
 
         if (totalSunDayHoursPNG > 0.0) drawRow("OT CN - Ca ngày ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunDayHoursPNG)}h)", "+${fmt.format(totalSunDayPayPNG)}đ", paintGreen)
 
-        if (totalSunNightHoursPNG > 0.0) drawRow("OT CN - Ca đêm ${df.format(config.heSoOtChuNhat)} (${df.format(totalSunNightHoursPNG)}h)", "+${fmt.format(totalSunNightPayPNG)}đ", paintGreen)
+        if (totalSunNightHoursPNG > 0.0) drawRow("OT CN - Ca đêm ${df.format(config.heSoOtChuNhatDem)} (${df.format(totalSunNightHoursPNG)}h)", "+${fmt.format(totalSunNightPayPNG)}đ", paintGreen)
 
         if (totalSunDayHoursPNG == 0.0 && totalSunNightHoursPNG == 0.0 && summary.tienChuNhat > 0.0) {
             drawRow("OT chủ nhật ${df.format(config.heSoOtChuNhat)} (${df.format(summary.chuNhatHours)}h)", "+${fmt.format(summary.tienChuNhat)}đ", paintGreen)
@@ -641,6 +650,7 @@ object ExportUtils {
         if (summary.tienBh > 0.0) drawRow("Bảo hiểm xã hội (10.5%)", "-${fmt.format(summary.tienBh)}đ", paintRed)
         if (summary.tamUng > 0.0) drawRow("Tạm ứng lương", "-${fmt.format(summary.tamUng)}đ", paintRed)
         if (summary.doanPhi > 0.0) drawRow("Kinh phí công đoàn", "-${fmt.format(summary.doanPhi)}đ", paintRed)
+        if (summary.tienThueTncn > 0.0) drawRow("Thuế TNCN thử việc (10%)", "-${fmt.format(summary.tienThueTncn)}đ", paintRed)
         if (selectedTab == 0 && summary.tienKhauTruNghi > 0.0) {
             val missed = ((if (summary.isCurrentMonth) summary.expectedWorkDays else summary.standardWorkDays).toDouble() - summary.workingDays).coerceAtLeast(0.0)
             drawRow("Khấu trừ nghỉ vắng (${df.format(missed)} ngày)", "-${fmt.format(summary.tienKhauTruNghi)}đ", paintRed)
@@ -1048,7 +1058,7 @@ object ExportUtils {
 
         val projSunNightHoursPDF = if (selectedTab == 1 && includeSundayInProjection) remainingSundaysNight * sundayHoursPerShiftPDF else 0.0
         val totalSunNightHoursPDF = summary.chuNhatNightHours + projSunNightHoursPDF
-        val otSundayNightPay = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPDF * (dailySalary / 8.0) * config.heSoOtChuNhat else 0.0)
+        val otSundayNightPay = summary.tienChuNhatDem + (if (selectedTab == 1 && includeSundayInProjection) projSunNightHoursPDF * (dailySalary / 8.0) * config.heSoOtChuNhatDem else 0.0)
 
         val otSundayPay = otSundayDayPay + otSundayNightPay
         val otHolidayPay = summary.tienOtLe

@@ -1092,7 +1092,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
         checkOutMin: Int?,
         dayTypeOverride: String? = null,
         noteStr: String? = null,
-        customBreakDeduction: Boolean? = null
+        customBreakDeduction: Boolean? = null,
+        isForgotPunch: Boolean = false
     ) {
         val session = currentUserSession.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
@@ -1234,7 +1235,8 @@ class TimeSnapViewModel(application: Application) : AndroidViewModel(application
                 note = noteStr,
                 shiftId = sId,
                 shiftType = sType,
-                customBreakDeduction = customBreakDeduction
+                customBreakDeduction = customBreakDeduction,
+                isForgotPunch = if (isLeave) false else isForgotPunch
             )
 
             val calculated = com.example.data.SalaryCalculator.calculateSingleEntry(newEntry, userConfig.value)
@@ -1989,5 +1991,9 @@ data class SalarySummary(
     val otLeHours: Double = 0.0,
     val tienOtLe: Double = 0.0,
     val actualPresenceDays: Double = 0.0,
-    val actualStandardWorkingDays: Double = 0.0
+    val actualStandardWorkingDays: Double = 0.0,
+    val tienThueTncn: Double = 0.0,
+    val tienPhatChuyenCan: Double = 0.0,
+    val forgotPunchCount: Int = 0,
+    val totalLateEarlyMinutes: Int = 0
 )

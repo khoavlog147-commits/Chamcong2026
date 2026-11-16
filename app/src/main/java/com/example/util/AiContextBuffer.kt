@@ -132,7 +132,7 @@ object AiContextBuffer {
             * Công ty: ${c.companyName} | Lịch trình/Ca: ${c.lichTrinh} | Ngày vào làm: ${c.ngayVaoLam.ifBlank { "Chưa cập nhật" }}
             * Lương cơ bản HĐ: ${fmt.format(c.luongCoBan)}đ | Lương đóng BHXH: ${fmt.format(c.luongDongBaoHiem)}đ (${c.tiLeDongBaoHiem}%)
             * Đoàn phí công đoàn: ${fmt.format(c.doanPhiCongDoan)}đ | Ngày chốt lương: Ngày ${c.ngayChotLuong} hàng tháng
-            * Hệ số Tăng ca: Ngày thường x${c.heSoOtNgayThuong} | Chủ nhật x${c.heSoOtChuNhat} | Ngày lễ x${c.heSoOtNgayLe} | Ca đêm x${c.heSoOtDem} (Ca đêm: ${c.caDemStart} - ${c.caDemEnd})
+            * Hệ số Tăng ca: Ngày thường x${c.heSoOtNgayThuong} | OT đêm x${c.heSoOtDem} | CN ngày x${c.heSoOtChuNhat} | CN đêm x${c.heSoOtChuNhatDem} | Ngày lễ x${c.heSoOtNgayLe} (Ca đêm: ${c.caDemStart} - ${c.caDemEnd})
             * Giờ nghỉ giải lao: ${c.soGioNghiGiaiLao}g (${if (c.tinhKhauTruNghi) "Có trừ vào tổng giờ công" else "Không trừ vào tổng giờ công"})
             * Quỹ phép năm: ${c.soNgayPhepNam} ngày (Còn lại: ${c.phepNamConLai} ngày) | Chuyên cần gốc: ${fmt.format(c.tienChuyenCanGoc)}đ
             * Chi tiết 12 khoản phụ cấp & hỗ trợ:

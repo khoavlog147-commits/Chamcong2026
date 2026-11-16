@@ -10,7 +10,7 @@ import com.example.data.model.SalaryAdvance
 import com.example.data.model.TimeEntry
 import com.example.data.model.UserConfig
 
-@Database(entities = [TimeEntry::class, UserConfig::class, SalaryAdvance::class], version = 10, exportSchema = false)
+@Database(entities = [TimeEntry::class, UserConfig::class, SalaryAdvance::class], version = 11, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timeEntryDao(): TimeEntryDao
     abstract fun userConfigDao(): UserConfigDao
@@ -49,6 +49,14 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE user_config ADD COLUMN heSoOtChuNhatDem REAL NOT NULL DEFAULT 2.7")
+                db.execSQL("ALTER TABLE user_config ADD COLUMN isThuViec INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE time_entries ADD COLUMN isForgotPunch INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -56,7 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "timesnap_pro_db"
                 )
-                .addMigrations(MIGRATION_5_6, MIGRATION_7_8, MIGRATION_9_10)
+                .addMigrations(MIGRATION_5_6, MIGRATION_7_8, MIGRATION_9_10, MIGRATION_10_11)
                 .fallbackToDestructiveMigration() // safe for production prototyping iteration
                 .build()
                 INSTANCE = instance

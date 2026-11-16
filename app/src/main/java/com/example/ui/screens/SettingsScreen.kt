@@ -65,12 +65,14 @@ import com.example.ui.theme.DarkContainer
 import com.example.ui.theme.LightGray
 import com.example.ui.theme.MediumGray
 import com.example.ui.theme.NeonBlue
+import com.example.ui.theme.NightPurple
 import com.example.ui.theme.AccentGreen
 import com.example.ui.theme.AccentOrange
 import com.example.ui.theme.AccentRed
 import com.example.ui.theme.White
 import com.example.viewmodel.TimeSnapViewModel
 import java.text.DecimalFormat
+import java.util.Calendar
 
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.OffsetMapping
@@ -246,8 +248,10 @@ fun SettingsScreen(
 
     var heSoOtNgayThuong by remember { mutableStateOf("") }
     var heSoOtChuNhat by remember { mutableStateOf("") }
+    var heSoOtChuNhatDem by remember { mutableStateOf("") }
     var heSoOtNgayLe by remember { mutableStateOf("") }
     var heSoOtDem by remember { mutableStateOf("") }
+    var isThuViec by remember { mutableStateOf(false) }
 
     var tienChuyenCanGoc by remember { mutableStateOf("") }
     var soNgayPhepNam by remember { mutableStateOf("") }
@@ -293,8 +297,10 @@ fun SettingsScreen(
 
             heSoOtNgayThuong = c.heSoOtNgayThuong.toString()
             heSoOtChuNhat = c.heSoOtChuNhat.toString()
+            heSoOtChuNhatDem = c.heSoOtChuNhatDem.toString()
             heSoOtNgayLe = c.heSoOtNgayLe.toString()
             heSoOtDem = c.heSoOtDem.toString()
+            isThuViec = c.isThuViec
 
             tienChuyenCanGoc = c.tienChuyenCanGoc.toLong().toString()
             soNgayPhepNam = c.soNgayPhepNam.toString()
@@ -332,11 +338,13 @@ fun SettingsScreen(
 
     val otThuongCoeff = heSoOtNgayThuong.toDoubleOrNull() ?: 1.5
     val otCnCoeff = heSoOtChuNhat.toDoubleOrNull() ?: 2.0
+    val otCnDemCoeff = heSoOtChuNhatDem.toDoubleOrNull() ?: 2.7
     val otLeCoeff = heSoOtNgayLe.toDoubleOrNull() ?: 3.0
-    val otDemCoeff = heSoOtDem.toDoubleOrNull() ?: 1.75
+    val otDemCoeff = heSoOtDem.toDoubleOrNull() ?: 1.8
 
     val otThuongPrice = hourlyPrice * otThuongCoeff
     val otCnPrice = hourlyPrice * otCnCoeff
+    val otCnDemPrice = hourlyPrice * otCnDemCoeff
     val otLePrice = hourlyPrice * otLeCoeff
     val otDemPrice = hourlyPrice * otDemCoeff
 
@@ -370,10 +378,11 @@ fun SettingsScreen(
                 luongDongBaoHiem = sLbh.toDoubleOrNull() ?: 0.0,
                 tiLeDongBaoHiem = tiLeDongBaoHiem.toDoubleOrNull() ?: 0.0,
                 doanPhiCongDoan = sDp.toDoubleOrNull() ?: 0.0,
-                heSoOtNgayThuong = heSoOtNgayThuong.toDoubleOrNull() ?: 0.0,
-                heSoOtChuNhat = heSoOtChuNhat.toDoubleOrNull() ?: 0.0,
-                heSoOtNgayLe = heSoOtNgayLe.toDoubleOrNull() ?: 0.0,
-                heSoOtDem = heSoOtDem.toDoubleOrNull() ?: 0.0,
+                heSoOtNgayThuong = heSoOtNgayThuong.toDoubleOrNull() ?: current.heSoOtNgayThuong,
+                heSoOtChuNhat = heSoOtChuNhat.toDoubleOrNull() ?: current.heSoOtChuNhat,
+                heSoOtChuNhatDem = heSoOtChuNhatDem.toDoubleOrNull() ?: current.heSoOtChuNhatDem,
+                heSoOtNgayLe = heSoOtNgayLe.toDoubleOrNull() ?: current.heSoOtNgayLe,
+                heSoOtDem = heSoOtDem.toDoubleOrNull() ?: current.heSoOtDem,
                 tienChuyenCanGoc = sCc.toDoubleOrNull() ?: 0.0,
                 soNgayPhepNam = soNgayPhepNam.toIntOrNull() ?: 0,
                 phepNamConLai = phepNamConLai.toIntOrNull() ?: 0,
@@ -393,7 +402,8 @@ fun SettingsScreen(
                 pcThamNien = pcThamNien.replace(".", "").toDoubleOrNull() ?: 0.0,
                 allowanceCalcTypes = allowanceCalcTypesMap.entries.joinToString(";") { "${it.key}:${it.value}" },
                 tinhKhauTruNghi = tinhKhauTruNghi,
-                soGioNghiGiaiLao = interpretBreakHours(soGioNghiGiaiLao, 0.0).third
+                soGioNghiGiaiLao = interpretBreakHours(soGioNghiGiaiLao, 0.0).third,
+                isThuViec = isThuViec
             )
             viewModel.updateSalaryConfig(updated)
         }
@@ -841,6 +851,43 @@ fun SettingsScreen(
                         visualTransformation = ThousandSeparatorVisualTransformation()
                     )
 
+                    // Probation toggle (10% PIT)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF1E1E1E), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Chế độ Thử việc (Thuế TNCN 10%)",
+                                color = White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Tạm khấu trừ 10% thuế TNCN; chuyên cần tính theo công thực tế & mất nếu nghỉ.",
+                                color = LightGray,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Switch(
+                            checked = isThuViec,
+                            onCheckedChange = {
+                                isThuViec = it
+                                saveChanges()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = White,
+                                checkedTrackColor = AccentOrange,
+                                uncheckedThumbColor = MediumGray,
+                                uncheckedTrackColor = Color(0xFF2B2B2B)
+                            )
+                        )
+                    }
+
                     // Dynamic calculated cost
                     Box(
                         modifier = Modifier
@@ -857,6 +904,38 @@ fun SettingsScreen(
                             lineHeight = 16.sp
                         )
                     }
+
+                    OutlinedButton(
+                        onClick = {
+                            luongCoBan = if (isThuViec) "5310000" else "5681700"
+                            heSoOtNgayThuong = "1.5"
+                            heSoOtDem = "1.8"
+                            heSoOtChuNhat = "2.0"
+                            heSoOtChuNhatDem = "2.7"
+                            heSoOtNgayLe = "3.0"
+                            tienChuyenCanGoc = "300000"
+                            pcHieuSuat = if (isThuViec) "0" else "500000"
+                            pcKhac1 = "500000"
+                            pcComCa = "25000"
+                            pcComOt = "25000"
+                            tinhKhauTruNghi = true
+                            soGioNghiGiaiLao = "1.5"
+                            allowanceCalcTypesMap = allowanceCalcTypesMap.toMutableMap().apply {
+                                put("pcComCa", "PER_WORK_DAY")
+                                put("pcComOt", "OT_MEAL_GE_2H")
+                                put("tienChuyenCanGoc", "MONTHLY_FLAT")
+                            }
+                            saveChanges()
+                            Toast.makeText(context, "Đã áp dụng mẫu chuẩn Bestar Tools (vẫn sửa tự do từng mục)!", Toast.LENGTH_SHORT).show()
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, NeonBlue.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth().testTag("apply_bestar_preset_button")
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = NeonBlue, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Áp dụng mẫu chuẩn Bestar Tools", color = NeonBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
@@ -868,18 +947,18 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ConfigInputField(
-                            label = "Ngày thường",
+                            label = "Ngày thường (Ca ngày)",
                             value = heSoOtNgayThuong,
                             onValueChange = { heSoOtNgayThuong = it; saveChanges() },
                             keyboardType = KeyboardType.Decimal,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("ot_weekday_day_input")
                         )
                         ConfigInputField(
-                            label = "Chủ nhật",
-                            value = heSoOtChuNhat,
-                            onValueChange = { heSoOtChuNhat = it; saveChanges() },
+                            label = "OT đêm (Ngày thường)",
+                            value = heSoOtDem,
+                            onValueChange = { heSoOtDem = it; saveChanges() },
                             keyboardType = KeyboardType.Decimal,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("ot_weekday_night_input")
                         )
                     }
                     Row(
@@ -887,19 +966,48 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ConfigInputField(
-                            label = "Ngày Lễ",
+                            label = "Chủ nhật (Ca ngày)",
+                            value = heSoOtChuNhat,
+                            onValueChange = { heSoOtChuNhat = it; saveChanges() },
+                            keyboardType = KeyboardType.Decimal,
+                            modifier = Modifier.weight(1f).testTag("ot_sunday_day_input")
+                        )
+                        ConfigInputField(
+                            label = "Chủ nhật (Ca đêm)",
+                            value = heSoOtChuNhatDem,
+                            onValueChange = { heSoOtChuNhatDem = it; saveChanges() },
+                            keyboardType = KeyboardType.Decimal,
+                            modifier = Modifier.weight(1f).testTag("ot_sunday_night_input")
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Bottom
+                    ) {
+                        ConfigInputField(
+                            label = "Ngày Lễ / Tết",
                             value = heSoOtNgayLe,
                             onValueChange = { heSoOtNgayLe = it; saveChanges() },
                             keyboardType = KeyboardType.Decimal,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f).testTag("ot_holiday_input")
                         )
-                        ConfigInputField(
-                            label = "OT đêm",
-                            value = heSoOtDem,
-                            onValueChange = { heSoOtDem = it; saveChanges() },
-                            keyboardType = KeyboardType.Decimal,
-                            modifier = Modifier.weight(1f)
-                        )
+                        OutlinedButton(
+                            onClick = {
+                                heSoOtNgayThuong = "1.5"
+                                heSoOtDem = "1.8"
+                                heSoOtChuNhat = "2.0"
+                                heSoOtChuNhatDem = "2.7"
+                                heSoOtNgayLe = "3.0"
+                                saveChanges()
+                                Toast.makeText(context, "Đã đặt hệ số 1.5 / 1.8 / 2.0 / 2.7 / 3.0", Toast.LENGTH_SHORT).show()
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, NeonBlue.copy(alpha = 0.4f)),
+                            modifier = Modifier.weight(1f).height(52.dp).testTag("reset_ot_coeffs_button")
+                        ) {
+                            Text("Chuẩn 1.5 - 1.8 - 2.0 - 2.7", color = NeonBlue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     // Simulated live estimate
@@ -912,26 +1020,32 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "• Tiền OT Ngày thường (${heSoOtNgayThuong}x): ${dec.format(otThuongPrice)} đ/giờ",
+                            text = "• OT Ngày thường - Ca ngày (${heSoOtNgayThuong}x): ${dec.format(otThuongPrice)} đ/giờ",
                             color = LightGray,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "• Tiền OT Chủ nhật (${heSoOtChuNhat}x): ${dec.format(otCnPrice)} đ/giờ",
+                            text = "• OT Ngày thường - Ca đêm (${heSoOtDem}x): ${dec.format(otDemPrice)} đ/giờ",
+                            color = NeonBlue,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "• OT Chủ nhật - Ca ngày (${heSoOtChuNhat}x): ${dec.format(otCnPrice)} đ/giờ",
                             color = AccentRed,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "• Tiền OT Ngày Lễ (${heSoOtNgayLe}x): ${dec.format(otLePrice)} đ/giờ",
-                            color = AccentOrange,
+                            text = "• OT Chủ nhật - Ca đêm (${heSoOtChuNhatDem}x): ${dec.format(otCnDemPrice)} đ/giờ",
+                            color = NightPurple,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "• Tiền OT Đêm (${heSoOtDem}x): ${dec.format(otDemPrice)} đ/giờ",
-                            color = NeonBlue,
+                            text = "• OT Ngày Lễ (${heSoOtNgayLe}x): ${dec.format(otLePrice)} đ/giờ",
+                            color = AccentOrange,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -1227,6 +1341,38 @@ fun SettingsScreen(
                                 activeEditingAllowanceType = allowanceCalcTypesMap["pcThamNien"] ?: com.example.data.model.UserConfig.getDefaultCalcType("pcThamNien")
                             }
                         )
+                        if (ngayVaoLam.length >= 10) {
+                            val yearsServed = remember(ngayVaoLam) {
+                                try {
+                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                                    val joinDate = sdf.parse(ngayVaoLam)
+                                    if (joinDate != null) {
+                                        val jCal = Calendar.getInstance().apply { time = joinDate }
+                                        val nowCal = Calendar.getInstance()
+                                        var yrs = nowCal.get(Calendar.YEAR) - jCal.get(Calendar.YEAR)
+                                        if (nowCal.get(Calendar.DAY_OF_YEAR) < jCal.get(Calendar.DAY_OF_YEAR)) yrs--
+                                        yrs.coerceAtLeast(0)
+                                    } else 0
+                                } catch (e: Exception) { 0 }
+                            }
+                            if (yearsServed > 0) {
+                                val suggestedSeniority = yearsServed * 200000L
+                                TextButton(
+                                    onClick = {
+                                        pcThamNien = suggestedSeniority.toString()
+                                        saveChanges()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Text(
+                                        text = "Áp dụng thâm niên $yearsServed năm (${DecimalFormat("#,###").format(suggestedSeniority)}đ = 200k/năm)",
+                                        color = NeonBlue,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                         AllowanceRowItem(
                             name = "13. Sản phẩm",
                             value = pcSanPham,
@@ -2222,7 +2368,8 @@ fun AllowanceRowItem(
         "MONTHLY_PRO_RATED" -> "Theo tháng (/26)"
         "MONTHLY_FLAT" -> "Tháng cố định"
         "PER_WORK_DAY" -> "Theo ngày công"
-        "OT_MEAL_GE_2H", "OT_MEAL_GE_1H" -> "Cơm OT ≥ 1h"
+        "OT_MEAL_GE_2H" -> "Cơm OT ≥ 2h"
+        "OT_MEAL_GE_1H" -> "Cơm OT ≥ 1h"
         "PER_NIGHT_SHIFT" -> "Số ca đêm"
         else -> "Theo tháng (/26)"
     }
@@ -2344,11 +2491,12 @@ fun AllowanceEditDialog(
                         "MONTHLY_PRO_RATED" to ("Theo tháng (/26)" to "Chia 26 ngày công chuẩn và nhân ngày làm thực tế"),
                         "MONTHLY_FLAT" to ("Tháng cố định" to "Hưởng đủ 100% cố định không tính theo ngày công"),
                         "PER_WORK_DAY" to ("Theo ngày công" to "Cộng thêm theo số ngày đi làm thực tế"),
+                        "OT_MEAL_GE_2H" to ("Cơm OT ≥ 2h" to "Nhân với số ngày tăng ca từ 2 giờ trở lên (chuẩn Bestar)"),
                         "OT_MEAL_GE_1H" to ("Cơm OT ≥ 1h" to "Nhân với số ngày tăng ca từ 1 giờ trở lên"),
                         "PER_NIGHT_SHIFT" to ("Theo số ca đêm" to "Nhân trực tiếp với số ca làm việc ban đêm")
                     ).forEach { (typeKey, info) ->
                         val (typeLabel, description) = info
-                        val isSelected = selectedType == typeKey || (typeKey == "OT_MEAL_GE_1H" && selectedType == "OT_MEAL_GE_2H")
+                        val isSelected = selectedType == typeKey
                         
                         Box(
                             modifier = Modifier
