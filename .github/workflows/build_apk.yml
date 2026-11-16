@@ -32,10 +32,29 @@ jobs:
         mkdir -p app
         if [ -n "$GOOGLE_SERVICES_DATA" ]; then
           printf '%s\n' "$GOOGLE_SERVICES_DATA" > app/google-services.json
-          echo "Created app/google-services.json from secret."
+          python3 -c '
+          import json
+          p = "app/google-services.json"
+          pkg = "com.aistudio.timesnap.abxyz"
+          with open(p, "r", encoding="utf-8") as f:
+              d = json.load(f)
+          pid = d.get("project_info", {}).get("project_id")
+          clients = d.get("client", [])
+          ok = any(x.get("client_info", {}).get("android_client_info", {}).get("package_name") == pkg for x in clients)
+          if not ok and clients:
+              cloned = json.loads(json.dumps(clients[0]))
+              cloned.setdefault("client_info", {}).setdefault("android_client_info", {})["package_name"] = pkg
+              clients.append(cloned)
+              d["client"] = clients
+              with open(p, "w", encoding="utf-8") as f:
+                  json.dump(d, f, indent=2)
+              print(f"::warning::Added compatibility client for {pkg} in project {pid}")
+          else:
+              print(f"Verified google-services.json for project {pid}")
+          '
         elif [ ! -f "app/google-services.json" ]; then
+          echo "::warning::Secret GOOGLE_SERVICES_JSON is not set! Building with placeholder config — Firebase server login will NOT work until you add GOOGLE_SERVICES_JSON in GitHub Repository Secrets."
           printf '%s\n' '{"project_info":{"project_number":"123456789012","project_id":"timesnap-placeholder","storage_bucket":"timesnap-placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef1234567890","android_client_info":{"package_name":"com.aistudio.timesnap.abxyz"}},"oauth_client":[],"api_key":[{"current_key":"placeholder-api-key-for-ci"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
-          echo "Created fallback placeholder app/google-services.json for build."
         fi
 
     - name: Configure .env from Secret

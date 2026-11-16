@@ -1329,6 +1329,36 @@ object FirestoreService {
         }
     }
 
+    suspend fun resolveEmailByEmployeeCode(employeeCode: String): String? {
+        val code = employeeCode.trim()
+        if (code.isBlank()) return null
+        val firestore = getDb() ?: return null
+        return try {
+            val bySalary = kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                firestore.collection("users_salary")
+                    .whereEqualTo("maNhanVien", code)
+                    .limit(1)
+                    .get()
+                    .awaitTaskFirestore()
+            }
+            val email1 = bySalary?.documents?.firstOrNull()?.getString("emailDangKy")?.trim()
+            if (!email1.isNullOrBlank()) return email1.lowercase()
+
+            val byGroup = kotlinx.coroutines.withTimeoutOrNull(4000L) {
+                firestore.collectionGroup("salary_config")
+                    .whereEqualTo("maNhanVien", code)
+                    .limit(1)
+                    .get()
+                    .awaitTaskFirestore()
+            }
+            val email2 = byGroup?.documents?.firstOrNull()?.getString("emailDangKy")?.trim()
+            if (!email2.isNullOrBlank()) email2.lowercase() else null
+        } catch (e: Exception) {
+            Log.w(TAG, "Cannot resolve employee code $code from Firestore: ${e.message}")
+            null
+        }
+    }
+
     suspend fun deleteUserFully(userId: String) {
         if (userId.startsWith("demo") || userId.contains("demo")) return
         val firestore = getDb() ?: return
