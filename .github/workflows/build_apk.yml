@@ -91,16 +91,24 @@ jobs:
         if [ ! -f "my-upload-key.jks" ]; then
           cp debug.keystore my-upload-key.jks 2>/dev/null || true
         fi
+        mkdir -p ~/.android
+        cp debug.keystore ~/.android/debug.keystore 2>/dev/null || true
 
     - name: Build Android APK
       env:
         STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
         KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'android' }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'androiddebugkey' }}
         KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
       run: gradle assembleDebug --stacktrace --no-daemon
 
     - name: Verify APK output
-      run: ls -lh app/build/outputs/apk/debug/app-debug.apk
+      run: |
+        ls -lh app/build/outputs/apk/debug/app-debug.apk
+        APKSIGNER=$(find "$ANDROID_HOME/build-tools" "$ANDROID_SDK_ROOT/build-tools" -name apksigner 2>/dev/null | head -n 1 || true)
+        if [ -n "$APKSIGNER" ]; then
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+        fi
 
     - name: Upload APK (Zipped Artifact)
       uses: actions/upload-artifact@v4

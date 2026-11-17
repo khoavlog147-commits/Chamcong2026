@@ -16,15 +16,37 @@ android {
         applicationId = "com.aistudio.timesnap.abxyz"
         minSdk = 25
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val customKeystore = listOfNotNull(
+        System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }?.let { file(it) },
+        rootProject.file("debug.keystore")
+    ).firstOrNull { it.exists() }
+
+    signingConfigs {
+        if (customKeystore != null) {
+            create("customSigning") {
+                storeFile = customKeystore
+                storePassword = System.getenv("STORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
+                keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "androiddebugkey"
+                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "android"
+            }
+        }
+    }
+
+    val activeSigning = signingConfigs.findByName("customSigning") ?: signingConfigs.getByName("debug")
+
     buildTypes {
+        debug {
+            signingConfig = activeSigning
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = activeSigning
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
